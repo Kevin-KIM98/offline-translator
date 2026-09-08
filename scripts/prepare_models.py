@@ -156,6 +156,20 @@ def cmd_manifest(a: argparse.Namespace) -> None:
         }
         print(f"stt: {f.name} ({f.stat().st_size / 1e6:.0f} MB)")
 
+    llm_dir = root / "llm"
+    llm_files = sorted(llm_dir.glob(a.llm_glob)) if llm_dir.exists() else []
+    if llm_files:
+        f = llm_files[0]
+        manifest["llm"] = {
+            "id": f.stem,
+            "version": a.model_version,
+            "filename": f.name,
+            "size_bytes": f.stat().st_size,
+            "sha256": sha256_of(f),
+            "download_url": url("llm", "", f.name),
+        }
+        print(f"llm: {f.name} ({f.stat().st_size / 1e6:.0f} MB)")
+
     nmt_root = root / "nmt"
     tok = nmt_root / "tokenizer"
     if tok.is_dir():
@@ -220,6 +234,10 @@ def cmd_manifest(a: argparse.Namespace) -> None:
             f = stt_files[0]
             lines.append(f"up \"{f.as_posix()}\" \"{flat_name('stt', '', f.name)}\"")
             count += 1
+        if llm_files:
+            f = llm_files[0]
+            lines.append(f"up \"{f.as_posix()}\" \"{flat_name('llm', '', f.name)}\"")
+            count += 1
         for entry in nmt:
             for fi in entry["files"]:
                 lines.append(f"up \"{(nmt_root / entry['dir_name'] / fi['filename']).as_posix()}\" \"{flat_name('nmt', entry['dir_name'], fi['filename'])}\"")
@@ -257,6 +275,7 @@ def main() -> None:
     m.add_argument("--version", default="1.1.0", help="manifest_version")
     m.add_argument("--model-version", default="1", help="per-model version string")
     m.add_argument("--stt-glob", default="*.bin", help="which STT file to reference (e.g. 'whisper-small-*.bin')")
+    m.add_argument("--llm-glob", default="*.gguf", help="which GGUF under <root>/llm to reference")
     m.add_argument("--flat", action="store_true", help="flat asset names (stt_x.bin, nmt_ko-en_model.bin) for GitHub releases")
     m.add_argument("--out", default=None, help="manifest output path (default <root>/manifest.json)")
     m.add_argument("--upload-script", default=None, help="also write a bash script that uploads assets with gh")

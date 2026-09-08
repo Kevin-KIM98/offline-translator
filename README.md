@@ -1,15 +1,24 @@
-# Offline 5-language speech translator
+# Offline 7-language speech translator
 
-On-device, no-network speech translation for **Android and iOS** (Korean · English · Japanese · Chinese · Spanish):
+On-device, no-network speech translation for **Android and iOS** — Korean · English · Spanish ·
+Vietnamese · Thai · Japanese · Chinese, in every direction:
 
 ```
-mic 16 kHz ─► RNNoise ─► VAD segmenter ─► whisper.cpp ─► CTranslate2 (OPUS-MT INT8) ─► OS TTS
-              denoise     utterances       STT (5 langs)    NMT + pivot routing        AVSpeech / android.tts
+mic 16 kHz ─► RNNoise ─► VAD segmenter ─► whisper.cpp ─► translation ─────────────────► OS TTS
+              denoise     utterances       STT + language   Marian INT8 pair when one    AVSpeech /
+                                           auto-detect      exists, else on-device LLM    android.tts
+                                                            (llama.cpp, Qwen2.5-Instruct)
 ```
+
+Two translation engines share one pipeline. **Marian** (CTranslate2 OPUS-MT, ≈ 80 MB per pair) is
+fast and strong for X↔English; the **LLM** (Qwen2.5-1.5B-Instruct Q4, 1.1 GB, via llama.cpp)
+translates any pair in one hop and can detect the source language itself. The default `auto`
+backend uses Marian wherever a pair exists (directly or through English) and the LLM for the rest,
+so the LLM is only downloaded when the chosen languages need it.
 
 Everything runs inside one native library with a C ABI; thin Kotlin and Swift layers add the
-microphone, model download and TTS. Models (≈ 0.2 GB STT + 80 MB per language pair) are fetched on
-first launch from this repo's GitHub releases — no server of your own is needed.
+microphone, model download and TTS. Models are fetched on first launch from this repo's GitHub
+releases — no server of your own is needed.
 
 ## Install in an app
 
@@ -53,6 +62,11 @@ try session.start(sourceLang: "ko", targetLang: "en")
 Both `prepare` calls are safe on every launch: models already on the device are verified against
 the manifest and skipped. Text-only translation is `session.translate(...)`.
 
+`languages` decides what gets downloaded: `["ko","en"]` ≈ 0.5 GB (STT + two Marian pairs);
+`["ko","th"]` adds the LLM (1.1 GB) because no Marian model translates into Thai. Pass
+`backend = LLM` (Kotlin `TranslationBackend.LLM`, Swift `.LLM`) to translate everything with the
+LLM — slower, but a single model for all 42 directions with automatic source-language detection.
+
 ### Self-hosting models
 
 Point `manifestUrl` at your own copy of `assets/manifest.json` (regenerate it with
@@ -64,7 +78,8 @@ Point `manifestUrl` at your own copy of `assets/manifest.json` (regenerate it wi
 |---|---|---|
 | noise suppression + VAD | RNNoise | 30 ms frames, utterance segmentation with pre-roll / hangover |
 | speech recognition | whisper.cpp `small-q5_1` (190 MB) | beam 5, punctuated per-language prompts, conversation context, hallucination filter, adaptive encoder window |
-| translation | CTranslate2 OPUS-MT INT8 (≈ 80 MB / pair) | beam 4, repetition control, sentence batching, English-pivot routing for pairs without a direct model, per-language post-processing |
+| translation (Marian) | CTranslate2 OPUS-MT INT8 (≈ 80 MB / pair, 11 pairs) | beam 4, repetition control, sentence batching, English-pivot routing, per-language post-processing |
+| translation (LLM) | llama.cpp + Qwen2.5-1.5B-Instruct Q4_K_M (1.1 GB) | any→any in one hop, source auto-detect, chat-template prompting, greedy decoding, output cleanup; `scripts/finetune_lora.py` adapts it to your domain |
 | speech output | AVSpeechSynthesizer / android.speech.tts | offline OS voices |
 
 Measured on a desktop CPU (no GPU), Korean speech → English, whisper `small`:
@@ -88,9 +103,14 @@ Text translation samples with the shipped models (desktop CPU, beam 4):
 | ja→ko (pivot via en) | こんにちは。明日の会議は午後3時に始まります。一番近い駅はどこですか？ | 안녕하세요. 내일 모임은 오후 3시에 시작합니다. 가장 가까운 역은 어디인가요? |
 | es→ko (pivot via en) | Hola. ¿Dónde está la estación de metro más cercana? | 안녕하세요. 가장 가까운 지하철 역은 어디죠? |
 
+LLM samples (Qwen2.5-1.5B, desktop CPU, 1.3–3.7 s each): ko→vi "Xin chào. Hội nghị của tôi sẽ bắt đầu vào 3 giờ chiều ngày mai.",
+ko→th "สวัสดีครับ/ค่ะ วันพรุ่งนี้การประชุมจะเริ่มเวลา 3 โมง", auto→en (Spanish in) "Hello. Where is the nearest metro station?".
+Into Korean the Marian pivot (th→en→ko: "안녕하세요, 내일 3시에 미팅 시작해요 가장 가까운 지하철역은 어디인가요?") beats the 1.5B LLM,
+which is why `auto` prefers Marian.
+
 Models are hosted on the [`models-v1` release](https://github.com/Kevin-KIM98/offline-translator/releases/tag/models-v1)
-and described by [assets/manifest.json](assets/manifest.json) (per-file SHA-256). A first launch with
-Korean + English downloads about 500 MB; each additional language adds roughly 160 MB.
+and described by [assets/manifest.json](assets/manifest.json) (per-file SHA-256): whisper `small-q5_1`,
+11 Marian pairs (ko/ja/zh/es/vi/th ↔ en, en→ko tc-big) and the Qwen2.5-1.5B GGUF.
 
 ## Repository layout
 
@@ -155,5 +175,6 @@ AAR on Ubuntu, the XCFramework on macOS, rewrites `Package.swift` with the new c
 
 ## Status
 
-* C++ core + all four engines verified on Windows/MSVC 2022: 219/219 unit tests, Korean speech → English end to end (one-shot and streaming).
+* C++ core + all five engines (RNNoise, whisper.cpp, CTranslate2, SentencePiece, llama.cpp) verified on Windows/MSVC 2022: 260/260 unit tests, Korean speech → English end to end (one-shot and streaming), LLM translation across all seven languages.
+* "Training": the LLM is a pre-trained multilingual model configured by prompting; `scripts/finetune_lora.py` is the supervised fine-tuning path (LoRA → merged GGUF) for domain data — it requires a GPU and was not run as part of this repo.
 * Android AAR / iOS XCFramework are built by CI; the Kotlin/Swift layers compile against the C API but have not yet been exercised on a physical device from this workstation — please report device issues.

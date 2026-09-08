@@ -1,5 +1,5 @@
 {
-  "manifest_version": "1.1.0",
+  "manifest_version": "1.2.0",
   "base_url": "https://github.com/Kevin-KIM98/offline-translator/releases/download/models-v1/",
   "stt": {
     "id": "whisper-small-q5_1",
@@ -8,6 +8,14 @@
     "size_bytes": 190085487,
     "sha256": "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb",
     "download_url": "stt_whisper-small-q5_1.bin"
+  },
+  "llm": {
+    "id": "qwen2.5-1.5b-instruct-q4_k_m",
+    "version": "1",
+    "filename": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+    "size_bytes": 1117320736,
+    "sha256": "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e",
+    "download_url": "llm_qwen2.5-1.5b-instruct-q4_k_m.gguf"
   },
   "nmt": [
     {
@@ -124,6 +132,43 @@
           "size_bytes": 777969,
           "sha256": "e9d0300fce8fa7a734a7cede1b0faf9dba3328432652e607d2c8eebdb026e8b1",
           "download_url": "nmt_en-ko_target_vocabulary.json"
+        }
+      ]
+    },
+    {
+      "pair": "en-vi",
+      "dir_name": "en-vi",
+      "version": "1",
+      "files": [
+        {
+          "filename": "config.json",
+          "size_bytes": 189,
+          "sha256": "4244772990e30069563e3ddfb4ad6dc95bdfd2ac3de667ea8858c9b0a8433fa8",
+          "download_url": "nmt_en-vi_config.json"
+        },
+        {
+          "filename": "model.bin",
+          "size_bytes": 73683276,
+          "sha256": "53a1d87fbcdfe1b95e51a8da90b673208895fc986507b68dcd4a8031ca54676c",
+          "download_url": "nmt_en-vi_model.bin"
+        },
+        {
+          "filename": "shared_vocabulary.json",
+          "size_bytes": 935068,
+          "sha256": "5f2a279e57b170f567fb605bd44fb40f8ed22f73a06648eefa9b877831e95a3e",
+          "download_url": "nmt_en-vi_shared_vocabulary.json"
+        },
+        {
+          "filename": "source.spm",
+          "size_bytes": 808612,
+          "sha256": "fdd9ab486ca8ea060967105e30db7d8928729c78a67448711d2dd7c3153b37cd",
+          "download_url": "nmt_en-vi_source.spm"
+        },
+        {
+          "filename": "target.spm",
+          "size_bytes": 756198,
+          "sha256": "fb8ad63c818f073c246952c91b2cb1f16aa30728bf51b5c179b8481bc0e20bb5",
+          "download_url": "nmt_en-vi_target.spm"
         }
       ]
     },
@@ -272,6 +317,80 @@
           "size_bytes": 813126,
           "sha256": "f1531ac8576fe64267dfca0dc33950a6e9a2d3fd9e05346558ad7ea5ee0e65bf",
           "download_url": "nmt_ko-en_target.spm"
+        }
+      ]
+    },
+    {
+      "pair": "th-en",
+      "dir_name": "th-en",
+      "version": "1",
+      "files": [
+        {
+          "filename": "config.json",
+          "size_bytes": 233,
+          "sha256": "72901fbd8abd89fb5cf4a388f26fc681f5c4c58a1e1a88b30b879f107270e7ee",
+          "download_url": "nmt_th-en_config.json"
+        },
+        {
+          "filename": "model.bin",
+          "size_bytes": 78166755,
+          "sha256": "844ade22eda89d7d3efa8d046f9e662d4e5bc90803650351531f4c3486529f1d",
+          "download_url": "nmt_th-en_model.bin"
+        },
+        {
+          "filename": "shared_vocabulary.json",
+          "size_bytes": 2165636,
+          "sha256": "8a1cf3e29a6442af9ba0df9458490318cccfdc92bd623a1499f1e23a415c4559",
+          "download_url": "nmt_th-en_shared_vocabulary.json"
+        },
+        {
+          "filename": "source.spm",
+          "size_bytes": 1213743,
+          "sha256": "01ecb88d0f92bbb20c21257b92e93e301a10971ecd60971e8e637bc3eacd9124",
+          "download_url": "nmt_th-en_source.spm"
+        },
+        {
+          "filename": "target.spm",
+          "size_bytes": 810346,
+          "sha256": "fc618401104178afa0e8d67d469a49f8e71cd3151c51d640a7003a1f71b16b1e",
+          "download_url": "nmt_th-en_target.spm"
+        }
+      ]
+    },
+    {
+      "pair": "vi-en",
+      "dir_name": "vi-en",
+      "version": "1",
+      "files": [
+        {
+          "filename": "config.json",
+          "size_bytes": 189,
+          "sha256": "4244772990e30069563e3ddfb4ad6dc95bdfd2ac3de667ea8858c9b0a8433fa8",
+          "download_url": "nmt_vi-en_config.json"
+        },
+        {
+          "filename": "model.bin",
+          "size_bytes": 73711356,
+          "sha256": "da0c1a36f92c9826f5ce28e01d9301e4cbbde47f2923ade0c030fc75e5b3d251",
+          "download_url": "nmt_vi-en_model.bin"
+        },
+        {
+          "filename": "shared_vocabulary.json",
+          "size_bytes": 936003,
+          "sha256": "1a261fb75cbe05d3f184b74199aecb8c764859d1324dd3203f080f3c181b4db5",
+          "download_url": "nmt_vi-en_shared_vocabulary.json"
+        },
+        {
+          "filename": "source.spm",
+          "size_bytes": 756168,
+          "sha256": "9deb4f9e7bebd3876f4bf238a9eb52f2f95a1fba2210a4a8239167c55c15e67d",
+          "download_url": "nmt_vi-en_source.spm"
+        },
+        {
+          "filename": "target.spm",
+          "size_bytes": 808853,
+          "sha256": "629182070d11db929990c603779345a11743b749f6586f224829303fa979c138",
+          "download_url": "nmt_vi-en_target.spm"
         }
       ]
     },
