@@ -27,7 +27,6 @@ let package = Package(
             dependencies: ["OfflineTranslatorCore"],
             path: "platform/ios/OfflineTranslatorObjC",
             publicHeadersPath: "include",
-            cxxSettings: [.unsafeFlags(["-std=c++17"])],
             linkerSettings: [
                 .linkedFramework("Accelerate"),
                 .linkedFramework("CoreML"),
