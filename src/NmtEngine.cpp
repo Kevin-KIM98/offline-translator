@@ -382,15 +382,15 @@ bool NmtEngine::translateDirect(const std::string& text, const std::string& src,
         if (isCjk(tgt)) {
             // Some ja/zh models drop sentence-final punctuation; restore it from the source
             // sentence so consecutive sentences don't run together ("こんにちはいい天気だ").
-            static const char* const kTerminals[] = {".", "!", "?", "ã", "ï¼", "ï¼"};
+            static const char* const kTerminals[] = {".", "!", "?", "\xE3\x80\x82", "\xEF\xBC\x81", "\xEF\xBC\x9F"};
             bool ends = false;
             for (const char* term : kTerminals)
                 if (t.size() >= std::strlen(term) && t.compare(t.size() - std::strlen(term), std::strlen(term), term) == 0) ends = true;
             if (!ends) {
                 const std::string& src = sentences[i];
-                const bool q = !src.empty() && (src.back() == '?' || (src.size() >= 3 && src.compare(src.size() - 3, 3, "ï¼") == 0));
-                const bool ex = !src.empty() && (src.back() == '!' || (src.size() >= 3 && src.compare(src.size() - 3, 3, "ï¼") == 0));
-                t += q ? "ï¼" : ex ? "ï¼" : "ã";
+                const bool q = !src.empty() && (src.back() == '?' || (src.size() >= 3 && src.compare(src.size() - 3, 3, "\xEF\xBC\x9F") == 0));
+                const bool ex = !src.empty() && (src.back() == '!' || (src.size() >= 3 && src.compare(src.size() - 3, 3, "\xEF\xBC\x81") == 0));
+                t += q ? "\xEF\xBC\x9F" : ex ? "\xEF\xBC\x81" : "\xE3\x80\x82";
             }
         }
         if (!out.empty()) out += sep;

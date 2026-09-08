@@ -28,6 +28,8 @@ android {
                     "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
                 )
                 cppFlags += "-O3"
+                // Only build our library (skips sentencepiece/cpuinfo command-line tools).
+                targets += "offline_translator"
             }
         }
         ndk {
