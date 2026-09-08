@@ -300,8 +300,25 @@ std::vector<std::string> NmtEngine::splitSentences(const std::string& text) {
         const bool terminal = ch == "." || ch == "!" || ch == "?" ||
                               ch == "\xE3\x80\x82" /* 。 */ || ch == "\xEF\xBC\x81" /* ！ */ || ch == "\xEF\xBC\x9F" /* ？ */;
         if (terminal) {
-            // Don't split on decimals like "3.14".
-            if (ch == "." && i < text.size() && text[i] >= '0' && text[i] <= '9') continue;
+            if (ch == ".") {
+                // Don't split on decimals ("3.14"), on a period glued to the next character
+                // ("p.m.", "e.g.", "a.b.c"), or after a one-letter token / known abbreviation.
+                if (i < text.size()) {
+                    const char nx = text[i];
+                    if ((nx >= '0' && nx <= '9') || ((nx >= 'a' && nx <= 'z') || (nx >= 'A' && nx <= 'Z'))) continue;
+                }
+                const std::string t = trim(cur);
+                const auto sp = t.find_last_of(' ');
+                std::string word = sp == std::string::npos ? t : t.substr(sp + 1);
+                if (!word.empty()) word.pop_back(); // drop the period
+                std::string lw;
+                for (const char c : word) lw.push_back(static_cast<char>((c >= 'A' && c <= 'Z') ? c - 'A' + 'a' : c));
+                static const char* const kAbbrev[] = {"e.g", "i.e", "etc", "mr", "mrs", "ms", "dr", "prof", "vs", "st", "no", "sr", "jr", "approx", "dept", "inc", "ltd", "p.m", "a.m"};
+                bool abbrev = lw.size() == 1 && ((lw[0] >= 'a' && lw[0] <= 'z'));
+                for (const char* a : kAbbrev)
+                    if (lw == a) { abbrev = true; break; }
+                if (abbrev && i < text.size()) continue;
+            }
             const std::string t = trim(cur);
             if (!t.empty()) out.push_back(t);
             cur.clear();

@@ -250,6 +250,13 @@ void testSentenceSplit() {
         CHECK_EQ(s[5], "잘 지내세요？");
     }
     CHECK(NmtEngine::splitSentences("   ").empty());
+    const auto abbr = NmtEngine::splitSentences("It is 3 p.m. now. See Mr. Kim, e.g. tomorrow. Bye.");
+    CHECK_EQ(abbr.size(), std::size_t(3));
+    if (abbr.size() == 3) {
+        CHECK_EQ(abbr[0], "It is 3 p.m. now.");
+        CHECK_EQ(abbr[1], "See Mr. Kim, e.g. tomorrow.");
+        CHECK_EQ(abbr[2], "Bye.");
+    }
 }
 
 std::string makeManifest(const std::string& sttData, const std::string& modelData, const std::string& vocabData,

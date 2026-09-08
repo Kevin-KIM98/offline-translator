@@ -12,6 +12,11 @@ if(NOT DEFINED CMAKE_POLICY_VERSION_MINIMUM)
     set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "Minimum policy version for vendored projects")
 endif()
 
+# iOS: never turn third-party executables into .app bundles (breaks their install() rules).
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(CMAKE_MACOSX_BUNDLE OFF)
+endif()
+
 set(TRANSLATOR_HAS_RNNOISE 0)
 set(TRANSLATOR_HAS_WHISPER 0)
 set(TRANSLATOR_HAS_CTRANSLATE2 0)
@@ -134,6 +139,13 @@ if(TRANSLATOR_WITH_CTRANSLATE2)
         set(WITH_CUDNN           OFF  CACHE BOOL   "" FORCE)
         set(WITH_OPENBLAS        OFF  CACHE BOOL   "" FORCE)
         set(WITH_RUY             ON   CACHE BOOL   "" FORCE)   # ARM int8/float GEMM
+        # cpuinfo (via ruy) builds command-line tools by default; on iOS CMake turns those into
+        # app bundles and its install() rules fail. We only need the library.
+        set(CPUINFO_BUILD_TOOLS      OFF CACHE BOOL "" FORCE)
+        set(CPUINFO_BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+        set(CPUINFO_BUILD_MOCK_TESTS OFF CACHE BOOL "" FORCE)
+        set(CPUINFO_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
+        set(CPUINFO_BUILD_PKG_CONFIG OFF CACHE BOOL "" FORCE)
         # Without OpenMP CTranslate2 falls back to a thread_local BS::thread_pool, which was
         # observed to deadlock on MSVC with intra-op threads > 1. Use the compiler's OpenMP
         # everywhere it exists (MSVC, GCC/Clang, Android NDK libomp); iOS toolchains lack it.
@@ -169,6 +181,12 @@ if(TRANSLATOR_WITH_SENTENCEPIECE)
         set(SPM_ENABLE_TCMALLOC      OFF CACHE BOOL "" FORCE)
         set(SPM_BUILD_TEST           OFF CACHE BOOL "" FORCE)
         set(SPM_ENABLE_NFKC_COMPILE  OFF CACHE BOOL "" FORCE)
+        # sentencepiece's iOS branch calls set_xcode_property() from a third-party toolchain
+        # file we don't use; provide a no-op so its CLI tools configure.
+        if(NOT COMMAND set_xcode_property)
+            function(set_xcode_property)
+            endfunction()
+        endif()
         add_subdirectory(${_sp} ${CMAKE_BINARY_DIR}/third_party/sentencepiece EXCLUDE_FROM_ALL)
         set(TRANSLATOR_SENTENCEPIECE_INCLUDE ${_sp}/src)
         set(TRANSLATOR_HAS_SENTENCEPIECE 1)
