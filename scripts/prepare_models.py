@@ -185,18 +185,26 @@ def cmd_manifest(a: argparse.Namespace) -> None:
     print(f"→ {out}")
 
     if a.upload_script:
-        # Emit a script that uploads every referenced file under its flat asset name.
+        # Emit a script that uploads every referenced file under its flat asset name. GitHub
+        # names an asset after the local file (the `file#label` form only sets the label), so
+        # the files are first copied into a flat/ directory under their asset names.
+        flat_dir = Path(a.upload_script).parent / "flat"
         lines = ["#!/usr/bin/env bash", "set -euo pipefail", f"TAG=\"${{1:-{a.release_tag or 'models'}}}\"",
+                 f"FLAT=\"{flat_dir.as_posix()}\"", "mkdir -p \"$FLAT\"",
                  "gh release view \"$TAG\" >/dev/null 2>&1 || gh release create \"$TAG\" --title \"$TAG\" --notes \"Model assets referenced by assets/manifest.json\"",
-                 "up() { gh release upload \"$TAG\" \"$1#$2\" --clobber; }"]
+                 "up() { cp -f \"$1\" \"$FLAT/$2\"; gh release upload \"$TAG\" \"$FLAT/$2\" --clobber; echo \"uploaded $2\"; }"]
+        count = 0
         if stt_files:
             f = stt_files[0]
             lines.append(f"up \"{f.as_posix()}\" \"{flat_name('stt', '', f.name)}\"")
+            count += 1
         for entry in nmt:
             for fi in entry["files"]:
                 lines.append(f"up \"{(nmt_root / entry['dir_name'] / fi['filename']).as_posix()}\" \"{flat_name('nmt', entry['dir_name'], fi['filename'])}\"")
+                count += 1
+        lines.append("echo \"all $((0)) done\"".replace("$((0))", str(count)))
         Path(a.upload_script).write_text("\n".join(lines) + "\n", encoding="utf-8")
-        print(f"→ {a.upload_script} (run it with the release tag to upload {len(lines) - 5} assets)")
+        print(f"→ {a.upload_script} (run it with the release tag to upload {count} assets)")
 
 
 def main() -> None:
