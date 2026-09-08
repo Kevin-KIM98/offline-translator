@@ -79,7 +79,7 @@ jobs:
       - name: Configure & build
         shell: bash
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DTRANSLATOR_STRICT_DEPS=ON -DTRANSLATOR_BUILD_SHARED=OFF
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DTRANSLATOR_STRICT_DEPS=ON -DTRANSLATOR_BUILD_SHARED=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5
           cmake --build build --config Release --target translator_cli translator_tests --parallel 4
       - name: Test
         shell: bash

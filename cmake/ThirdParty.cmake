@@ -6,6 +6,12 @@
 
 set(TRANSLATOR_TP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
 
+# CMake 4 refuses cmake_minimum_required(< 3.5) found in some vendored sub-projects
+# (cpu_features, clog); this keeps them configurable without patching them.
+if(NOT DEFINED CMAKE_POLICY_VERSION_MINIMUM)
+    set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "Minimum policy version for vendored projects")
+endif()
+
 set(TRANSLATOR_HAS_RNNOISE 0)
 set(TRANSLATOR_HAS_WHISPER 0)
 set(TRANSLATOR_HAS_CTRANSLATE2 0)
@@ -131,8 +137,8 @@ if(TRANSLATOR_WITH_CTRANSLATE2)
         # Without OpenMP CTranslate2 falls back to a thread_local BS::thread_pool, which was
         # observed to deadlock on MSVC with intra-op threads > 1. Use the compiler's OpenMP
         # everywhere it exists (MSVC, GCC/Clang, Android NDK libomp); iOS toolchains lack it.
-        if(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
-            set(OPENMP_RUNTIME   NONE CACHE STRING "" FORCE)
+        if(APPLE)
+            set(OPENMP_RUNTIME   NONE CACHE STRING "" FORCE)   # Apple clang has no OpenMP
         else()
             set(OPENMP_RUNTIME   COMP CACHE STRING "" FORCE)
         endif()

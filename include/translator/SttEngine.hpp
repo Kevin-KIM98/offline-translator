@@ -32,7 +32,10 @@ public:
     };
 
     // lang: ISO-639-1 or "auto". Audio shorter than ~1 s is zero-padded (whisper minimum).
-    SttResult transcribe(const float* pcm, std::size_t n, const std::string& lang, const DecodeOptions& opts = {});
+    SttResult transcribe(const float* pcm, std::size_t n, const std::string& lang, const DecodeOptions& opts);
+    SttResult transcribe(const float* pcm, std::size_t n, const std::string& lang) {
+        return transcribe(pcm, n, lang, DecodeOptions());
+    }
 
 private:
     struct Impl;

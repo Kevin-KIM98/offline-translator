@@ -25,6 +25,7 @@ android {
                     "-DANDROID_ARM_NEON=ON",
                     "-DTRANSLATOR_VULKAN=OFF",   // set ON for Adreno/Mali GPU offload (needs Vulkan NDK headers)
                     "-DTRANSLATOR_STRICT_DEPS=ON",
+                    "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
                 )
                 cppFlags += "-O3"
             }
