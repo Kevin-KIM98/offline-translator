@@ -1,0 +1,35 @@
+{
+  "manifest_version": "1.1.0",
+  "base_url": "https://assets.yourdomain.com/models/",
+  "stt": {
+    "id": "whisper-small-q5_1",
+    "version": "1",
+    "filename": "whisper-small-q5_1.bin",
+    "size_bytes": 190085487,
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "download_url": "stt/whisper-small-q5_1.bin"
+  },
+  "nmt": [
+    {
+      "pair": "ko-en",
+      "dir_name": "ko-en",
+      "version": "1",
+      "files": [
+        { "filename": "model.bin",              "size_bytes": 78000000, "sha256": "0000000000000000000000000000000000000000000000000000000000000000", "download_url": "nmt/ko-en/model.bin" },
+        { "filename": "config.json",            "size_bytes": 300,      "sha256": "0000000000000000000000000000000000000000000000000000000000000000", "download_url": "nmt/ko-en/config.json" },
+        { "filename": "shared_vocabulary.json", "size_bytes": 1200000,  "sha256": "0000000000000000000000000000000000000000000000000000000000000000", "download_url": "nmt/ko-en/shared_vocabulary.json" },
+        { "filename": "source.spm",             "size_bytes": 800000,   "sha256": "0000000000000000000000000000000000000000000000000000000000000000", "download_url": "nmt/ko-en/source.spm" },
+        { "filename": "target.spm",             "size_bytes": 800000,   "sha256": "0000000000000000000000000000000000000000000000000000000000000000", "download_url": "nmt/ko-en/target.spm" }
+      ]
+    },
+    {
+      "pair": "en-ko",
+      "dir_name": "en-ko",
+      "version": "1",
+      "size_bytes": 89128960,
+      "sha256": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d",
+      "download_url": "nmt/en-ko.zip",
+      "required_files": ["model.bin", "source.spm", "target.spm"]
+    }
+  ]
+}

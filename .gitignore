@@ -1,0 +1,34 @@
+# Build trees
+build*/
+dist/
+cmake-build-*/
+.cache/
+
+# Third-party engines are fetched by scripts/fetch_third_party.{sh,ps1}
+third_party/*
+!third_party/.gitkeep
+
+# Model binaries never go in git
+models/
+*.bin
+*.mlmodelc
+*.spm
+
+# IDE / OS
+.vs/
+.vscode/
+.idea/
+*.xcuserstate
+xcuserdata/
+.DS_Store
+Thumbs.db
+
+# Android
+platform/android/.cxx/
+platform/android/build/
+platform/android/local.properties
+
+# Python
+__pycache__/
+*.pyc
+.venv/
