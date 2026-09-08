@@ -1,5 +1,36 @@
 # Model preparation
 
+## 0. LLM backend (any→any, 7 languages)
+
+Since 0.3 the engine can translate with a small instruction-tuned LLM through llama.cpp instead
+of (or in addition to) the per-pair Marian models. One GGUF file covers every direction among
+Korean, English, Spanish, Vietnamese, Thai, Japanese and Chinese, and the source language may be
+left to the model (`"auto"`).
+
+| model | file | size | CPU latency (desktop, 4 threads, ~25-token sentence) | notes |
+|---|---|---|---|---|
+| Qwen2.5-1.5B-Instruct Q4_K_M | `qwen2.5-1.5b-instruct-q4_k_m.gguf` | 1.04 GB | 1.3–3.7 s | fluent; occasional wrong time/date words into Korean |
+| Qwen2.5-3B-Instruct Q4_K_M | `qwen2.5-3b-instruct-q4_k_m.gguf` | 1.93 GB | ≈ 2× slower | noticeably better into Korean / Thai |
+
+Grab them from `Qwen/Qwen2.5-*-Instruct-GGUF` on Hugging Face and add an `llm` entry to the manifest:
+
+```json
+"llm": { "id": "qwen2.5-1.5b-instruct-q4_k_m", "version": "1", "filename": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+         "size_bytes": 1043030016, "sha256": "…", "download_url": "llm_qwen2.5-1.5b-instruct-q4_k_m.gguf" }
+```
+
+**How the backends are combined (`translation_backend = auto`)**: a Marian pair is used whenever
+one exists for the direction (direct, or X→en→Y through the English models) because it is 5–10×
+faster and, for X→English, at least as good; the LLM handles everything else (e.g. en→th, ko→vi,
+ja→zh direct). `LlmMode.IF_NEEDED` makes the app download the GGUF only when the chosen languages
+actually need it. Force LLM-only with `backend = llm`.
+
+**Teaching it your domain ("학습")**: `scripts/finetune_lora.py` fine-tunes the same Qwen model
+with LoRA on parallel sentences (Tatoeba for all 7 languages, plus your own JSONL — glossaries,
+corrected app outputs), merges the adapter and exports a quantized GGUF that drops into the
+manifest. The training prompt is byte-identical to what `LlmEngine` sends at runtime. It needs a
+GPU machine (≈ 12 GB VRAM for 1.5B); nothing is trained on the phone.
+
 Everything the devices download is produced by `scripts/prepare_models.py` and published as a
 static file tree + `manifest.json`. No server logic is needed — any CDN / object storage works.
 

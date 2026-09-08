@@ -39,6 +39,27 @@ tr_pipeline* p = tr_pipeline_create(&cfg);        // NULL → tr_last_global_err
 | `post_process_translations` | 1 | capitalization / spacing / full-width punctuation per target language |
 | `pivot_langs` | `en,ko` | pivot order when no direct pair exists (X→en→Y models are the strongest) |
 
+### LLM backend (0.3+)
+
+| field | default | effect |
+|---|---|---|
+| `llm_model_path` | NULL | GGUF instruction model (Qwen2.5-Instruct). NULL → Marian only |
+| `translation_backend` | 0 | 0 **auto**: Marian pair when one exists (direct or via English), else the LLM · 1 Marian only · 2 LLM only |
+| `llm_context_size` | 1024 | prompt + output tokens |
+| `llm_max_output_tokens` | 256 | hard cap (also bounded by input length) |
+| `llm_temperature` | 0 | 0 = greedy (recommended) |
+| `llm_gpu_layers` | 99 | Metal / Vulkan offload when compiled in |
+| `llm_system_prompt` | NULL | override the built-in interpreter instruction |
+
+With the LLM, `source_lang` may be `"auto"` for text translation too: the model is told to detect
+the language. `route` in the result is `["llm"]` when the LLM produced the translation.
+`tr_build_capabilities()` reports `"llama": true` when llama.cpp is compiled in;
+`tr_pipeline_capabilities()` adds `"llm_loaded"` and `"backend"`.
+
+`tr_mm_status_for_languages_json(m, "ko,th", deep, llm_mode)` — `llm_mode` 0 includes the manifest's
+`llm` entry only when some requested direction has no Marian route (direct or via English),
+1 always, 2 never. `tr_mm_llm_model_path(m)` gives the install path.
+
 ### Streaming (microphone)
 
 ```
