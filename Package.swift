@@ -19,7 +19,7 @@ let package = Package(
         .binaryTarget(
             name: "OfflineTranslatorCore",
             url: "https://github.com/Kevin-KIM98/offline-translator/releases/download/v0.2.0/OfflineTranslatorCore.xcframework.zip",
-            checksum: "0000000000000000000000000000000000000000000000000000000000000000"
+            checksum: "83062ab0f3978a661b53e098b0f629755c4902b18134c50fa5d7474f68fd20dc"
         ),
         // Objective-C++ wrapper (OTTranslationPipeline / OTModelManager).
         .target(
