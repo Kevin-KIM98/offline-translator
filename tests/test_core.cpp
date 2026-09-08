@@ -251,6 +251,14 @@ void testLlmEngine() {
     CHECK(pa.find("Detect the language") != std::string::npos);
     CHECK(pa.find("into Thai") != std::string::npos);
     CHECK_EQ(LlmEngine::buildInstruction("ko", "en", "custom"), "custom");
+    CHECK(!LlmEngine::exampleSentence("th").empty());
+    CHECK(LlmEngine::exampleSentence("xx").empty());
+    CHECK(LlmEngine::foreignScriptRatio("안녕하세요 반갑습니다", "ko") < 0.01);
+    CHECK(LlmEngine::foreignScriptRatio("안녕하세요 户外使用 밝기", "ko") > 0.15);
+    CHECK(LlmEngine::foreignScriptRatio("สวัสดีครับ 会议明天开始", "th") > 0.3);
+    CHECK(LlmEngine::foreignScriptRatio("Hello p.m. 3", "en") < 0.01);
+    CHECK(LlmEngine::foreignScriptRatio("東京駅はどこですか", "ja") < 0.01);
+    CHECK(LlmEngine::foreignScriptRatio("", "ko") == 0.0);
 
     LlmEngine e;
     CHECK(!e.isLoaded());

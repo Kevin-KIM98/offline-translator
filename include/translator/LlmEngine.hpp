@@ -27,6 +27,7 @@ struct LlmResult {
     std::string text;
     int promptTokens = 0;
     int outputTokens = 0;
+    bool retried = false;        // a second pass was needed because the first output mixed scripts
     double elapsedMs = 0.0;
 };
 
@@ -50,6 +51,11 @@ public:
     static std::string languageName(const std::string& code);
     // The prompt the engine sends (exposed for tests / debugging).
     static std::string buildInstruction(const std::string& src, const std::string& tgt, const std::string& systemPrompt);
+    // One-shot demonstration sentence in `code` ("Where is the nearest station?"), empty if unknown.
+    static std::string exampleSentence(const std::string& code);
+    // Fraction of letters in `text` that belong to a script foreign to `lang` (Han in Korean,
+    // Hangul in Thai, ...). Used to catch small-model language mixing; exposed for tests.
+    static double foreignScriptRatio(const std::string& text, const std::string& lang);
 
 private:
     struct Impl;
