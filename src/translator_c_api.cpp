@@ -15,7 +15,7 @@
 using namespace translator;
 
 #ifndef TRANSLATOR_VERSION_STRING
-#define TRANSLATOR_VERSION_STRING "0.1.0"
+#define TRANSLATOR_VERSION_STRING "0.2.0"
 #endif
 
 struct tr_pipeline {
@@ -130,8 +130,17 @@ TR_API void tr_pipeline_config_init(tr_pipeline_config* cfg) {
     cfg->n_threads = 4;
     cfg->use_gpu = 1;
     cfg->enable_denoise = 1;
-    cfg->beam_size = 2;
+    cfg->beam_size = 4;
     cfg->max_decoding_length = 256;
+    cfg->stt_beam_size = 5;
+    cfg->use_default_prompts = 1;
+    cfg->use_context_prompt = 1;
+    cfg->clean_transcripts = 1;
+    cfg->post_process_translations = 1;
+    cfg->no_repeat_ngram_size = 3;
+    cfg->repetition_penalty = 1.1f;
+    cfg->no_speech_threshold = 0.85f;
+    cfg->stt_adaptive_audio_ctx = 1;
 }
 
 TR_API void tr_segmenter_config_init(tr_segmenter_config* cfg) {
@@ -157,8 +166,17 @@ TR_API tr_pipeline* tr_pipeline_create(const tr_pipeline_config* cfg) {
     c.nThreads = cfg->n_threads > 0 ? cfg->n_threads : 4;
     c.useGpu = cfg->use_gpu != 0;
     c.enableDenoise = cfg->enable_denoise != 0;
-    c.beamSize = cfg->beam_size > 0 ? cfg->beam_size : 2;
+    c.beamSize = cfg->beam_size > 0 ? cfg->beam_size : 4;
     c.maxDecodingLength = cfg->max_decoding_length > 0 ? cfg->max_decoding_length : 256;
+    c.sttBeamSize = cfg->stt_beam_size > 0 ? cfg->stt_beam_size : 1;
+    c.useDefaultPrompts = cfg->use_default_prompts != 0;
+    c.useContextPrompt = cfg->use_context_prompt != 0;
+    c.cleanTranscripts = cfg->clean_transcripts != 0;
+    c.postProcessTranslations = cfg->post_process_translations != 0;
+    c.noRepeatNgramSize = cfg->no_repeat_ngram_size;
+    c.repetitionPenalty = cfg->repetition_penalty > 0.0f ? cfg->repetition_penalty : 1.0f;
+    c.noSpeechThreshold = cfg->no_speech_threshold;
+    c.sttAdaptiveAudioContext = cfg->stt_adaptive_audio_ctx != 0;
     if (cfg->pivot_langs && *cfg->pivot_langs) c.pivotLangs = splitCsv(cfg->pivot_langs);
     c.initialPrompt = safe(cfg->initial_prompt);
     c.preloadAllPairs = cfg->preload_all_pairs != 0;

@@ -23,6 +23,22 @@ cfg.n_threads = 4; cfg.use_gpu = 1; cfg.enable_denoise = 1; cfg.pivot_langs = "k
 tr_pipeline* p = tr_pipeline_create(&cfg);        // NULL → tr_last_global_error()
 ```
 
+### Quality knobs (`tr_pipeline_config`, 0.2+)
+
+| field | default | effect |
+|---|---|---|
+| `stt_beam_size` | 5 | whisper beam search width; 1 = greedy (fastest) |
+| `use_default_prompts` | 1 | punctuated per-language prompt → whisper emits punctuation, so NMT sees real sentences |
+| `use_context_prompt` | 1 | previous transcript (≤ 200 chars) appended to the prompt for consistent vocabulary |
+| `stt_adaptive_audio_ctx` | 1 | shrink whisper's 30 s encoder window to the utterance length (~3× faster on CPU) |
+| `no_speech_threshold` | 0.85 | drop whisper segments it flags as non-speech |
+| `clean_transcripts` | 1 | remove `[music]`-style markers, runaway repetitions and stock hallucinations ("시청해주셔서 감사합니다") |
+| `beam_size` | 4 | NMT beam |
+| `no_repeat_ngram_size` | 3 | NMT n-gram blocking |
+| `repetition_penalty` | 1.1 | NMT |
+| `post_process_translations` | 1 | capitalization / spacing / full-width punctuation per target language |
+| `pivot_langs` | `en,ko` | pivot order when no direct pair exists (X→en→Y models are the strongest) |
+
 ### Streaming (microphone)
 
 ```

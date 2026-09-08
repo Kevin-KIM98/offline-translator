@@ -21,8 +21,18 @@ public:
     bool isLoaded() const;
     bool isNativeWhisper() const;
 
+    struct DecodeOptions {
+        int beamSize = 5;                 // 1 = greedy
+        float noSpeechThreshold = 0.85f;  // segments above this no-speech probability are dropped
+        std::string initialPrompt;        // style / vocabulary prompt (see text::buildSttPrompt)
+        // Shrink the encoder context to the utterance length (whisper always encodes a 30 s
+        // window otherwise). Roughly halves STT time for short utterances at a small accuracy
+        // cost; ignored when the audio is longer than ~20 s.
+        bool adaptiveAudioContext = true;
+    };
+
     // lang: ISO-639-1 or "auto". Audio shorter than ~1 s is zero-padded (whisper minimum).
-    SttResult transcribe(const float* pcm, std::size_t n, const std::string& lang, const std::string& initialPrompt = "");
+    SttResult transcribe(const float* pcm, std::size_t n, const std::string& lang, const DecodeOptions& opts = {});
 
 private:
     struct Impl;

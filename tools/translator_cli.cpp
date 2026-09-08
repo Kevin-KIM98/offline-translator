@@ -235,7 +235,11 @@ bool makePipeline(const Args& a, TranslationPipeline& p, bool needWhisper) {
     cfg.nThreads = std::atoi(a.get("threads", "4").c_str());
     cfg.useGpu = !a.has("cpu");
     cfg.enableDenoise = !a.has("no-denoise");
-    cfg.beamSize = std::atoi(a.get("beam", "2").c_str());
+    if (a.has("beam")) cfg.beamSize = std::atoi(a.get("beam").c_str());
+    if (a.has("stt-beam")) cfg.sttBeamSize = std::atoi(a.get("stt-beam").c_str());
+    if (a.has("no-context")) cfg.useContextPrompt = false;
+    if (a.has("full-audio-ctx")) cfg.sttAdaptiveAudioContext = false;
+    if (a.has("no-default-prompt")) cfg.useDefaultPrompts = false;
     if (a.has("prompt")) cfg.initialPrompt = a.get("prompt");
 
     std::string err;

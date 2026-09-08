@@ -1,5 +1,6 @@
 #include "translator/SttEngine.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <vector>
@@ -81,13 +82,13 @@ bool SttEngine::load(const std::string& modelPath, bool useGpu, int nThreads, st
     return true;
 }
 
-SttResult SttEngine::transcribe(const float* pcm, std::size_t n, const std::string& lang, const std::string& initialPrompt) {
+SttResult SttEngine::transcribe(const float* pcm, std::size_t n, const std::string& lang, const DecodeOptions& opts) {
     SttResult r;
     const auto t0 = std::chrono::steady_clock::now();
 
 #if !TRANSLATOR_HAS_WHISPER
     r.error = "whisper not compiled in (TRANSLATOR_HAS_WHISPER=0)";
-    (void)pcm; (void)n; (void)lang; (void)initialPrompt; (void)t0;
+    (void)pcm; (void)n; (void)lang; (void)opts; (void)t0;
     return r;
 #else
     if (!isLoaded()) {
@@ -111,7 +112,10 @@ SttResult SttEngine::transcribe(const float* pcm, std::size_t n, const std::stri
         count = padded.size();
     }
 
-    whisper_full_params wparams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+    const bool beam = opts.beamSize > 1;
+    whisper_full_params wparams = whisper_full_default_params(beam ? WHISPER_SAMPLING_BEAM_SEARCH : WHISPER_SAMPLING_GREEDY);
+    if (beam) wparams.beam_search.beam_size = opts.beamSize;
+    else wparams.greedy.best_of = 1;
     wparams.n_threads = impl_->nThreads;
     wparams.print_progress = false;
     wparams.print_realtime = false;
@@ -121,6 +125,7 @@ SttResult SttEngine::transcribe(const float* pcm, std::size_t n, const std::stri
     wparams.no_context = true;          // each utterance is independent
     wparams.single_segment = false;
     wparams.suppress_blank = true;
+    wparams.suppress_nst = true;        // suppress non-speech tokens ("[Music]", "♪", ...)
     wparams.no_timestamps = true;
     wparams.temperature = 0.0f;
     wparams.temperature_inc = 0.2f;
@@ -128,7 +133,16 @@ SttResult SttEngine::transcribe(const float* pcm, std::size_t n, const std::stri
     const std::string langBuf = (lang.empty() || lang == "auto") ? "auto" : lang;
     wparams.language = langBuf.c_str();
     wparams.detect_language = false;
-    wparams.initial_prompt = initialPrompt.empty() ? nullptr : initialPrompt.c_str();
+    wparams.initial_prompt = opts.initialPrompt.empty() ? nullptr : opts.initialPrompt.c_str();
+
+    if (opts.adaptiveAudioContext) {
+        // 1500 encoder positions ↔ 30 s. Keep ≥ 1.5 s of headroom and a floor of 512 (~10 s).
+        const double seconds = static_cast<double>(count) / kSampleRate;
+        if (seconds < 20.0) {
+            const int ctx = static_cast<int>(seconds * 50.0) + 96;
+            wparams.audio_ctx = std::max(512, std::min(1500, ctx));
+        }
+    }
 
     if (whisper_full(impl_->ctx, wparams, data, static_cast<int>(count)) != 0) {
         r.error = "whisper_full failed";
@@ -137,6 +151,8 @@ SttResult SttEngine::transcribe(const float* pcm, std::size_t n, const std::stri
 
     const int nSeg = whisper_full_n_segments(impl_->ctx);
     for (int i = 0; i < nSeg; ++i) {
+        // Skip segments whisper itself considers non-speech (music, silence, breathing).
+        if (opts.noSpeechThreshold > 0.0f && whisper_full_get_segment_no_speech_prob(impl_->ctx, i) > opts.noSpeechThreshold) continue;
         const char* seg = whisper_full_get_segment_text(impl_->ctx, i);
         if (seg) r.text += seg;
     }

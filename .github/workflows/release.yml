@@ -1,0 +1,129 @@
+# Builds the prebuilt mobile artifacts and publishes a GitHub release:
+#   * offline-translator-<ver>.aar            (Android, arm64-v8a + x86_64, JNI inside)
+#   * OfflineTranslatorCore.xcframework.zip   (iOS device + simulator, consumed by Package.swift)
+#   * translator_cli-<os>.zip                 (desktop CLI for testing)
+#
+# Trigger: Actions → "Release" → Run workflow → version (e.g. 0.2.0).
+# The workflow rewrites Package.swift with the new XCFramework URL/checksum, commits, tags
+# v<version>, and attaches all artifacts to the release.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. 0.2.0)"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  VERSION: ${{ github.event.inputs.version }}
+
+jobs:
+  android:
+    name: Android AAR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch engines
+        run: bash scripts/fetch_third_party.sh --shallow
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - uses: android-actions/setup-android@v3
+      - name: Install NDK + CMake
+        run: |
+          sdkmanager "ndk;27.2.12479018" "cmake;3.22.1" > /dev/null
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.9" }
+      - name: Build AAR
+        working-directory: platform/android
+        run: |
+          gradle --no-daemon assembleRelease
+          ls -la build/outputs/aar
+          cp build/outputs/aar/offline-translator-release.aar "$GITHUB_WORKSPACE/offline-translator-${VERSION}.aar"
+      - uses: actions/upload-artifact@v4
+        with: { name: android-aar, path: offline-translator-*.aar }
+
+  ios:
+    name: iOS XCFramework
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch engines
+        run: bash scripts/fetch_third_party.sh --shallow
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app || true
+      - name: Build XCFramework
+        run: bash scripts/build_ios.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-xcframework
+          path: |
+            dist/ios/OfflineTranslatorCore.xcframework.zip
+            dist/ios/OfflineTranslatorCore.xcframework.zip.checksum
+
+  cli:
+    name: Desktop CLI (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-14]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch engines
+        shell: bash
+        run: bash scripts/fetch_third_party.sh --shallow
+      - name: Configure & build
+        shell: bash
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DTRANSLATOR_STRICT_DEPS=ON -DTRANSLATOR_BUILD_SHARED=OFF
+          cmake --build build --config Release --target translator_cli translator_tests --parallel 4
+      - name: Test
+        shell: bash
+        run: |
+          if [ -f build/Release/translator_tests.exe ]; then build/Release/translator_tests.exe; else build/translator_tests; fi
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p out
+          if [ -f build/Release/translator_cli.exe ]; then cp build/Release/translator_cli.exe out/; else cp build/translator_cli out/; fi
+          cd out && 7z a "../translator_cli-${{ runner.os }}.zip" . > /dev/null
+      - uses: actions/upload-artifact@v4
+        with: { name: cli-${{ runner.os }}, path: translator_cli-*.zip }
+
+  publish:
+    name: Publish release
+    needs: [android, ios, cli]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/download-artifact@v4
+        with: { path: artifacts, merge-multiple: true }
+      - name: Update Package.swift with the XCFramework checksum
+        run: |
+          CHECKSUM=$(cat artifacts/OfflineTranslatorCore.xcframework.zip.checksum)
+          URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/OfflineTranslatorCore.xcframework.zip"
+          sed -i "s|url: \".*OfflineTranslatorCore.xcframework.zip\"|url: \"${URL}\"|" Package.swift
+          sed -i "s|checksum: \"[0-9a-f]*\"|checksum: \"${CHECKSUM}\"|" Package.swift
+          sed -i "s|VERSION \([0-9]*\.[0-9]*\.[0-9]*\) LANGUAGES|VERSION ${VERSION} LANGUAGES|" CMakeLists.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Package.swift CMakeLists.txt
+          git commit -m "release: v${VERSION} (XCFramework checksum ${CHECKSUM:0:12})" || echo "nothing to commit"
+          git tag -f "v${VERSION}"
+          git push origin HEAD:${{ github.ref_name }}
+          git push -f origin "v${VERSION}"
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --notes "Prebuilt engine. Android: add the AAR to app/libs. iOS: add this repo as a Swift Package (tag v${VERSION})." \
+            artifacts/offline-translator-${VERSION}.aar \
+            artifacts/OfflineTranslatorCore.xcframework.zip \
+            artifacts/translator_cli-*.zip

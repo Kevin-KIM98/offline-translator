@@ -1,18 +1,21 @@
+#if canImport(OfflineTranslatorObjC)
+import OfflineTranslatorObjC
+#endif
 import AVFoundation
 
 /// OS text-to-speech (AVSpeechSynthesizer). Works offline whenever the language's voice is
 /// installed (Settings → Accessibility → Spoken Content → Voices).
-final class OfflineTTSManager: NSObject, AVSpeechSynthesizerDelegate {
+public final class OfflineTTSManager: NSObject, AVSpeechSynthesizerDelegate {
 
     private let synthesizer = AVSpeechSynthesizer()
     private var completions: [ObjectIdentifier: (Bool) -> Void] = [:]
 
-    override init() {
+    public override init() {
         super.init()
         synthesizer.delegate = self
     }
 
-    static func voice(for lang: String) -> AVSpeechSynthesisVoice? {
+    public static func voice(for lang: String) -> AVSpeechSynthesisVoice? {
         let code: String
         switch lang {
         case "ko": code = "ko-KR"
@@ -29,11 +32,11 @@ final class OfflineTTSManager: NSObject, AVSpeechSynthesizerDelegate {
             ?? AVSpeechSynthesisVoice(language: code)
     }
 
-    static func isLanguageAvailable(_ lang: String) -> Bool { voice(for: lang) != nil }
+    public static func isLanguageAvailable(_ lang: String) -> Bool { voice(for: lang) != nil }
 
     /// Fire-and-forget. Returns false if no voice is available for `lang`.
     @discardableResult
-    func speak(_ text: String, lang: String, rate: Float = AVSpeechUtteranceDefaultSpeechRate, interrupt: Bool = true) -> Bool {
+    public func speak(_ text: String, lang: String, rate: Float = AVSpeechUtteranceDefaultSpeechRate, interrupt: Bool = true) -> Bool {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               let voice = Self.voice(for: lang) else { return false }
         if interrupt, synthesizer.isSpeaking { synthesizer.stopSpeaking(at: .immediate) }
@@ -45,7 +48,7 @@ final class OfflineTTSManager: NSObject, AVSpeechSynthesizerDelegate {
     }
 
     /// Suspends until playback ends (or fails). Returns false if the language is unavailable.
-    func speakAndWait(_ text: String, lang: String, rate: Float = AVSpeechUtteranceDefaultSpeechRate) async -> Bool {
+    public func speakAndWait(_ text: String, lang: String, rate: Float = AVSpeechUtteranceDefaultSpeechRate) async -> Bool {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               let voice = Self.voice(for: lang) else { return false }
         if synthesizer.isSpeaking { synthesizer.stopSpeaking(at: .immediate) }
@@ -58,19 +61,19 @@ final class OfflineTTSManager: NSObject, AVSpeechSynthesizerDelegate {
         }
     }
 
-    func stop() {
+    public func stop() {
         synthesizer.stopSpeaking(at: .immediate)
     }
 
-    var isSpeaking: Bool { synthesizer.isSpeaking }
+    public var isSpeaking: Bool { synthesizer.isSpeaking }
 
     // MARK: AVSpeechSynthesizerDelegate
 
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+    public func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         completions.removeValue(forKey: ObjectIdentifier(utterance))?(true)
     }
 
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+    public func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
         completions.removeValue(forKey: ObjectIdentifier(utterance))?(false)
     }
 }

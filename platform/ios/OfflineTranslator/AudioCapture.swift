@@ -1,20 +1,23 @@
+#if canImport(OfflineTranslatorObjC)
+import OfflineTranslatorObjC
+#endif
 import AVFoundation
 
 /// Microphone → 16 kHz mono Float32 frames via AVAudioEngine + AVAudioConverter.
 /// `onFrames` is invoked on the audio render thread; keep it cheap (feed the engine only).
-final class AudioCapture {
+public final class AudioCapture {
 
-    static let sampleRate: Double = 16_000
+    public static let sampleRate: Double = 16_000
 
     private let engine = AVAudioEngine()
     private var converter: AVAudioConverter?
     private let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false)!
     private(set) var isRunning = false
 
-    var onFrames: ((UnsafePointer<Float>, Int) -> Void)?
-    var onError: ((String) -> Void)?
+    public var onFrames: ((UnsafePointer<Float>, Int) -> Void)?
+    public var onError: ((String) -> Void)?
 
-    static func requestPermission() async -> Bool {
+    public static func requestPermission() async -> Bool {
         if #available(iOS 17.0, *) {
             return await AVAudioApplication.requestRecordPermission()
         } else {
@@ -24,7 +27,7 @@ final class AudioCapture {
         }
     }
 
-    func start() throws {
+    public func start() throws {
         guard !isRunning else { return }
         let session = AVAudioSession.sharedInstance()
         // .voiceChat enables the hardware AEC so the mic doesn't hear our own TTS output.
@@ -50,7 +53,7 @@ final class AudioCapture {
                                                name: AVAudioSession.interruptionNotification, object: session)
     }
 
-    func stop() {
+    public func stop() {
         guard isRunning else { return }
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()

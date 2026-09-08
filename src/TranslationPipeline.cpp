@@ -4,6 +4,7 @@
 #include "translator/FileUtil.hpp"
 #include "translator/NmtEngine.hpp"
 #include "translator/SttEngine.hpp"
+#include "translator/TextUtil.hpp"
 
 #include <chrono>
 #include <cstring>
@@ -23,6 +24,31 @@ struct TranslationPipeline::Impl {
 
     std::vector<float> frameBuf;       // partial frame carry-over for feedAudio
     float frameOut[kFrameSize] = {};
+
+    std::string previousTranscript;    // conversation context for the next whisper prompt
+    std::string previousLang;
+
+    SttEngine::DecodeOptions decodeOptions(const std::string& lang) const {
+        SttEngine::DecodeOptions o;
+        o.beamSize = cfg.sttBeamSize;
+        o.noSpeechThreshold = cfg.noSpeechThreshold;
+        o.adaptiveAudioContext = cfg.sttAdaptiveAudioContext;
+        const bool wantDefault = cfg.initialPrompt.empty() && cfg.useDefaultPrompts;
+        // With "auto" we only know the language after the first utterance; reuse it.
+        const std::string promptLang = (lang.empty() || lang == "auto") ? previousLang : lang;
+        o.initialPrompt = text::buildSttPrompt(wantDefault ? std::string() : cfg.initialPrompt,
+                                               wantDefault ? promptLang : std::string(),
+                                               cfg.useContextPrompt ? previousTranscript : std::string());
+        return o;
+    }
+
+    void rememberTranscript(const std::string& t, const std::string& lang) {
+        if (t.empty()) return;
+        if (!lang.empty() && lang != previousLang) previousTranscript.clear(); // language switched
+        previousLang = lang;
+        previousTranscript = previousTranscript.empty() ? t : previousTranscript + " " + t;
+        if (previousTranscript.size() > 600) previousTranscript = previousTranscript.substr(previousTranscript.size() - 600);
+    }
 
     mutable std::mutex audioMutex;     // segmenter + denoiser + frameBuf
     mutable std::mutex engineMutex;    // stt + nmt (serializes inference)
@@ -77,7 +103,15 @@ bool TranslationPipeline::initialize(const PipelineConfig& cfg, std::string* err
         }
     }
 
-    impl_->nmt.init(cfg.nmtRootDir, cfg.nThreads, cfg.beamSize, cfg.maxDecodingLength);
+    NmtEngine::Options nmtOpts;
+    nmtOpts.nThreads = cfg.nThreads;
+    nmtOpts.beamSize = cfg.beamSize;
+    nmtOpts.maxDecodingLength = cfg.maxDecodingLength;
+    nmtOpts.noRepeatNgramSize = cfg.noRepeatNgramSize;
+    nmtOpts.repetitionPenalty = cfg.repetitionPenalty;
+    impl_->nmt.init(cfg.nmtRootDir, nmtOpts);
+    impl_->previousTranscript.clear();
+    impl_->previousLang.clear();
     if (cfg.preloadAllPairs) {
         for (const auto& pair : impl_->nmt.availablePairs()) {
             const auto dash = pair.find('-');
@@ -163,6 +197,7 @@ void TranslationPipeline::resetAudio() {
     impl_->frameBuf.clear();
     impl_->segmenter.reset();
     impl_->denoiser.reset();
+    impl_->previousTranscript.clear();
 }
 
 void TranslationPipeline::setSegmenterConfig(const SegmenterConfig& cfg) {
@@ -199,8 +234,13 @@ SttResult TranslationPipeline::transcribe(const float* pcm, std::size_t n, const
         r.error = "pipeline not initialized";
         return r;
     }
-    SttResult r = impl_->stt.transcribe(pcm, n, sourceLang, impl_->cfg.initialPrompt);
-    if (!r.ok) impl_->setError(r.error);
+    SttResult r = impl_->stt.transcribe(pcm, n, sourceLang, impl_->decodeOptions(sourceLang));
+    if (!r.ok) {
+        impl_->setError(r.error);
+        return r;
+    }
+    if (impl_->cfg.cleanTranscripts) r.text = text::cleanTranscript(r.text, r.detectedLang);
+    impl_->rememberTranscript(r.text, r.detectedLang);
     return r;
 }
 
@@ -227,6 +267,7 @@ TranslationResult TranslationPipeline::translateText(const std::string& text, co
         impl_->setError(err);
         return r;
     }
+    if (impl_->cfg.postProcessTranslations && !r.route.empty()) r.translatedText = text::postProcessTranslation(r.translatedText, targetLang);
     r.nmtMs = Impl::msSince(t0);
     r.totalMs = r.nmtMs;
     r.ok = true;
@@ -251,15 +292,16 @@ TranslationResult TranslationPipeline::processSpeechToTranslation(const float* p
     }
 
     // 1. STT
-    const SttResult stt = impl_->stt.transcribe(pcm, n, sourceLang, impl_->cfg.initialPrompt);
+    const SttResult stt = impl_->stt.transcribe(pcm, n, sourceLang, impl_->decodeOptions(sourceLang));
     r.sttMs = stt.elapsedMs;
     if (!stt.ok) {
         r.error = stt.error;
         impl_->setError(r.error);
         return r;
     }
-    r.sourceText = stt.text;
     if (!stt.detectedLang.empty()) r.sourceLang = stt.detectedLang;
+    r.sourceText = impl_->cfg.cleanTranscripts ? text::cleanTranscript(stt.text, r.sourceLang) : stt.text;
+    impl_->rememberTranscript(r.sourceText, r.sourceLang);
     if (r.sourceText.empty()) {
         // Silence / non-speech: not an error, just nothing to translate.
         r.ok = true;
@@ -280,6 +322,7 @@ TranslationResult TranslationPipeline::processSpeechToTranslation(const float* p
             r.totalMs = Impl::msSince(t0);
             return r;
         }
+        if (impl_->cfg.postProcessTranslations) r.translatedText = text::postProcessTranslation(r.translatedText, targetLang);
     }
     r.nmtMs = Impl::msSince(t1);
     r.totalMs = Impl::msSince(t0);

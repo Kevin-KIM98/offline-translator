@@ -29,10 +29,21 @@ struct PipelineConfig {
     int nThreads = 4;                   // whisper / CTranslate2 intra-op threads
     bool useGpu = true;                 // whisper: Metal (iOS) / Vulkan-OpenCL (Android) when compiled in
     bool enableDenoise = true;          // RNNoise front-end
-    int beamSize = 2;                   // NMT beam (1 = greedy, fastest)
+    int beamSize = 4;                   // NMT beam (1 = greedy, fastest)
     int maxDecodingLength = 256;        // NMT hard stop
-    std::vector<std::string> pivotLangs = {"ko", "en"}; // tried in order when no direct pair exists
+    int noRepeatNgramSize = 3;          // NMT: block repeated n-grams (0 = off)
+    float repetitionPenalty = 1.1f;     // NMT: >1 discourages repeating tokens
+    // Tried in order when no direct pair exists. X→en / en→X OPUS-MT models are the strongest,
+    // so English is the preferred pivot.
+    std::vector<std::string> pivotLangs = {"en", "ko"};
     std::string initialPrompt;          // optional whisper prompt (domain vocabulary, punctuation style)
+    bool useDefaultPrompts = true;      // when initialPrompt is empty use a punctuated per-language prompt
+    bool useContextPrompt = true;       // append the previous utterance's transcript to the prompt
+    int sttBeamSize = 5;                // whisper beam search width (1 = greedy)
+    float noSpeechThreshold = 0.85f;    // drop whisper segments whose no-speech probability exceeds this
+    bool sttAdaptiveAudioContext = true;// shrink whisper's encoder window to the utterance length (faster)
+    bool cleanTranscripts = true;       // filter hallucinations / repetitions from STT output
+    bool postProcessTranslations = true;// spacing / capitalization fixes on NMT output
     bool preloadAllPairs = false;       // load every NMT pair found on disk at init (memory heavy)
 };
 

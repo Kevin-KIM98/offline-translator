@@ -24,7 +24,21 @@ public:
     NmtEngine(const NmtEngine&) = delete;
     NmtEngine& operator=(const NmtEngine&) = delete;
 
-    void init(const std::string& rootDir, int nThreads, int beamSize, int maxDecodingLength);
+    struct Options {
+        int nThreads = 4;
+        int beamSize = 4;
+        int maxDecodingLength = 256;
+        int noRepeatNgramSize = 3;     // 0 = off
+        float repetitionPenalty = 1.1f;
+    };
+    void init(const std::string& rootDir, const Options& options);
+    void init(const std::string& rootDir, int nThreads, int beamSize, int maxDecodingLength) {
+        Options o;
+        o.nThreads = nThreads;
+        o.beamSize = beamSize;
+        o.maxDecodingLength = maxDecodingLength;
+        init(rootDir, o);
+    }
     const std::string& rootDir() const;
 
     static std::string pairName(const std::string& src, const std::string& tgt) { return src + "-" + tgt; }

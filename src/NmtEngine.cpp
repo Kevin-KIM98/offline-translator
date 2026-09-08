@@ -57,8 +57,10 @@ struct LoadedPair {
 struct NmtEngine::Impl {
     std::string rootDir;
     int nThreads = 4;
-    int beamSize = 2;
+    int beamSize = 4;
     int maxDecodingLength = 256;
+    int noRepeatNgramSize = 3;
+    float repetitionPenalty = 1.1f;
     std::map<std::string, std::unique_ptr<LoadedPair>> loaded; // key: "src-tgt"
     mutable std::mutex mutex;
 
@@ -124,13 +126,15 @@ struct NmtEngine::Impl {
 NmtEngine::NmtEngine() : impl_(new Impl) {}
 NmtEngine::~NmtEngine() = default;
 
-void NmtEngine::init(const std::string& rootDir, int nThreads, int beamSize, int maxDecodingLength) {
+void NmtEngine::init(const std::string& rootDir, const Options& o) {
     std::lock_guard<std::mutex> lock(impl_->mutex);
     impl_->loaded.clear();
     impl_->rootDir = rootDir;
-    impl_->nThreads = nThreads > 0 ? nThreads : 4;
-    impl_->beamSize = beamSize > 0 ? beamSize : 1;
-    impl_->maxDecodingLength = maxDecodingLength > 0 ? maxDecodingLength : 256;
+    impl_->nThreads = o.nThreads > 0 ? o.nThreads : 4;
+    impl_->beamSize = o.beamSize > 0 ? o.beamSize : 1;
+    impl_->maxDecodingLength = o.maxDecodingLength > 0 ? o.maxDecodingLength : 256;
+    impl_->noRepeatNgramSize = o.noRepeatNgramSize > 0 ? o.noRepeatNgramSize : 0;
+    impl_->repetitionPenalty = o.repetitionPenalty > 0.0f ? o.repetitionPenalty : 1.0f;
 }
 
 const std::string& NmtEngine::rootDir() const { return impl_->rootDir; }
@@ -331,7 +335,12 @@ bool NmtEngine::translateDirect(const std::string& text, const std::string& src,
         opts.beam_size = static_cast<std::size_t>(impl_->beamSize);
         opts.max_decoding_length = static_cast<std::size_t>(impl_->maxDecodingLength);
         opts.return_scores = false;
-        opts.repetition_penalty = 1.1f;
+        opts.repetition_penalty = impl_->repetitionPenalty;
+        opts.no_repeat_ngram_size = static_cast<std::size_t>(impl_->noRepeatNgramSize);
+        // Bound decoding by input length: Marian never needs more than ~3x the source tokens.
+        std::size_t longest = 0;
+        for (const auto& t : batch) longest = std::max(longest, t.size());
+        opts.max_decoding_length = std::min<std::size_t>(opts.max_decoding_length, longest * 3 + 16);
 
         std::vector<std::vector<std::string>> prefixes;
         if (!p.targetPrefixToken.empty()) prefixes.assign(batch.size(), {p.targetPrefixToken});

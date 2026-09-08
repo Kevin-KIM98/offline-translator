@@ -1,3 +1,6 @@
+#if canImport(OfflineTranslatorObjC)
+import OfflineTranslatorObjC
+#endif
 import Foundation
 
 /// Model download / verify / install orchestration for iOS.
@@ -6,9 +9,9 @@ import Foundation
 /// C++ core through `OTModelManager`. Zip archives require an unzip step — wire your preferred
 /// library (e.g. ZIPFoundation) into `unzipHandler`, or publish "files" mode manifests which
 /// need no archive handling at all (recommended).
-final class ModelDownloader: NSObject {
+public final class ModelDownloader: NSObject {
 
-    enum Event {
+    public enum Event {
         case started(id: String, totalBytes: UInt64)
         case downloading(id: String, file: String, bytesDone: UInt64, bytesTotal: UInt64)
         case verifying(id: String, bytesDone: UInt64, bytesTotal: UInt64)
@@ -17,10 +20,10 @@ final class ModelDownloader: NSObject {
         case allDone(failed: [String])
     }
 
-    typealias UnzipHandler = (_ archive: URL, _ destination: URL) throws -> Void
+    public typealias UnzipHandler = (_ archive: URL, _ destination: URL) throws -> Void
 
-    let manager: OTModelManager
-    var unzipHandler: UnzipHandler?
+    public let manager: OTModelManager
+    public var unzipHandler: UnzipHandler?
     private let session: URLSession
     private var manifestURL: URL?
 
@@ -28,7 +31,10 @@ final class ModelDownloader: NSObject {
     ///   - modelsRoot: defaults to <Application Support>/models (excluded from iCloud backup).
     ///   - manifestURL: remote manifest; when nil only the cached / bundled manifest is used.
     ///   - bundledManifest: name of a manifest.json in the app bundle used on first launch.
-    init(modelsRoot: URL? = nil, manifestURL: URL? = nil, bundledManifest: String? = "manifest") {
+    /// Default manifest: models hosted on the project GitHub releases. Override to self-host.
+    public static let defaultManifestURL = URL(string: "https://raw.githubusercontent.com/Kevin-KIM98/offline-translator/main/assets/manifest.json")!
+
+    public init(modelsRoot: URL? = nil, manifestURL: URL? = ModelDownloader.defaultManifestURL, bundledManifest: String? = "manifest") {
         let root = modelsRoot ?? Self.defaultModelsRoot()
         manager = OTModelManager(modelsRoot: root.path)
         self.manifestURL = manifestURL
@@ -46,15 +52,15 @@ final class ModelDownloader: NSObject {
         }
     }
 
-    static func defaultModelsRoot() -> URL {
+    public static func defaultModelsRoot() -> URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return support.appendingPathComponent("models", isDirectory: true)
     }
 
-    var hasManifest: Bool { !manager.manifestVersion.isEmpty }
+    public var hasManifest: Bool { !manager.manifestVersion.isEmpty }
 
     /// Fetches the latest manifest; keeps the cached one on failure.
-    func refreshManifest() async -> Bool {
+    public func refreshManifest() async -> Bool {
         guard let url = manifestURL else { return hasManifest }
         guard let (data, _) = try? await session.data(from: url),
               let json = String(data: data, encoding: .utf8) else { return hasManifest }
@@ -63,19 +69,19 @@ final class ModelDownloader: NSObject {
         return ok || hasManifest
     }
 
-    func status(deepVerify: Bool = false) -> [OTModelStatus] { manager.status(withDeepVerify: deepVerify) }
+    public func status(deepVerify: Bool = false) -> [OTModelStatus] { manager.status(withDeepVerify: deepVerify) }
 
-    func status(languages: [String], deepVerify: Bool = false) -> [OTModelStatus] {
+    public func status(languages: [String], deepVerify: Bool = false) -> [OTModelStatus] {
         manager.status(forLanguages: languages, deepVerify: deepVerify)
     }
 
-    func freeBytes() -> UInt64 {
+    public func freeBytes() -> UInt64 {
         let values = try? URL(fileURLWithPath: manager.modelsRoot).resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
         return UInt64(max(0, values?.volumeAvailableCapacityForImportantUsage ?? 0))
     }
 
     /// Downloads + installs everything in `models` that needs it. Events arrive on the stream.
-    func installAll(_ models: [OTModelStatus]) -> AsyncStream<Event> {
+    public func installAll(_ models: [OTModelStatus]) -> AsyncStream<Event> {
         AsyncStream { continuation in
             let task = Task.detached(priority: .utility) { [self] in
                 var failed: [String] = []
@@ -99,9 +105,10 @@ final class ModelDownloader: NSObject {
         }
     }
 
-    struct InstallError: LocalizedError {
-        let message: String
-        var errorDescription: String? { message }
+    public struct InstallError: LocalizedError {
+        public let message: String
+        public init(message: String) { self.message = message }
+        public var errorDescription: String? { message }
     }
 
     private func installOne(_ m: OTModelStatus, emit: @escaping (Event) -> Void) async throws {

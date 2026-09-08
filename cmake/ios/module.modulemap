@@ -1,0 +1,4 @@
+module OfflineTranslatorCore {
+    header "translator_c_api.h"
+    export *
+}

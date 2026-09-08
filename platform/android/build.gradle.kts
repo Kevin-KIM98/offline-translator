@@ -5,6 +5,10 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+base {
+    archivesName.set("offline-translator")
+}
+
 android {
     namespace = "com.offlinetranslator"
     compileSdk = 35

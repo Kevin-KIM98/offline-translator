@@ -84,9 +84,14 @@ sealed class InstallEvent {
 class ModelRepository(
     private val context: Context,
     val modelsRoot: File = File(context.filesDir, "models"),
-    private val manifestUrl: String? = null,
+    private val manifestUrl: String? = DEFAULT_MANIFEST_URL,
     private val bundledManifestAsset: String? = "manifest.json",
 ) : Closeable {
+
+    companion object {
+        /** Default manifest: models hosted on the project's GitHub releases. Override to self-host. */
+        const val DEFAULT_MANIFEST_URL = "https://raw.githubusercontent.com/Kevin-KIM98/offline-translator/main/assets/manifest.json"
+    }
 
     private var handle: Long = NativeBridge.mmCreate(modelsRoot.absolutePath)
 

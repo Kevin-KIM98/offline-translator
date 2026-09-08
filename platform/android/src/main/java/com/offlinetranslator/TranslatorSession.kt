@@ -94,4 +94,53 @@ class TranslatorSession(
         tts.shutdown()
         translator.close()
     }
+
+    companion object {
+        /**
+         * One-call setup: fetch the manifest, download whatever the given languages need
+         * (with progress), and return a ready session. Safe to call on every launch — models
+         * already installed are skipped.
+         *
+         *   val session = TranslatorSession.prepare(context, listOf("ko", "en")) { done, total -> ... }
+         *   session.onResult = { r -> ... }
+         *   session.start(sourceLang = "ko", targetLang = "en")
+         */
+        suspend fun prepare(
+            context: Context,
+            languages: List<String>,
+            manifestUrl: String? = ModelRepository.DEFAULT_MANIFEST_URL,
+            speakResults: Boolean = true,
+            onProgress: ((bytesDone: Long, bytesTotal: Long) -> Unit)? = null,
+        ): TranslatorSession {
+            val repo = ModelRepository(context, manifestUrl = manifestUrl)
+            try {
+                repo.refreshManifest()
+                if (!repo.hasManifest()) throw TranslatorException("no model manifest available (offline on first launch?)")
+                val needed = repo.statusForLanguages(languages).filter { it.needsDownload }
+                val total = needed.sumOf { it.totalBytes }
+                if (needed.isNotEmpty()) {
+                    if (repo.freeBytes() < total + 50L * 1024 * 1024) {
+                        throw TranslatorException("not enough storage: need ${total / 1_000_000} MB")
+                    }
+                    var completedBytes = 0L
+                    var failure: String? = null
+                    repo.installAll(needed).collect { ev ->
+                        when (ev) {
+                            is InstallEvent.Downloading -> onProgress?.invoke(completedBytes + ev.bytesDone, total)
+                            is InstallEvent.Installed -> {
+                                completedBytes += needed.first { it.id == ev.id }.totalBytes
+                                onProgress?.invoke(completedBytes, total)
+                            }
+                            is InstallEvent.Failed -> failure = "${ev.id}: ${ev.reason}"
+                            else -> {}
+                        }
+                    }
+                    failure?.let { throw TranslatorException("model download failed: $it") }
+                }
+                return TranslatorSession(context, repo.pipelineConfig(), speakResults)
+            } finally {
+                repo.close()
+            }
+        }
+    }
 }

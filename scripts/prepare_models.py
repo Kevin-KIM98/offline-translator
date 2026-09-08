@@ -124,13 +124,26 @@ def cmd_nmt(a: argparse.Namespace) -> None:
         print(f"  ok: {sum(p.stat().st_size for p in dest.iterdir()) / 1e6:.0f} MB")
 
 
+def flat_name(kind: str, group: str, filename: str) -> str:
+    """Asset name used when files are hosted flat (e.g. GitHub release assets)."""
+    return f"{kind}_{group}_{filename}" if group else f"{kind}_{filename}"
+
+
 def cmd_manifest(a: argparse.Namespace) -> None:
     root = Path(a.root)
     base = a.base_url.rstrip("/")
     manifest = {"manifest_version": a.version, "base_url": base + "/"}
+    flat = a.flat
+    only_files = {"model.bin", "config.json", "shared_vocabulary.json", "source_vocabulary.json",
+                  "target_vocabulary.json", "source.spm", "target.spm", "pair.json"}
+
+    def url(kind: str, group: str, filename: str) -> str:
+        if flat:
+            return flat_name(kind, group, filename)
+        return f"{kind}/{group}/{filename}" if group else f"{kind}/{filename}"
 
     stt_dir = root / "stt"
-    stt_files = sorted(stt_dir.glob("*.bin")) if stt_dir.exists() else []
+    stt_files = sorted(stt_dir.glob(a.stt_glob)) if stt_dir.exists() else []
     if stt_files:
         f = stt_files[0]
         manifest["stt"] = {
@@ -139,9 +152,9 @@ def cmd_manifest(a: argparse.Namespace) -> None:
             "filename": f.name,
             "size_bytes": f.stat().st_size,
             "sha256": sha256_of(f),
-            "download_url": f"stt/{f.name}",
+            "download_url": url("stt", "", f.name),
         }
-        print(f"stt: {f.name}")
+        print(f"stt: {f.name} ({f.stat().st_size / 1e6:.0f} MB)")
 
     nmt_root = root / "nmt"
     tok = nmt_root / "tokenizer"
@@ -150,7 +163,7 @@ def cmd_manifest(a: argparse.Namespace) -> None:
         for p in sorted(tok.iterdir()):
             if p.is_file():
                 files.append({"filename": p.name, "size_bytes": p.stat().st_size, "sha256": sha256_of(p),
-                              "download_url": f"nmt/tokenizer/{p.name}"})
+                              "download_url": url("nmt", "tokenizer", p.name)})
         manifest["tokenizer"] = {"version": a.model_version, "dir_name": "tokenizer", "files": files}
 
     nmt = []
@@ -160,16 +173,30 @@ def cmd_manifest(a: argparse.Namespace) -> None:
                 continue
             files = []
             for p in sorted(d.iterdir()):
-                if p.is_file():
+                if p.is_file() and p.name in only_files:
                     files.append({"filename": p.name, "size_bytes": p.stat().st_size, "sha256": sha256_of(p),
-                                  "download_url": f"nmt/{d.name}/{p.name}"})
+                                  "download_url": url("nmt", d.name, p.name)})
             nmt.append({"pair": d.name, "dir_name": d.name, "version": a.model_version, "files": files})
             print(f"nmt: {d.name} ({len(files)} files, {sum(x['size_bytes'] for x in files) / 1e6:.0f} MB)")
     manifest["nmt"] = nmt
 
-    out = root / "manifest.json"
-    out.write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
+    out = Path(a.out) if a.out else root / "manifest.json"
+    out.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"→ {out}")
+
+    if a.upload_script:
+        # Emit a script that uploads every referenced file under its flat asset name.
+        lines = ["#!/usr/bin/env bash", "set -euo pipefail", f"TAG=\"${{1:-{a.release_tag or 'models'}}}\"",
+                 "gh release view \"$TAG\" >/dev/null 2>&1 || gh release create \"$TAG\" --title \"$TAG\" --notes \"Model assets referenced by assets/manifest.json\"",
+                 "up() { gh release upload \"$TAG\" \"$1#$2\" --clobber; }"]
+        if stt_files:
+            f = stt_files[0]
+            lines.append(f"up \"{f.as_posix()}\" \"{flat_name('stt', '', f.name)}\"")
+        for entry in nmt:
+            for fi in entry["files"]:
+                lines.append(f"up \"{(nmt_root / entry['dir_name'] / fi['filename']).as_posix()}\" \"{flat_name('nmt', entry['dir_name'], fi['filename'])}\"")
+        Path(a.upload_script).write_text("\n".join(lines) + "\n", encoding="utf-8")
+        print(f"→ {a.upload_script} (run it with the release tag to upload {len(lines) - 5} assets)")
 
 
 def main() -> None:
@@ -198,6 +225,11 @@ def main() -> None:
     m.add_argument("--base-url", required=True)
     m.add_argument("--version", default="1.1.0", help="manifest_version")
     m.add_argument("--model-version", default="1", help="per-model version string")
+    m.add_argument("--stt-glob", default="*.bin", help="which STT file to reference (e.g. 'whisper-small-*.bin')")
+    m.add_argument("--flat", action="store_true", help="flat asset names (stt_x.bin, nmt_ko-en_model.bin) for GitHub releases")
+    m.add_argument("--out", default=None, help="manifest output path (default <root>/manifest.json)")
+    m.add_argument("--upload-script", default=None, help="also write a bash script that uploads assets with gh")
+    m.add_argument("--release-tag", default="models", help="default tag used by the upload script")
     m.set_defaults(fn=cmd_manifest)
 
     a = ap.parse_args()

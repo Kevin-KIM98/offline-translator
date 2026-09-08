@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18.2)
-project(OfflineTranslationEngine VERSION 0.1.0 LANGUAGES C CXX)
+project(OfflineTranslationEngine VERSION 0.2.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -97,6 +97,7 @@ set(TRANSLATOR_SOURCES
     src/Sha256.cpp
     src/MiniJson.cpp
     src/FileUtil.cpp
+    src/TextUtil.cpp
     src/Denoiser.cpp
     src/SpeechSegmenter.cpp
     src/SttEngine.cpp

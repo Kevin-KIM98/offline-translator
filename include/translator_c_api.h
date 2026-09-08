@@ -50,11 +50,21 @@ typedef struct tr_pipeline_config {
     int n_threads;                    /* 0 → default (4) */
     int use_gpu;                      /* 1 → Metal / Vulkan when compiled in */
     int enable_denoise;               /* 1 → RNNoise front-end */
-    int beam_size;                    /* 0 → default (2) */
+    int beam_size;                    /* 0 → default (4) */
     int max_decoding_length;          /* 0 → default (256) */
-    const char* pivot_langs;          /* comma-separated, e.g. "ko,en"; NULL → "ko,en" */
+    const char* pivot_langs;          /* comma-separated, e.g. "en,ko"; NULL → "en,ko" */
     const char* initial_prompt;       /* optional whisper prompt */
     int preload_all_pairs;            /* 1 → load every NMT pair at init */
+    /* Quality knobs (0.2+); tr_pipeline_config_init() sets the defaults. */
+    int stt_beam_size;                /* whisper beam width, 1 = greedy (default 5) */
+    int use_default_prompts;          /* punctuated per-language whisper prompt (default 1) */
+    int use_context_prompt;           /* feed the previous transcript as context (default 1) */
+    int clean_transcripts;            /* hallucination / repetition filter (default 1) */
+    int post_process_translations;    /* spacing / capitalization fixes (default 1) */
+    int no_repeat_ngram_size;         /* NMT n-gram blocking (default 3, 0 = off) */
+    float repetition_penalty;         /* NMT (default 1.1) */
+    float no_speech_threshold;        /* drop whisper segments above this (default 0.85) */
+    int stt_adaptive_audio_ctx;       /* shrink whisper encoder window to utterance length (default 1) */
 } tr_pipeline_config;
 
 typedef struct tr_segmenter_config {

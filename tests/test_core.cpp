@@ -5,6 +5,7 @@
 #include "translator/NmtEngine.hpp"
 #include "translator/Sha256.hpp"
 #include "translator/SpeechSegmenter.hpp"
+#include "translator/TextUtil.hpp"
 #include "translator/TranslationPipeline.hpp"
 #include "translator_c_api.h"
 
@@ -184,6 +185,56 @@ void testSegmenter() {
     CHECK(seg.hasUtterance());
     seg.reset();
     CHECK(!seg.hasUtterance());
+}
+
+void testTextUtil() {
+    std::puts("[text util]");
+    using namespace translator::text;
+
+    // Prompts
+    CHECK(!defaultPromptFor("ko").empty());
+    CHECK(defaultPromptFor("xx").empty());
+    CHECK_EQ(buildSttPrompt("", "ko", ""), defaultPromptFor("ko"));
+    CHECK_EQ(buildSttPrompt("custom", "ko", ""), "custom");
+    const std::string withCtx = buildSttPrompt("", "en", "the previous sentence was here.");
+    CHECK(withCtx.find(defaultPromptFor("en")) == 0);
+    CHECK(withCtx.find("previous sentence") != std::string::npos);
+    // Long context is truncated at a word boundary from the end.
+    std::string longCtx;
+    for (int i = 0; i < 100; ++i) longCtx += "word" + std::to_string(i) + " ";
+    const std::string truncated = buildSttPrompt("x", "", longCtx, 50);
+    CHECK(truncated.size() < 60);
+    CHECK(truncated.find("word99") != std::string::npos);
+    CHECK(truncated.find("x ") == 0);
+
+    // Hallucinations
+    CHECK(isHallucination("시청해주셔서 감사합니다.", "ko"));
+    CHECK(isHallucination("Thank you for watching!", "en"));
+    CHECK(isHallucination("ご視聴ありがとうございました", "ja"));
+    CHECK(isHallucination("Thanks for watching.", "auto"));
+    CHECK(!isHallucination("오늘 날씨가 정말 좋네요.", "ko"));
+    CHECK(!isHallucination("Thank you for the detailed report on the quarterly numbers.", "en"));
+
+    // Cleaning
+    CHECK_EQ(cleanTranscript("[음악] 안녕하세요 (박수) 반갑습니다", "ko"), "안녕하세요 반갑습니다");
+    CHECK_EQ(cleanTranscript("♪ ♪ ♪", "en"), "");
+    CHECK_EQ(cleanTranscript("yes yes yes yes yes yes yes no", "en"), "yes yes yes no");
+    CHECK_EQ(cleanTranscript("감사합니다감사합니다감사합니다감사합니다감사합니다 네", "ko"), "감사합니다감사합니다 네");
+    CHECK_EQ(cleanTranscript("시청해주셔서 감사합니다", "ko"), "");
+    CHECK_EQ(cleanTranscript("  Hello   world  ", "en"), "Hello world");
+
+    // Post-processing
+    CHECK_EQ(postProcessTranslation("hello . it 's a great day . how are you?", "en"), "Hello. It 's a great day. How are you?");
+    CHECK_EQ(postProcessTranslation("the value is 3.14 , ok", "en"), "The value is 3.14, ok");
+    CHECK_EQ(postProcessTranslation("the meeting starts at 3:00 p.m. see you e.g. tomorrow.", "en"),
+             "The meeting starts at 3:00 p.m. See you e.g. tomorrow.");
+    CHECK_EQ(postProcessTranslation("안녕하세요 . 반갑습니다 !", "ko"), "안녕하세요. 반갑습니다!");
+    CHECK_EQ(postProcessTranslation("こんにちは 。 元気 です か ?", "ja"), "こんにちは。元気ですか？");
+    CHECK_EQ(postProcessTranslation("你好 , 世界 .", "zh"), "你好，世界。");
+    CHECK_EQ(postProcessTranslation("¿cómo estás? bien.", "es"), "¿Cómo estás? Bien.");
+    CHECK(isCjkChar("한"));
+    CHECK(isCjkChar("漢"));
+    CHECK(!isCjkChar("a"));
 }
 
 void testSentenceSplit() {
@@ -577,6 +628,7 @@ int main() {
     testSha256();
     testJson();
     testSegmenter();
+    testTextUtil();
     testSentenceSplit();
     testModelManager();
     testPipelineStub();
