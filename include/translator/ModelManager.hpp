@@ -39,7 +39,7 @@ struct DownloadItem {
 };
 
 struct ModelEntry {
-    enum class Kind { Stt, Nmt, Tokenizer };
+    enum class Kind { Stt, Nmt, Tokenizer, Llm };
 
     std::string id;             // "whisper-small-q4", "nmt-ko-en", "nmt-tokenizer"
     Kind kind = Kind::Nmt;
@@ -49,7 +49,7 @@ struct ModelEntry {
     std::vector<DownloadItem> downloads;
     std::vector<std::string> requiredFiles; // relative to installPath (dirs) — for stt: {basename}
 
-    bool isSingleFile() const { return kind == Kind::Stt; }
+    bool isSingleFile() const { return kind == Kind::Stt || kind == Kind::Llm; }
     std::uint64_t totalBytes() const;
     // Stable fingerprint of the manifest entry (hash of version + per-file hashes).
     std::string signature() const;
@@ -107,8 +107,12 @@ public:
     std::vector<ModelStatus> status(bool deepVerify = false, const ProgressFn& progress = nullptr) const;
     std::vector<ModelStatus> pending(bool deepVerify = false) const;
     Json statusJson(bool deepVerify = false) const;
-    // Only the models needed for a given language pair (direct or via pivot) plus STT/tokenizer.
-    std::vector<ModelStatus> statusForLanguages(const std::vector<std::string>& langs, bool deepVerify = false) const;
+    // Only the models needed for the given languages: STT + tokenizer always, NMT pairs whose
+    // both languages are requested, and the LLM per `llmMode` (IfNeeded = some requested
+    // direction has neither a direct pair nor an English pivot).
+    enum class LlmMode { IfNeeded, Always, Never };
+    std::vector<ModelStatus> statusForLanguages(const std::vector<std::string>& langs, bool deepVerify = false,
+                                                LlmMode llmMode = LlmMode::IfNeeded) const;
 
     // ---- Download staging / verification / install ------------------------------
     std::string stagingDir(const std::string& id) const; // created on demand
@@ -129,6 +133,8 @@ public:
 
     // Path helpers for wiring into PipelineConfig.
     std::string sttModelPath() const;
+    std::string llmModelPath() const;   // empty when the manifest has no "llm" entry
+    std::string llmDir() const;
 
 private:
     bool parseFileItem(const Json& j, const std::string& defaultDirUrl, DownloadItem& out, std::string* error) const;

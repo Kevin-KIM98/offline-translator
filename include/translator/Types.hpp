@@ -12,11 +12,18 @@ namespace translator {
 constexpr int kSampleRate = 16000;   // Hz — the whole pipeline runs at 16 kHz mono
 constexpr int kFrameSize = 480;      // RNNoise frame: 480 samples = 30 ms @ 16 kHz
 
-// ISO-639-1 codes used throughout: "ko", "en", "ja", "zh", "es". "auto" = detect.
+// ISO-639-1 codes used throughout: ko en es vi th ja zh. "auto" = detect.
 inline const std::vector<std::string>& supportedLanguages() {
-    static const std::vector<std::string> langs = {"ko", "en", "ja", "zh", "es"};
+    static const std::vector<std::string> langs = {"ko", "en", "es", "vi", "th", "ja", "zh"};
     return langs;
 }
+
+// Which translation engine handles a request.
+enum class TranslationBackend {
+    Auto,    // Marian pair if one exists (direct or via pivot), otherwise the LLM
+    Marian,  // CTranslate2 OPUS-MT only
+    Llm,     // LLM only (any→any in one hop; source may be "auto")
+};
 inline bool isSupportedLanguage(const std::string& code) {
     for (const auto& l : supportedLanguages())
         if (l == code) return true;
@@ -24,8 +31,15 @@ inline bool isSupportedLanguage(const std::string& code) {
 }
 
 struct PipelineConfig {
-    std::string whisperModelPath;       // <models>/stt/whisper-small-q4.bin
+    std::string whisperModelPath;       // <models>/stt/whisper-small-q5_1.bin
     std::string nmtRootDir;             // <models>/nmt
+    std::string llmModelPath;           // <models>/llm/<model>.gguf (optional)
+    TranslationBackend backend = TranslationBackend::Auto;
+    int llmContextSize = 1024;
+    int llmMaxOutputTokens = 256;
+    float llmTemperature = 0.0f;        // 0 = greedy
+    int llmGpuLayers = 99;              // Metal / Vulkan offload when compiled in
+    std::string llmSystemPrompt;        // override the built-in translation instruction
     int nThreads = 4;                   // whisper / CTranslate2 intra-op threads
     bool useGpu = true;                 // whisper: Metal (iOS) / Vulkan-OpenCL (Android) when compiled in
     bool enableDenoise = true;          // RNNoise front-end
@@ -62,7 +76,7 @@ struct TranslationResult {
     std::string sourceLang;
     std::string targetLang;
     std::string translatedText;
-    std::vector<std::string> route;     // e.g. {"ja-ko","ko-en"} when pivoting
+    std::vector<std::string> route;     // e.g. {"ja-ko","ko-en"} when pivoting, {"llm"} for the LLM
     double sttMs = 0.0;
     double nmtMs = 0.0;
     double totalMs = 0.0;

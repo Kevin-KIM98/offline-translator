@@ -65,6 +65,14 @@ typedef struct tr_pipeline_config {
     float repetition_penalty;         /* NMT (default 1.1) */
     float no_speech_threshold;        /* drop whisper segments above this (default 0.85) */
     int stt_adaptive_audio_ctx;       /* shrink whisper encoder window to utterance length (default 1) */
+    /* LLM translation backend (0.3+) */
+    const char* llm_model_path;       /* GGUF file; NULL → Marian only */
+    int translation_backend;          /* 0 auto (Marian if a pair exists, else LLM), 1 Marian only, 2 LLM only */
+    int llm_context_size;             /* default 1024 */
+    int llm_max_output_tokens;        /* default 256 */
+    float llm_temperature;            /* default 0 (greedy) */
+    int llm_gpu_layers;               /* default 99 */
+    const char* llm_system_prompt;    /* optional override of the translation instruction */
 } tr_pipeline_config;
 
 typedef struct tr_segmenter_config {
@@ -139,8 +147,11 @@ TR_API const char* tr_mm_manifest_version(tr_model_manager* m);
 /* Status JSON: {"manifest_version","models_root","pending_bytes","models":[ModelStatus...]}
    deep_verify=1 re-hashes installed files (slow; run on a background thread). */
 TR_API char* tr_mm_status_json(tr_model_manager* m, int deep_verify);
-/* Same but limited to STT/tokenizer + NMT pairs whose both languages are in `langs_csv` ("ko,en"). */
-TR_API char* tr_mm_status_for_languages_json(tr_model_manager* m, const char* langs_csv, int deep_verify);
+/* Same but limited to STT/tokenizer + NMT pairs whose both languages are in `langs_csv` ("ko,en").
+   llm_mode: 0 = include the LLM only when some requested direction has no Marian route,
+             1 = always include the LLM, 2 = never. */
+TR_API char* tr_mm_status_for_languages_json(tr_model_manager* m, const char* langs_csv, int deep_verify, int llm_mode);
+TR_API char* tr_mm_llm_model_path(tr_model_manager* m);   /* "" when the manifest has no llm entry */
 
 /* Download staging directory for a model id (created). Caller must tr_string_free(). */
 TR_API char* tr_mm_staging_dir(tr_model_manager* m, const char* id);

@@ -21,6 +21,26 @@ set(TRANSLATOR_HAS_RNNOISE 0)
 set(TRANSLATOR_HAS_WHISPER 0)
 set(TRANSLATOR_HAS_CTRANSLATE2 0)
 set(TRANSLATOR_HAS_SENTENCEPIECE 0)
+set(TRANSLATOR_HAS_LLAMA 0)
+
+# ---------------------------------------------------------------------------
+# ggml options shared by llama.cpp and whisper.cpp (whoever is added first creates the
+# `ggml` target; whisper.cpp skips its own copy when the target already exists).
+# ---------------------------------------------------------------------------
+set(GGML_NATIVE OFF CACHE BOOL "" FORCE)   # never -march=native for mobile
+set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+set(GGML_CCACHE OFF CACHE BOOL "" FORCE)
+if(APPLE)
+    set(GGML_METAL               ${TRANSLATOR_METAL} CACHE BOOL "" FORCE)
+    set(GGML_METAL_EMBED_LIBRARY ON                  CACHE BOOL "" FORCE)
+    set(GGML_ACCELERATE          ON                  CACHE BOOL "" FORCE)
+    set(GGML_BLAS                ON                  CACHE BOOL "" FORCE)
+    set(GGML_BLAS_VENDOR         Apple               CACHE STRING "" FORCE)
+endif()
+if(ANDROID)
+    set(GGML_VULKAN ${TRANSLATOR_VULKAN} CACHE BOOL "" FORCE)
+    set(GGML_OPENCL ${TRANSLATOR_OPENCL} CACHE BOOL "" FORCE)
+endif()
 
 # Recursively set a target property on every buildable target created under `dir`.
 function(_translator_set_property_recursive dir prop value)
@@ -95,6 +115,26 @@ if(TRANSLATOR_WITH_RNNOISE)
 endif()
 
 # ---------------------------------------------------------------------------
+# llama.cpp (+ ggml) — LLM translation backend. Added BEFORE whisper.cpp so both share one ggml.
+# ---------------------------------------------------------------------------
+if(TRANSLATOR_WITH_LLAMA)
+    set(_ll ${TRANSLATOR_TP_DIR}/llama.cpp)
+    if(EXISTS ${_ll}/CMakeLists.txt)
+        set(LLAMA_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
+        set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+        set(LLAMA_BUILD_SERVER   OFF CACHE BOOL "" FORCE)
+        set(LLAMA_BUILD_TOOLS    OFF CACHE BOOL "" FORCE)
+        set(LLAMA_BUILD_COMMON   OFF CACHE BOOL "" FORCE)
+        set(LLAMA_CURL           OFF CACHE BOOL "" FORCE)
+        add_subdirectory(${_ll} ${CMAKE_BINARY_DIR}/third_party/llama.cpp EXCLUDE_FROM_ALL)
+        _translator_set_property_recursive(${_ll} POSITION_INDEPENDENT_CODE ON)
+        set(TRANSLATOR_HAS_LLAMA 1)
+    else()
+        _translator_dep_missing("llama.cpp" "git clone --branch b5030 https://github.com/ggml-org/llama.cpp third_party/llama.cpp")
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
 # whisper.cpp (+ ggml) — official CMake project
 # ---------------------------------------------------------------------------
 if(TRANSLATOR_WITH_WHISPER)
@@ -104,20 +144,9 @@ if(TRANSLATOR_WITH_WHISPER)
         set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
         set(WHISPER_BUILD_SERVER   OFF CACHE BOOL "" FORCE)
         set(WHISPER_CURL           OFF CACHE BOOL "" FORCE)
-        set(GGML_NATIVE            OFF CACHE BOOL "" FORCE)  # never -march=native for mobile
-        set(GGML_OPENMP            OFF CACHE BOOL "" FORCE)
         if(APPLE)
-            set(GGML_METAL               ${TRANSLATOR_METAL}  CACHE BOOL "" FORCE)
-            set(GGML_METAL_EMBED_LIBRARY ON                   CACHE BOOL "" FORCE)
-            set(GGML_ACCELERATE          ON                   CACHE BOOL "" FORCE)
-            set(GGML_BLAS                ON                   CACHE BOOL "" FORCE)
-            set(GGML_BLAS_VENDOR         Apple                CACHE STRING "" FORCE)
             set(WHISPER_COREML           ${TRANSLATOR_COREML} CACHE BOOL "" FORCE)
             set(WHISPER_COREML_ALLOW_FALLBACK ON              CACHE BOOL "" FORCE)
-        endif()
-        if(ANDROID)
-            set(GGML_VULKAN ${TRANSLATOR_VULKAN} CACHE BOOL "" FORCE)
-            set(GGML_OPENCL ${TRANSLATOR_OPENCL} CACHE BOOL "" FORCE)
         endif()
         add_subdirectory(${_wh} ${CMAKE_BINARY_DIR}/third_party/whisper.cpp EXCLUDE_FROM_ALL)
         _translator_set_property_recursive(${_wh} POSITION_INDEPENDENT_CODE ON)

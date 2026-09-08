@@ -113,8 +113,9 @@ JNI_FN(jstring, lastGlobalError)(JNIEnv* env, jobject) { return utf8ToJstring(en
 /* ---------------------------------------------------------------------- */
 
 JNI_FN(jlong, pipelineCreate)(JNIEnv* env, jobject, jstring whisperPath, jstring nmtRoot, jint nThreads, jboolean useGpu,
-                             jboolean denoise, jint beam, jint maxLen, jstring pivots, jstring prompt, jboolean preloadAll) {
-    OptString wp(env, whisperPath), nr(env, nmtRoot), pv(env, pivots), pr(env, prompt);
+                             jboolean denoise, jint beam, jint maxLen, jstring pivots, jstring prompt, jboolean preloadAll,
+                             jstring llmPath, jint backend, jint llmCtx) {
+    OptString wp(env, whisperPath), nr(env, nmtRoot), pv(env, pivots), pr(env, prompt), lp(env, llmPath);
     tr_pipeline_config cfg;
     tr_pipeline_config_init(&cfg);
     cfg.whisper_model_path = wp.c_str();
@@ -127,6 +128,9 @@ JNI_FN(jlong, pipelineCreate)(JNIEnv* env, jobject, jstring whisperPath, jstring
     cfg.pivot_langs = pv.c_str();
     cfg.initial_prompt = pr.c_str();
     cfg.preload_all_pairs = preloadAll ? 1 : 0;
+    cfg.llm_model_path = lp.c_str();
+    cfg.translation_backend = backend;
+    if (llmCtx > 0) cfg.llm_context_size = llmCtx;
     tr_pipeline* p = tr_pipeline_create(&cfg);
     if (!p) LOGE("pipelineCreate failed: %s", tr_last_global_error());
     return reinterpret_cast<jlong>(p);
@@ -246,10 +250,12 @@ JNI_FN(jboolean, mmSaveManifest)(JNIEnv*, jobject, jlong h) { return tr_mm_save_
 JNI_FN(jstring, mmManifestVersion)(JNIEnv* env, jobject, jlong h) { return utf8ToJstring(env, tr_mm_manifest_version(M(h))); }
 JNI_FN(jstring, mmStatusJson)(JNIEnv* env, jobject, jlong h, jboolean deep) { return takeString(env, tr_mm_status_json(M(h), deep ? 1 : 0)); }
 
-JNI_FN(jstring, mmStatusForLanguagesJson)(JNIEnv* env, jobject, jlong h, jstring langs, jboolean deep) {
+JNI_FN(jstring, mmStatusForLanguagesJson)(JNIEnv* env, jobject, jlong h, jstring langs, jboolean deep, jint llmMode) {
     OptString l(env, langs);
-    return takeString(env, tr_mm_status_for_languages_json(M(h), l.c_str(), deep ? 1 : 0));
+    return takeString(env, tr_mm_status_for_languages_json(M(h), l.c_str(), deep ? 1 : 0, llmMode));
 }
+
+JNI_FN(jstring, mmLlmModelPath)(JNIEnv* env, jobject, jlong h) { return takeString(env, tr_mm_llm_model_path(M(h))); }
 
 JNI_FN(jstring, mmStagingDir)(JNIEnv* env, jobject, jlong h, jstring id) {
     OptString i(env, id);

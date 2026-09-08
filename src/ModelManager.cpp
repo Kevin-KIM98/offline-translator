@@ -54,6 +54,7 @@ const char* ModelEntry::kindName(Kind k) {
         case Kind::Stt: return "stt";
         case Kind::Nmt: return "nmt";
         case Kind::Tokenizer: return "tokenizer";
+        case Kind::Llm: return "llm";
     }
     return "unknown";
 }
@@ -143,6 +144,14 @@ std::string ModelManager::cachedManifestPath() const { return fs::join(modelsRoo
 std::string ModelManager::sttModelPath() const {
     for (const auto& e : entries_)
         if (e.kind == ModelEntry::Kind::Stt) return e.installPath;
+    return {};
+}
+
+std::string ModelManager::llmDir() const { return fs::join(modelsRoot_, "llm"); }
+
+std::string ModelManager::llmModelPath() const {
+    for (const auto& e : entries_)
+        if (e.kind == ModelEntry::Kind::Llm) return e.installPath;
     return {};
 }
 
@@ -246,6 +255,22 @@ bool ModelManager::loadManifest(const Json& manifest, std::string* error) {
         d.isArchive = false;
         e.downloads.push_back(d);
         e.installPath = fs::join(sttDir(), d.filename);
+        e.requiredFiles = {d.filename};
+        entries.push_back(std::move(e));
+    }
+
+    // ---- LLM (optional, single GGUF file) ----
+    const Json& llm = manifest["llm"];
+    if (llm.isObject()) {
+        ModelEntry e;
+        e.kind = ModelEntry::Kind::Llm;
+        e.id = llm.getString("id", "llm");
+        e.version = llm.getString("version", "1");
+        DownloadItem d;
+        if (!parseFileItem(llm, resolveUrl("llm"), d, error)) return false;
+        d.isArchive = false;
+        e.downloads.push_back(d);
+        e.installPath = fs::join(llmDir(), d.filename);
         e.requiredFiles = {d.filename};
         entries.push_back(std::move(e));
     }
@@ -463,16 +488,35 @@ Json ModelManager::statusJson(bool deepVerify) const {
     return j;
 }
 
-std::vector<ModelStatus> ModelManager::statusForLanguages(const std::vector<std::string>& langs, bool deepVerify) const {
+std::vector<ModelStatus> ModelManager::statusForLanguages(const std::vector<std::string>& langs, bool deepVerify,
+                                                          LlmMode llmMode) const {
     std::vector<ModelStatus> out;
+    // Which Marian pairs exist in the manifest (for the "is the LLM needed" decision).
+    std::vector<std::string> pairs;
+    for (const auto& e : entries_)
+        if (e.kind == ModelEntry::Kind::Nmt) pairs.push_back(e.pair);
+    auto hasPair = [&](const std::string& a, const std::string& b) {
+        return std::find(pairs.begin(), pairs.end(), a + "-" + b) != pairs.end();
+    };
+    bool llmNeeded = false;
+    for (const auto& a : langs)
+        for (const auto& b : langs) {
+            if (a == b) continue;
+            const bool direct = hasPair(a, b);
+            const bool viaEn = a != "en" && b != "en" && hasPair(a, "en") && hasPair("en", b);
+            if (!direct && !viaEn) llmNeeded = true;
+        }
+
     for (const auto& e : entries_) {
-        bool wanted = e.kind != ModelEntry::Kind::Nmt;
-        if (!wanted) {
+        bool wanted = true;
+        if (e.kind == ModelEntry::Kind::Nmt) {
             const auto dash = e.pair.find('-');
             const std::string src = e.pair.substr(0, dash), tgt = dash == std::string::npos ? "" : e.pair.substr(dash + 1);
             const bool srcIn = std::find(langs.begin(), langs.end(), src) != langs.end();
             const bool tgtIn = std::find(langs.begin(), langs.end(), tgt) != langs.end();
             wanted = srcIn && tgtIn;
+        } else if (e.kind == ModelEntry::Kind::Llm) {
+            wanted = llmMode == LlmMode::Always || (llmMode == LlmMode::IfNeeded && llmNeeded);
         }
         if (wanted) out.push_back(statusOf(e, deepVerify));
     }

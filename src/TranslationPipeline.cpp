@@ -2,6 +2,7 @@
 
 #include "translator/Denoiser.hpp"
 #include "translator/FileUtil.hpp"
+#include "translator/LlmEngine.hpp"
 #include "translator/NmtEngine.hpp"
 #include "translator/SttEngine.hpp"
 #include "translator/TextUtil.hpp"
@@ -20,7 +21,52 @@ struct TranslationPipeline::Impl {
     Denoiser denoiser;
     SttEngine stt;
     NmtEngine nmt;
+    LlmEngine llm;
     SpeechSegmenter segmenter;
+
+    // Runs the configured backend. Fills translatedText/route or error.
+    bool translateWith(const std::string& text, const std::string& src, const std::string& tgt, TranslationResult& r) {
+        std::string err;
+        const bool llmReady = llm.isLoaded();
+        const bool marianRoute = (src != "auto" && !src.empty()) && !nmt.resolveRoute(src, tgt, cfg.pivotLangs).empty();
+        bool useLlm = false;
+        switch (cfg.backend) {
+            case TranslationBackend::Llm: useLlm = true; break;
+            case TranslationBackend::Marian: useLlm = false; break;
+            case TranslationBackend::Auto: useLlm = !marianRoute && llmReady; break;
+        }
+        if (useLlm) {
+            if (!llmReady) {
+                r.error = "LLM backend requested but no LLM model loaded";
+                return false;
+            }
+            const LlmResult lr = llm.translate(text, src, tgt);
+            if (!lr.ok) {
+                r.error = lr.error;
+                return false;
+            }
+            r.translatedText = lr.text;
+            r.route = {"llm"};
+            return true;
+        }
+        if (src.empty() || src == "auto") {
+            r.error = "source language must be known for Marian translation (load an LLM model for auto-detect)";
+            return false;
+        }
+        if (!nmt.translate(text, src, tgt, cfg.pivotLangs, r.translatedText, &r.route, &err)) {
+            if (llmReady && cfg.backend == TranslationBackend::Auto) {
+                const LlmResult lr = llm.translate(text, src, tgt);
+                if (lr.ok) {
+                    r.translatedText = lr.text;
+                    r.route = {"llm"};
+                    return true;
+                }
+            }
+            r.error = err;
+            return false;
+        }
+        return true;
+    }
 
     std::vector<float> frameBuf;       // partial frame carry-over for feedAudio
     float frameOut[kFrameSize] = {};
@@ -112,6 +158,33 @@ bool TranslationPipeline::initialize(const PipelineConfig& cfg, std::string* err
     impl_->nmt.init(cfg.nmtRootDir, nmtOpts);
     impl_->previousTranscript.clear();
     impl_->previousLang.clear();
+
+    impl_->llm.unload();
+    if (!cfg.llmModelPath.empty()) {
+        if (!fs::isFile(cfg.llmModelPath)) {
+            err = "LLM model file not found: " + cfg.llmModelPath;
+            impl_->setError(err);
+            if (error) *error = err;
+            return false;
+        }
+        LlmOptions lo;
+        lo.nThreads = cfg.nThreads;
+        lo.contextSize = cfg.llmContextSize;
+        lo.maxOutputTokens = cfg.llmMaxOutputTokens;
+        lo.temperature = cfg.llmTemperature;
+        lo.gpuLayers = cfg.llmGpuLayers;
+        lo.systemPrompt = cfg.llmSystemPrompt;
+        if (!impl_->llm.load(cfg.llmModelPath, lo, &err)) {
+            impl_->setError(err);
+            if (error) *error = err;
+            return false;
+        }
+    } else if (cfg.backend == TranslationBackend::Llm) {
+        err = "backend=llm requires llmModelPath";
+        impl_->setError(err);
+        if (error) *error = err;
+        return false;
+    }
     if (cfg.preloadAllPairs) {
         for (const auto& pair : impl_->nmt.availablePairs()) {
             const auto dash = pair.find('-');
@@ -131,6 +204,7 @@ void TranslationPipeline::shutdown() {
     std::lock_guard<std::mutex> audioLock(impl_->audioMutex);
     impl_->stt.unload();
     impl_->nmt.unloadAll();
+    impl_->llm.unload();
     impl_->segmenter.reset();
     impl_->frameBuf.clear();
     impl_->initialized = false;
@@ -256,15 +330,10 @@ TranslationResult TranslationPipeline::translateText(const std::string& text, co
         r.error = "pipeline not initialized";
         return r;
     }
-    if (sourceLang.empty() || sourceLang == "auto") {
-        r.error = "source language must be known for text translation";
+    if (sourceLang == targetLang) {
+        r.translatedText = text;
+    } else if (!impl_->translateWith(text, sourceLang, targetLang, r)) {
         impl_->setError(r.error);
-        return r;
-    }
-    std::string err;
-    if (!impl_->nmt.translate(text, sourceLang, targetLang, impl_->cfg.pivotLangs, r.translatedText, &r.route, &err)) {
-        r.error = err;
-        impl_->setError(err);
         return r;
     }
     if (impl_->cfg.postProcessTranslations && !r.route.empty()) r.translatedText = text::postProcessTranslation(r.translatedText, targetLang);
@@ -314,10 +383,8 @@ TranslationResult TranslationPipeline::processSpeechToTranslation(const float* p
     if (r.sourceLang == targetLang) {
         r.translatedText = r.sourceText;
     } else {
-        std::string err;
-        if (!impl_->nmt.translate(r.sourceText, r.sourceLang, targetLang, impl_->cfg.pivotLangs, r.translatedText, &r.route, &err)) {
-            r.error = err;
-            impl_->setError(err);
+        if (!impl_->translateWith(r.sourceText, r.sourceLang, targetLang, r)) {
+            impl_->setError(r.error);
             r.nmtMs = Impl::msSince(t1);
             r.totalMs = Impl::msSince(t0);
             return r;
@@ -352,6 +419,8 @@ std::vector<std::string> TranslationPipeline::availablePairs() const { return im
 
 bool TranslationPipeline::canTranslate(const std::string& src, const std::string& tgt) const {
     if (src == tgt) return true;
+    if (impl_->cfg.backend != TranslationBackend::Marian && impl_->llm.isLoaded()) return true;
+    if (impl_->cfg.backend == TranslationBackend::Llm) return false;
     return !impl_->nmt.resolveRoute(src, tgt, impl_->cfg.pivotLangs).empty();
 }
 
@@ -360,6 +429,9 @@ Json TranslationPipeline::capabilities() const {
     j.set("rnnoise", impl_->denoiser.isNativeRnnoise());
     j.set("whisper", impl_->stt.isNativeWhisper());
     j.set("ctranslate2", impl_->nmt.isNativeCTranslate2());
+    j.set("llama", LlmEngine::isNativeLlama());
+    j.set("llm_loaded", impl_->llm.isLoaded());
+    j.set("backend", impl_->cfg.backend == TranslationBackend::Llm ? "llm" : impl_->cfg.backend == TranslationBackend::Marian ? "marian" : "auto");
 #if TRANSLATOR_HAS_SENTENCEPIECE
     j.set("sentencepiece", true);
 #else

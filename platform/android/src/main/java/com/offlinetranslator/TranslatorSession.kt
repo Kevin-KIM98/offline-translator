@@ -110,13 +110,16 @@ class TranslatorSession(
             languages: List<String>,
             manifestUrl: String? = ModelRepository.DEFAULT_MANIFEST_URL,
             speakResults: Boolean = true,
+            llmMode: LlmMode = LlmMode.IF_NEEDED,
+            backend: TranslationBackend = TranslationBackend.AUTO,
             onProgress: ((bytesDone: Long, bytesTotal: Long) -> Unit)? = null,
         ): TranslatorSession {
             val repo = ModelRepository(context, manifestUrl = manifestUrl)
             try {
                 repo.refreshManifest()
                 if (!repo.hasManifest()) throw TranslatorException("no model manifest available (offline on first launch?)")
-                val needed = repo.statusForLanguages(languages).filter { it.needsDownload }
+                val effectiveLlm = if (backend == TranslationBackend.LLM) LlmMode.ALWAYS else llmMode
+                val needed = repo.statusForLanguages(languages, llmMode = effectiveLlm).filter { it.needsDownload }
                 val total = needed.sumOf { it.totalBytes }
                 if (needed.isNotEmpty()) {
                     if (repo.freeBytes() < total + 50L * 1024 * 1024) {
@@ -137,7 +140,7 @@ class TranslatorSession(
                     }
                     failure?.let { throw TranslatorException("model download failed: $it") }
                 }
-                return TranslatorSession(context, repo.pipelineConfig(), speakResults)
+                return TranslatorSession(context, repo.pipelineConfig(backend = backend), speakResults)
             } finally {
                 repo.close()
             }

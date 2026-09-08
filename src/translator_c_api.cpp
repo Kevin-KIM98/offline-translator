@@ -15,7 +15,7 @@
 using namespace translator;
 
 #ifndef TRANSLATOR_VERSION_STRING
-#define TRANSLATOR_VERSION_STRING "0.2.0"
+#define TRANSLATOR_VERSION_STRING "0.3.0"
 #endif
 
 struct tr_pipeline {
@@ -107,6 +107,11 @@ TR_API char* tr_build_capabilities(void) {
 #else
     j.set("sentencepiece", false);
 #endif
+#if TRANSLATOR_HAS_LLAMA
+    j.set("llama", true);
+#else
+    j.set("llama", false);
+#endif
     j.set("version", TRANSLATOR_VERSION_STRING);
     return dupString(j.dump());
 }
@@ -141,6 +146,13 @@ TR_API void tr_pipeline_config_init(tr_pipeline_config* cfg) {
     cfg->repetition_penalty = 1.1f;
     cfg->no_speech_threshold = 0.85f;
     cfg->stt_adaptive_audio_ctx = 1;
+    cfg->llm_model_path = nullptr;
+    cfg->translation_backend = 0;
+    cfg->llm_context_size = 1024;
+    cfg->llm_max_output_tokens = 256;
+    cfg->llm_temperature = 0.0f;
+    cfg->llm_gpu_layers = 99;
+    cfg->llm_system_prompt = nullptr;
 }
 
 TR_API void tr_segmenter_config_init(tr_segmenter_config* cfg) {
@@ -177,6 +189,13 @@ TR_API tr_pipeline* tr_pipeline_create(const tr_pipeline_config* cfg) {
     c.repetitionPenalty = cfg->repetition_penalty > 0.0f ? cfg->repetition_penalty : 1.0f;
     c.noSpeechThreshold = cfg->no_speech_threshold;
     c.sttAdaptiveAudioContext = cfg->stt_adaptive_audio_ctx != 0;
+    c.llmModelPath = safe(cfg->llm_model_path);
+    c.backend = cfg->translation_backend == 2 ? TranslationBackend::Llm : cfg->translation_backend == 1 ? TranslationBackend::Marian : TranslationBackend::Auto;
+    c.llmContextSize = cfg->llm_context_size > 0 ? cfg->llm_context_size : 1024;
+    c.llmMaxOutputTokens = cfg->llm_max_output_tokens > 0 ? cfg->llm_max_output_tokens : 256;
+    c.llmTemperature = cfg->llm_temperature;
+    c.llmGpuLayers = cfg->llm_gpu_layers;
+    c.llmSystemPrompt = safe(cfg->llm_system_prompt);
     if (cfg->pivot_langs && *cfg->pivot_langs) c.pivotLangs = splitCsv(cfg->pivot_langs);
     c.initialPrompt = safe(cfg->initial_prompt);
     c.preloadAllPairs = cfg->preload_all_pairs != 0;
@@ -347,7 +366,7 @@ TR_API char* tr_mm_status_json(tr_model_manager* m, int deep_verify) {
     return dupString(m->impl.statusJson(deep_verify != 0).dump());
 }
 
-TR_API char* tr_mm_status_for_languages_json(tr_model_manager* m, const char* langs_csv, int deep_verify) {
+TR_API char* tr_mm_status_for_languages_json(tr_model_manager* m, const char* langs_csv, int deep_verify, int llm_mode) {
     if (!m) return dupString("{\"models\":[]}");
     std::lock_guard<std::mutex> lock(m->mutex);
     Json j = Json::object();
@@ -355,7 +374,8 @@ TR_API char* tr_mm_status_for_languages_json(tr_model_manager* m, const char* la
     j.set("models_root", m->impl.modelsRoot());
     Json arr = Json::array();
     std::uint64_t pendingBytes = 0;
-    for (const auto& s : m->impl.statusForLanguages(splitCsv(safe(langs_csv)), deep_verify != 0)) {
+    const auto mode = llm_mode == 1 ? ModelManager::LlmMode::Always : llm_mode == 2 ? ModelManager::LlmMode::Never : ModelManager::LlmMode::IfNeeded;
+    for (const auto& s : m->impl.statusForLanguages(splitCsv(safe(langs_csv)), deep_verify != 0, mode)) {
         if (s.needsDownload()) pendingBytes += s.entry.totalBytes();
         arr.push_back(s.toJson());
     }
@@ -407,6 +427,12 @@ TR_API char* tr_mm_stt_model_path(tr_model_manager* m) {
     if (!m) return nullptr;
     std::lock_guard<std::mutex> lock(m->mutex);
     return dupString(m->impl.sttModelPath());
+}
+
+TR_API char* tr_mm_llm_model_path(tr_model_manager* m) {
+    if (!m) return nullptr;
+    std::lock_guard<std::mutex> lock(m->mutex);
+    return dupString(m->impl.llmModelPath());
 }
 
 TR_API char* tr_mm_nmt_root_dir(tr_model_manager* m) {

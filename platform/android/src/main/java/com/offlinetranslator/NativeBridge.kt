@@ -23,6 +23,7 @@ object NativeBridge {
     external fun pipelineCreate(
         whisperPath: String?, nmtRoot: String, nThreads: Int, useGpu: Boolean, denoise: Boolean,
         beam: Int, maxLen: Int, pivots: String?, prompt: String?, preloadAll: Boolean,
+        llmPath: String?, backend: Int, llmContextSize: Int,
     ): Long
     external fun pipelineDestroy(handle: Long)
     external fun pipelineLastError(handle: Long): String
@@ -55,7 +56,9 @@ object NativeBridge {
     external fun mmSaveManifest(handle: Long): Boolean
     external fun mmManifestVersion(handle: Long): String
     external fun mmStatusJson(handle: Long, deepVerify: Boolean): String
-    external fun mmStatusForLanguagesJson(handle: Long, langsCsv: String, deepVerify: Boolean): String
+    /** llmMode: 0 include the LLM only when a requested direction has no Marian route, 1 always, 2 never */
+    external fun mmStatusForLanguagesJson(handle: Long, langsCsv: String, deepVerify: Boolean, llmMode: Int): String
+    external fun mmLlmModelPath(handle: Long): String
     external fun mmStagingDir(handle: Long, id: String): String
     external fun mmClearStaging(handle: Long, id: String?): Boolean
     /** 1 ok, 0 mismatch, -1 io error, -2 aborted */

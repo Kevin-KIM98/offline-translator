@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18.2)
-project(OfflineTranslationEngine VERSION 0.2.0 LANGUAGES C CXX)
+project(OfflineTranslationEngine VERSION 0.3.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,6 +23,7 @@ option(TRANSLATOR_WITH_RNNOISE      "Enable RNNoise noise suppression"          
 option(TRANSLATOR_WITH_WHISPER      "Enable whisper.cpp STT"                               ON)
 option(TRANSLATOR_WITH_CTRANSLATE2  "Enable CTranslate2 NMT"                               ON)
 option(TRANSLATOR_WITH_SENTENCEPIECE "Enable SentencePiece tokenization"                   ON)
+option(TRANSLATOR_WITH_LLAMA        "Enable llama.cpp LLM translation backend"             ON)
 option(TRANSLATOR_COREML            "whisper.cpp: CoreML encoder (iOS/macOS)"              ${APPLE})
 option(TRANSLATOR_METAL             "whisper.cpp: Metal backend (iOS/macOS)"               ${APPLE})
 option(TRANSLATOR_VULKAN            "whisper.cpp: Vulkan backend (Android GPU)"            OFF)
@@ -52,13 +53,17 @@ target_compile_definitions(translator_deps INTERFACE
     TRANSLATOR_HAS_RNNOISE=${TRANSLATOR_HAS_RNNOISE}
     TRANSLATOR_HAS_WHISPER=${TRANSLATOR_HAS_WHISPER}
     TRANSLATOR_HAS_CTRANSLATE2=${TRANSLATOR_HAS_CTRANSLATE2}
-    TRANSLATOR_HAS_SENTENCEPIECE=${TRANSLATOR_HAS_SENTENCEPIECE})
+    TRANSLATOR_HAS_SENTENCEPIECE=${TRANSLATOR_HAS_SENTENCEPIECE}
+    TRANSLATOR_HAS_LLAMA=${TRANSLATOR_HAS_LLAMA})
 
 if(TRANSLATOR_HAS_RNNOISE)
     target_link_libraries(translator_deps INTERFACE translator_rnnoise)
 endif()
 if(TRANSLATOR_HAS_WHISPER)
     target_link_libraries(translator_deps INTERFACE whisper)
+endif()
+if(TRANSLATOR_HAS_LLAMA)
+    target_link_libraries(translator_deps INTERFACE llama)
 endif()
 if(TRANSLATOR_HAS_CTRANSLATE2)
     target_link_libraries(translator_deps INTERFACE ctranslate2)
@@ -102,6 +107,7 @@ set(TRANSLATOR_SOURCES
     src/SpeechSegmenter.cpp
     src/SttEngine.cpp
     src/NmtEngine.cpp
+    src/LlmEngine.cpp
     src/TranslationPipeline.cpp
     src/ModelManager.cpp
     src/translator_c_api.cpp
@@ -185,6 +191,7 @@ message(STATUS "OfflineTranslationEngine ${PROJECT_VERSION}")
 message(STATUS "  RNNoise        : ${TRANSLATOR_HAS_RNNOISE}")
 message(STATUS "  whisper.cpp    : ${TRANSLATOR_HAS_WHISPER}  (CoreML=${TRANSLATOR_COREML} Metal=${TRANSLATOR_METAL} Vulkan=${TRANSLATOR_VULKAN} OpenCL=${TRANSLATOR_OPENCL})")
 message(STATUS "  CTranslate2    : ${TRANSLATOR_HAS_CTRANSLATE2}")
+message(STATUS "  llama.cpp      : ${TRANSLATOR_HAS_LLAMA}")
 message(STATUS "  SentencePiece  : ${TRANSLATOR_HAS_SENTENCEPIECE}")
 message(STATUS "  Shared library : ${TRANSLATOR_BUILD_SHARED}")
 message(STATUS "  CLI / tests    : ${TRANSLATOR_BUILD_CLI} / ${TRANSLATOR_BUILD_TESTS}")

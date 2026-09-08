@@ -85,6 +85,8 @@ class OfflineTTSManager(context: Context) : TextToSpeech.OnInitListener {
             "ja" -> Locale.JAPANESE
             "zh" -> Locale.SIMPLIFIED_CHINESE
             "es" -> Locale("es", "ES")
+            "vi" -> Locale("vi", "VN")
+            "th" -> Locale("th", "TH")
             else -> Locale.forLanguageTag(lang)
         }
     }

@@ -313,7 +313,7 @@ std::vector<std::string> NmtEngine::splitSentences(const std::string& text) {
                 std::string word = sp == std::string::npos ? t : t.substr(sp + 1);
                 if (!word.empty()) word.pop_back(); // drop the period
                 std::string lw;
-                for (const char c : word) lw.push_back(static_cast<char>((c >= 'A' && c <= 'Z') ? c - 'A' + 'a' : c));
+                for (const char wc : word) lw.push_back(static_cast<char>((wc >= 'A' && wc <= 'Z') ? wc - 'A' + 'a' : wc));
                 static const char* const kAbbrev[] = {"e.g", "i.e", "etc", "mr", "mrs", "ms", "dr", "prof", "vs", "st", "no", "sr", "jr", "approx", "dept", "inc", "ltd", "p.m", "a.m"};
                 bool abbrev = lw.size() == 1 && ((lw[0] >= 'a' && lw[0] <= 'z'));
                 for (const char* a : kAbbrev)
@@ -395,9 +395,9 @@ bool NmtEngine::translateDirect(const std::string& text, const std::string& src,
             for (const char* term : kTerminals)
                 if (t.size() >= std::strlen(term) && t.compare(t.size() - std::strlen(term), std::strlen(term), term) == 0) ends = true;
             if (!ends) {
-                const std::string& src = sentences[i];
-                const bool q = !src.empty() && (src.back() == '?' || (src.size() >= 3 && src.compare(src.size() - 3, 3, "\xEF\xBC\x9F") == 0));
-                const bool ex = !src.empty() && (src.back() == '!' || (src.size() >= 3 && src.compare(src.size() - 3, 3, "\xEF\xBC\x81") == 0));
+                const std::string& srcSent = sentences[i];
+                const bool q = !srcSent.empty() && (srcSent.back() == '?' || (srcSent.size() >= 3 && srcSent.compare(srcSent.size() - 3, 3, "\xEF\xBC\x9F") == 0));
+                const bool ex = !srcSent.empty() && (srcSent.back() == '!' || (srcSent.size() >= 3 && srcSent.compare(srcSent.size() - 3, 3, "\xEF\xBC\x81") == 0));
                 t += q ? "\xEF\xBC\x9F" : ex ? "\xEF\xBC\x81" : "\xE3\x80\x82";
             }
         }

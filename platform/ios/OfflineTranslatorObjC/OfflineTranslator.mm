@@ -47,9 +47,11 @@ static NSString *OTStr(id v) { return [v isKindOfClass:[NSString class]] ? v : @
         _threads = 4;
         _useGPU = YES;
         _enableDenoise = YES;
-        _beamSize = 2;
+        _beamSize = 4;
         _maxDecodingLength = 256;
-        _pivotLanguages = @[ @"ko", @"en" ];
+        _pivotLanguages = @[ @"en", @"ko" ];
+        _backend = OTTranslationBackendAuto;
+        _llmContextSize = 1024;
     }
     return self;
 }
@@ -124,7 +126,7 @@ static NSString *OTStr(id v) { return [v isKindOfClass:[NSString class]] ? v : @
 
 + (NSString *)version { return [NSString stringWithUTF8String:tr_version()]; }
 + (NSDictionary *)buildCapabilities { return OTDict(OTTake(tr_build_capabilities())); }
-+ (NSArray<NSString *> *)supportedLanguages { return @[ @"ko", @"en", @"ja", @"zh", @"es" ]; }
++ (NSArray<NSString *> *)supportedLanguages { return @[ @"ko", @"en", @"es", @"vi", @"th", @"ja", @"zh" ]; }
 
 - (nullable instancetype)initWithConfig:(OTPipelineConfig *)config error:(NSError **)error {
     if ((self = [super init])) {
@@ -134,6 +136,7 @@ static NSString *OTStr(id v) { return [v isKindOfClass:[NSString class]] ? v : @
         std::string nmt = config.nmtRootDir.UTF8String;
         std::string pivots = [config.pivotLanguages componentsJoinedByString:@","].UTF8String;
         std::string prompt = config.initialPrompt ? config.initialPrompt.UTF8String : "";
+        std::string llm = config.llmModelPath ? config.llmModelPath.UTF8String : "";
         c.whisper_model_path = whisper.empty() ? nullptr : whisper.c_str();
         c.nmt_root_dir = nmt.c_str();
         c.n_threads = (int)config.threads;
@@ -144,6 +147,9 @@ static NSString *OTStr(id v) { return [v isKindOfClass:[NSString class]] ? v : @
         c.pivot_langs = pivots.c_str();
         c.initial_prompt = prompt.empty() ? nullptr : prompt.c_str();
         c.preload_all_pairs = config.preloadAllPairs ? 1 : 0;
+        c.llm_model_path = llm.empty() ? nullptr : llm.c_str();
+        c.translation_backend = (int)config.backend;
+        c.llm_context_size = (int)config.llmContextSize;
         _p = tr_pipeline_create(&c);
         if (!_p) {
             if (error) {
@@ -295,9 +301,15 @@ static NSString *OTStr(id v) { return [v isKindOfClass:[NSString class]] ? v : @
 }
 
 - (NSArray<OTModelStatus *> *)statusForLanguages:(NSArray<NSString *> *)languages deepVerify:(BOOL)deepVerify {
-    NSString *csv = [languages componentsJoinedByString:@","];
-    return [self parseStatus:OTTake(tr_mm_status_for_languages_json(_m, csv.UTF8String, deepVerify ? 1 : 0))];
+    return [self statusForLanguages:languages deepVerify:deepVerify llmMode:OTLlmModeIfNeeded];
 }
+
+- (NSArray<OTModelStatus *> *)statusForLanguages:(NSArray<NSString *> *)languages deepVerify:(BOOL)deepVerify llmMode:(OTLlmMode)llmMode {
+    NSString *csv = [languages componentsJoinedByString:@","];
+    return [self parseStatus:OTTake(tr_mm_status_for_languages_json(_m, csv.UTF8String, deepVerify ? 1 : 0, (int)llmMode))];
+}
+
+- (NSString *)llmModelPath { return OTTake(tr_mm_llm_model_path(_m)); }
 
 - (uint64_t)pendingBytesForLanguages:(nullable NSArray<NSString *> *)languages {
     NSArray *st = languages ? [self statusForLanguages:languages deepVerify:NO] : [self statusWithDeepVerify:NO];
@@ -322,11 +334,16 @@ static NSString *OTStr(id v) { return [v isKindOfClass:[NSString class]] ? v : @
 
 - (BOOL)removeModel:(NSString *)identifier { return tr_mm_remove(_m, identifier.UTF8String) != 0; }
 
-- (OTPipelineConfig *)pipelineConfig {
+- (OTPipelineConfig *)pipelineConfig { return [self pipelineConfigWithBackend:OTTranslationBackendAuto]; }
+
+- (OTPipelineConfig *)pipelineConfigWithBackend:(OTTranslationBackend)backend {
     OTPipelineConfig *c = [OTPipelineConfig new];
     NSString *stt = self.sttModelPath;
     c.whisperModelPath = stt.length ? stt : nil;
     c.nmtRootDir = self.nmtRootDir;
+    NSString *llm = self.llmModelPath;
+    c.llmModelPath = (llm.length && [[NSFileManager defaultManager] fileExistsAtPath:llm]) ? llm : nil;
+    c.backend = backend;
     c.threads = MAX(2, MIN(6, (NSInteger)[NSProcessInfo processInfo].activeProcessorCount));
     return c;
 }

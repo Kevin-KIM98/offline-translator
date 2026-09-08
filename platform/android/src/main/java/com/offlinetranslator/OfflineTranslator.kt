@@ -4,16 +4,32 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.Closeable
 
+/** Which engine translates. */
+enum class TranslationBackend(val native: Int) {
+    /** Marian pair when one exists (direct or via English), otherwise the LLM. */
+    AUTO(0),
+    /** CTranslate2 OPUS-MT only. */
+    MARIAN(1),
+    /** LLM only: any→any in one hop, source language may be "auto". */
+    LLM(2),
+}
+
+/** When the model repository should include the LLM for a language set. */
+enum class LlmMode(val native: Int) { IF_NEEDED(0), ALWAYS(1), NEVER(2) }
+
 /** Configuration mirrored from tr_pipeline_config. */
 data class PipelineConfig(
     val whisperModelPath: String?,
     val nmtRootDir: String,
+    val llmModelPath: String? = null,
+    val backend: TranslationBackend = TranslationBackend.AUTO,
+    val llmContextSize: Int = 1024,
     val nThreads: Int = Runtime.getRuntime().availableProcessors().coerceIn(2, 6),
     val useGpu: Boolean = true,
     val enableDenoise: Boolean = true,
-    val beamSize: Int = 2,
+    val beamSize: Int = 4,
     val maxDecodingLength: Int = 256,
-    val pivotLangs: List<String> = listOf("ko", "en"),
+    val pivotLangs: List<String> = listOf("en", "ko"),
     val initialPrompt: String? = null,
     val preloadAllPairs: Boolean = false,
 )
@@ -106,6 +122,9 @@ class OfflineTranslator(config: PipelineConfig) : Closeable {
         pivots = config.pivotLangs.joinToString(","),
         prompt = config.initialPrompt,
         preloadAll = config.preloadAllPairs,
+        llmPath = config.llmModelPath,
+        backend = config.backend.native,
+        llmContextSize = config.llmContextSize,
     )
 
     init {
@@ -157,6 +176,6 @@ class OfflineTranslator(config: PipelineConfig) : Closeable {
     companion object {
         val version: String get() = NativeBridge.version()
         val buildCapabilities: JSONObject get() = JSONObject(NativeBridge.buildCapabilities())
-        val supportedLanguages: List<String> = listOf("ko", "en", "ja", "zh", "es")
+        val supportedLanguages: List<String> = listOf("ko", "en", "es", "vi", "th", "ja", "zh")
     }
 }

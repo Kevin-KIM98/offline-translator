@@ -83,6 +83,8 @@ const std::vector<std::string>& hallucinations(const std::string& lang) {
         {"zh", {"谢谢观看", "感谢观看", "请订阅", "字幕由", "字幕志愿者", "中文字幕", "谢谢大家", "明镜与点点栏目"}},
         {"es", {"gracias por ver", "suscríbete", "subtítulos realizados por", "subtítulos por la comunidad de amara.org",
                 "gracias", "hasta la próxima"}},
+        {"vi", {"cảm ơn các bạn đã theo dõi", "cảm ơn đã xem", "hãy đăng ký kênh", "hẹn gặp lại", "phụ đề bởi", "cảm ơn"}},
+        {"th", {"ขอบคุณที่รับชม", "ขอบคุณครับ", "ขอบคุณค่ะ", "กดติดตาม", "แล้วพบกันใหม่", "คำบรรยายโดย"}},
     };
     static const std::vector<std::string> empty;
     const auto it = table.find(lang);
@@ -133,6 +135,8 @@ std::string defaultPromptFor(const std::string& lang) {
     if (lang == "ja") return "こんにちは。今日の会議は午後3時に始まります。はい、わかりました。ありがとうございます。";
     if (lang == "zh") return "你好。今天的会议下午三点开始。好的，我明白了。谢谢。";
     if (lang == "es") return "Hola. La reunión de hoy empieza a las tres de la tarde. Sí, entendido. Gracias.";
+    if (lang == "vi") return "Xin chào. Cuộc họp hôm nay bắt đầu lúc 3 giờ chiều. Vâng, tôi hiểu rồi. Cảm ơn.";
+    if (lang == "th") return "สวัสดีครับ การประชุมวันนี้เริ่มตอนบ่ายสามโมง ครับ เข้าใจแล้ว ขอบคุณครับ";
     return {};
 }
 
@@ -287,6 +291,10 @@ std::string postProcessTranslation(const std::string& input, const std::string& 
         out += ch;
     }
 
+    if (lang == "th") {
+        // Thai has no sentence-final punctuation; a space *is* the sentence separator.
+        return trim(out);
+    }
     if (lang == "ko") {
         // Korean keeps spaces between words but not before punctuation. Some models glue the
         // next sentence to the period ("시작됩니다.이 제품은") — reinsert the space.

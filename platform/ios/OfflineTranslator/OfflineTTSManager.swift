@@ -23,6 +23,8 @@ public final class OfflineTTSManager: NSObject, AVSpeechSynthesizerDelegate {
         case "ja": code = "ja-JP"
         case "zh": code = "zh-CN"
         case "es": code = "es-ES"
+        case "vi": code = "vi-VN"
+        case "th": code = "th-TH"
         default: code = lang
         }
         // Prefer enhanced/premium voices when downloaded; they sound far better than compact.

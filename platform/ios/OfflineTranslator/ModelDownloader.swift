@@ -71,8 +71,8 @@ public final class ModelDownloader: NSObject {
 
     public func status(deepVerify: Bool = false) -> [OTModelStatus] { manager.status(withDeepVerify: deepVerify) }
 
-    public func status(languages: [String], deepVerify: Bool = false) -> [OTModelStatus] {
-        manager.status(forLanguages: languages, deepVerify: deepVerify)
+    public func status(languages: [String], deepVerify: Bool = false, llmMode: OTLlmMode = .ifNeeded) -> [OTModelStatus] {
+        manager.status(forLanguages: languages, deepVerify: deepVerify, llmMode: llmMode)
     }
 
     public func freeBytes() -> UInt64 {

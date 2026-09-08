@@ -63,7 +63,7 @@ void usage() {
         "  install    --models <dir> --id <model-id> --staged <path> [--no-verify]\n"
         "  sha256     <file>\n"
         "  transcribe --models <dir> --wav <file> [--lang auto] [--threads N]\n"
-        "  translate  --models <dir> --text \"...\" --src ko --tgt en\n"
+        "  translate  --models <dir> --text \"...\" --src ko --tgt en [--llm <gguf>] [--backend auto|marian|llm]\n"
         "  speech     --models <dir> --wav <file> [--src auto] --tgt en [--stream] [--no-denoise]\n",
         stderr);
 }
@@ -241,6 +241,12 @@ bool makePipeline(const Args& a, TranslationPipeline& p, bool needWhisper) {
     if (a.has("full-audio-ctx")) cfg.sttAdaptiveAudioContext = false;
     if (a.has("no-default-prompt")) cfg.useDefaultPrompts = false;
     if (a.has("prompt")) cfg.initialPrompt = a.get("prompt");
+    if (a.has("llm")) cfg.llmModelPath = a.get("llm");
+    else if (loadManager(a, mm)) cfg.llmModelPath = mm.llmModelPath();
+    if (!cfg.llmModelPath.empty() && !fs::isFile(cfg.llmModelPath)) cfg.llmModelPath.clear();
+    const std::string backend = a.get("backend", "auto");
+    cfg.backend = backend == "llm" ? TranslationBackend::Llm : backend == "marian" ? TranslationBackend::Marian : TranslationBackend::Auto;
+    if (a.has("llm-ctx")) cfg.llmContextSize = std::atoi(a.get("llm-ctx").c_str());
 
     std::string err;
     if (!p.initialize(cfg, &err)) {

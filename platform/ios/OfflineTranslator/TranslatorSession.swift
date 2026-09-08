@@ -94,13 +94,16 @@ public final class TranslatorSession {
     ///     try session.start(sourceLang: "ko", targetLang: "en")
     public static func prepare(languages: [String],
                         manifestURL: URL? = ModelDownloader.defaultManifestURL,
+                        backend: OTTranslationBackend = .auto,
+                        llmMode: OTLlmMode = .ifNeeded,
                         progress: ((UInt64, UInt64) -> Void)? = nil) async throws -> TranslatorSession {
         let downloader = ModelDownloader(manifestURL: manifestURL)
         _ = await downloader.refreshManifest()
         guard downloader.hasManifest else {
             throw ModelDownloader.InstallError(message: "no model manifest available (offline on first launch?)")
         }
-        let needed = downloader.status(languages: languages).filter { $0.needsDownload }
+        let effectiveLlm: OTLlmMode = backend == .LLM ? .always : llmMode
+        let needed = downloader.status(languages: languages, llmMode: effectiveLlm).filter { $0.needsDownload }
         let total = needed.reduce(UInt64(0)) { $0 + $1.totalBytes }
         if !needed.isEmpty {
             if downloader.freeBytes() < total + 50_000_000 {
@@ -120,6 +123,6 @@ public final class TranslatorSession {
             }
             if let f = failure { throw ModelDownloader.InstallError(message: "model download failed: \(f)") }
         }
-        return try TranslatorSession(config: downloader.manager.pipelineConfig())
+        return try TranslatorSession(config: downloader.manager.pipelineConfig(with: backend))
     }
 }

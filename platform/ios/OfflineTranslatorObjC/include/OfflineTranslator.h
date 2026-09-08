@@ -10,9 +10,24 @@ typedef BOOL (^OTProgressBlock)(uint64_t bytesDone, uint64_t bytesTotal); // ret
 // Configuration
 // ---------------------------------------------------------------------------
 
+typedef NS_ENUM(NSInteger, OTTranslationBackend) {
+    OTTranslationBackendAuto = 0,    // Marian pair when one exists (direct or via English), else the LLM
+    OTTranslationBackendMarian = 1,  // CTranslate2 OPUS-MT only
+    OTTranslationBackendLLM = 2,     // LLM only: any→any, source may be "auto"
+};
+
+typedef NS_ENUM(NSInteger, OTLlmMode) {
+    OTLlmModeIfNeeded = 0,  // include the LLM when a requested direction has no Marian route
+    OTLlmModeAlways = 1,
+    OTLlmModeNever = 2,
+};
+
 @interface OTPipelineConfig : NSObject
 @property (nonatomic, copy, nullable) NSString *whisperModelPath;
 @property (nonatomic, copy) NSString *nmtRootDir;
+@property (nonatomic, copy, nullable) NSString *llmModelPath;   // GGUF; nil → Marian only
+@property (nonatomic) OTTranslationBackend backend;              // default Auto
+@property (nonatomic) NSInteger llmContextSize;                  // default 1024
 @property (nonatomic) NSInteger threads;            // default 4
 @property (nonatomic) BOOL useGPU;                  // Metal (default YES)
 @property (nonatomic) BOOL enableDenoise;           // RNNoise (default YES)
@@ -152,6 +167,7 @@ typedef NS_ENUM(NSInteger, OTVerifyResult) {
 @property (nonatomic, readonly) NSString *manifestVersion;
 @property (nonatomic, readonly) NSString *sttModelPath;
 @property (nonatomic, readonly) NSString *nmtRootDir;
+@property (nonatomic, readonly) NSString *llmModelPath;   // "" when the manifest has no LLM
 
 - (BOOL)loadManifestFile:(NSString *)path;
 - (BOOL)loadManifestJSON:(NSString *)json;
@@ -161,6 +177,7 @@ typedef NS_ENUM(NSInteger, OTVerifyResult) {
 /// deepVerify re-hashes installed files — slow, run on a background queue.
 - (NSArray<OTModelStatus *> *)statusWithDeepVerify:(BOOL)deepVerify;
 - (NSArray<OTModelStatus *> *)statusForLanguages:(NSArray<NSString *> *)languages deepVerify:(BOOL)deepVerify;
+- (NSArray<OTModelStatus *> *)statusForLanguages:(NSArray<NSString *> *)languages deepVerify:(BOOL)deepVerify llmMode:(OTLlmMode)llmMode;
 - (uint64_t)pendingBytesForLanguages:(nullable NSArray<NSString *> *)languages;
 
 - (NSString *)stagingDirForModel:(NSString *)identifier;
@@ -172,6 +189,7 @@ typedef NS_ENUM(NSInteger, OTVerifyResult) {
 - (BOOL)removeModel:(NSString *)identifier;
 
 - (OTPipelineConfig *)pipelineConfig;
+- (OTPipelineConfig *)pipelineConfigWithBackend:(OTTranslationBackend)backend;
 
 @end
 

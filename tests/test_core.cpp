@@ -1,5 +1,6 @@
 // Dependency-free unit tests for the pure C++ core (run on desktop, no models needed).
 #include "translator/FileUtil.hpp"
+#include "translator/LlmEngine.hpp"
 #include "translator/MiniJson.hpp"
 #include "translator/ModelManager.hpp"
 #include "translator/NmtEngine.hpp"
@@ -238,6 +239,40 @@ void testTextUtil() {
     CHECK(!isCjkChar("a"));
 }
 
+void testLlmEngine() {
+    std::puts("[llm engine]");
+    CHECK_EQ(LlmEngine::languageName("vi"), "Vietnamese");
+    CHECK_EQ(LlmEngine::languageName("th"), "Thai");
+    CHECK_EQ(LlmEngine::languageName("xx"), "xx");
+    const std::string p = LlmEngine::buildInstruction("ko", "en", "");
+    CHECK(p.find("from Korean into English") != std::string::npos);
+    CHECK(p.find("ONLY the English translation") != std::string::npos);
+    const std::string pa = LlmEngine::buildInstruction("auto", "th", "");
+    CHECK(pa.find("Detect the language") != std::string::npos);
+    CHECK(pa.find("into Thai") != std::string::npos);
+    CHECK_EQ(LlmEngine::buildInstruction("ko", "en", "custom"), "custom");
+
+    LlmEngine e;
+    CHECK(!e.isLoaded());
+    CHECK(!e.load(fs::join(tempRoot(), "missing.gguf"), LlmOptions{}) || !LlmEngine::isNativeLlama());
+    LlmResult r = e.translate("", "ko", "en");
+    CHECK(r.ok && r.text.empty());
+    r = e.translate("안녕", "ko", "en");
+    CHECK(!r.ok);
+    CHECK(!r.error.empty());
+
+    // Languages
+    CHECK_EQ(supportedLanguages().size(), std::size_t(7));
+    CHECK(isSupportedLanguage("vi"));
+    CHECK(isSupportedLanguage("th"));
+    CHECK(!text::defaultPromptFor("vi").empty());
+    CHECK(!text::defaultPromptFor("th").empty());
+    CHECK(text::isHallucination("ขอบคุณที่รับชม", "th"));
+    CHECK(text::isHallucination("Cảm ơn các bạn đã theo dõi!", "vi"));
+    CHECK_EQ(text::postProcessTranslation("สวัสดี  ครับ", "th"), "สวัสดี ครับ");
+    CHECK_EQ(text::postProcessTranslation("xin chào . tôi là", "vi"), "Xin chào. Tôi là");
+}
+
 void testSentenceSplit() {
     std::puts("[sentence split]");
     auto s = NmtEngine::splitSentences("Hello there. How are you? I am fine!  Pi is 3.14 ok.\n안녕하세요。잘 지내세요？");
@@ -304,6 +339,15 @@ std::string makeManifest(const std::string& sttData, const std::string& modelDat
         nmt.push_back(p);
     }
     m.set("nmt", nmt);
+
+    Json llm = Json::object();
+    llm.set("id", "qwen-test");
+    llm.set("version", "1");
+    llm.set("filename", "qwen-test.gguf");
+    llm.set("size_bytes", 4);
+    llm.set("sha256", Sha256::hashString("gguf"));
+    llm.set("download_url", "llm/qwen-test.gguf");
+    m.set("llm", llm);
     return m.dump(2);
 }
 
@@ -316,8 +360,17 @@ void testModelManager() {
     std::string err;
     CHECK(mm.loadManifestJson(makeManifest(sttData, modelData, vocabData), &err));
     CHECK(err.empty());
-    CHECK_EQ(mm.entries().size(), std::size_t(3));
+    CHECK_EQ(mm.entries().size(), std::size_t(4));
     CHECK_EQ(mm.manifestVersion(), "1.1.0");
+    const ModelEntry* llmEntry = mm.find("qwen-test");
+    CHECK(llmEntry != nullptr);
+    if (llmEntry) {
+        CHECK(llmEntry->kind == ModelEntry::Kind::Llm);
+        CHECK(llmEntry->isSingleFile());
+        CHECK_EQ(llmEntry->installPath, fs::join(fs::join(root, "llm"), "qwen-test.gguf"));
+        CHECK_EQ(llmEntry->downloads.front().url, "https://assets.example.com/models/llm/qwen-test.gguf");
+    }
+    CHECK_EQ(mm.llmModelPath(), fs::join(fs::join(root, "llm"), "qwen-test.gguf"));
 
     const ModelEntry* stt = mm.find("whisper-tiny-test");
     CHECK(stt != nullptr);
@@ -343,10 +396,26 @@ void testModelManager() {
 
     // Everything missing initially.
     for (const auto& s : mm.status()) CHECK(s.state == ModelState::Missing);
-    CHECK_EQ(mm.pending().size(), std::size_t(3));
+    CHECK_EQ(mm.pending().size(), std::size_t(4));
     const Json sj = mm.statusJson();
-    CHECK_EQ(sj["models"].size(), std::size_t(3));
-    CHECK_EQ(sj["pending_bytes"].asInt64(), static_cast<std::int64_t>(sttData.size() + modelData.size() + vocabData.size() + 12345));
+    CHECK_EQ(sj["models"].size(), std::size_t(4));
+    CHECK_EQ(sj["pending_bytes"].asInt64(), static_cast<std::int64_t>(sttData.size() + modelData.size() + vocabData.size() + 12345 + 4));
+
+    // LLM inclusion: ko+en have direct pairs → not needed; ko+ja has no route → needed.
+    auto hasLlm = [](const std::vector<ModelStatus>& v) {
+        for (const auto& s : v) if (s.entry.kind == ModelEntry::Kind::Llm) return true;
+        return false;
+    };
+    CHECK(!hasLlm(mm.statusForLanguages({"ko", "en"})));
+    CHECK(hasLlm(mm.statusForLanguages({"ko", "ja"})));
+    CHECK(hasLlm(mm.statusForLanguages({"ko", "en"}, false, ModelManager::LlmMode::Always)));
+    CHECK(!hasLlm(mm.statusForLanguages({"ko", "ja"}, false, ModelManager::LlmMode::Never)));
+
+    // Install the LLM file like the STT file.
+    const std::string llmStaging = mm.stagingDir("qwen-test");
+    CHECK(fs::writeFileAtomic(fs::join(llmStaging, "qwen-test.gguf"), "gguf"));
+    CHECK(mm.install("qwen-test", llmStaging, true, nullptr, &err));
+    CHECK(mm.statusOf(*mm.find("qwen-test"), true).state == ModelState::Ready);
 
     // Stage + install STT (file directly in staging dir).
     const std::string sttStaging = mm.stagingDir("whisper-tiny-test");
@@ -405,13 +474,13 @@ void testModelManager() {
     const auto forKoEn = mm.statusForLanguages({"ko", "en"});
     CHECK_EQ(forKoEn.size(), std::size_t(3));
     const auto forKoJa = mm.statusForLanguages({"ko", "ja"});
-    CHECK_EQ(forKoJa.size(), std::size_t(1)); // only STT
+    CHECK_EQ(forKoJa.size(), std::size_t(2)); // STT + LLM (no ko-ja route)
 
     // Cache + reload.
     CHECK(mm.saveManifest(&err));
     ModelManager mm2(root);
     CHECK(mm2.loadCachedManifest(&err));
-    CHECK_EQ(mm2.entries().size(), std::size_t(3));
+    CHECK_EQ(mm2.entries().size(), std::size_t(4));
 
     // Remove.
     CHECK(mm2.remove("nmt-en-ko", &err));
@@ -553,7 +622,7 @@ void testCApi() {
     char* status = tr_mm_status_json(mm, 0);
     const Json sj = Json::parse(status ? status : "");
     tr_string_free(status);
-    CHECK_EQ(sj["models"].size(), std::size_t(3));
+    CHECK_EQ(sj["models"].size(), std::size_t(4));
     CHECK_EQ(sj["models"].at(0)["state"].asString(), "missing");
     CHECK(sj["models"].at(0)["needs_download"].asBool());
 
@@ -569,7 +638,7 @@ void testCApi() {
     CHECK_EQ(tr_mm_verify_file(mm, "/nonexistent/file", "", 0, nullptr, nullptr), -1);
     CHECK_EQ(tr_mm_install(mm, "whisper-tiny-test", stagedFile.c_str(), 1, nullptr, nullptr), 1);
 
-    status = tr_mm_status_for_languages_json(mm, "ko,en", 1);
+    status = tr_mm_status_for_languages_json(mm, "ko,en", 1, 2);
     const Json sj2 = Json::parse(status ? status : "");
     tr_string_free(status);
     CHECK_EQ(sj2["models"].at(0)["state"].asString(), "ready");
@@ -638,6 +707,7 @@ int main() {
     testSegmenter();
     testTextUtil();
     testSentenceSplit();
+    testLlmEngine();
     testModelManager();
     testPipelineStub();
     testCApi();
