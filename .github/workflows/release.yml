@@ -92,7 +92,9 @@ jobs:
           if [ -f build/Release/translator_cli.exe ]; then cp build/Release/translator_cli.exe out/; else cp build/translator_cli out/; fi
           cd out && 7z a "../translator_cli-${{ runner.os }}.zip" . > /dev/null
       - uses: actions/upload-artifact@v4
-        with: { name: cli-${{ runner.os }}, path: translator_cli-*.zip }
+        with:
+          name: "cli-${{ runner.os }}"
+          path: translator_cli-*.zip
 
   publish:
     name: Publish release
