@@ -203,7 +203,8 @@ def cmd_manifest(a: argparse.Namespace) -> None:
                 lines.append(f"up \"{(nmt_root / entry['dir_name'] / fi['filename']).as_posix()}\" \"{flat_name('nmt', entry['dir_name'], fi['filename'])}\"")
                 count += 1
         lines.append("echo \"all $((0)) done\"".replace("$((0))", str(count)))
-        Path(a.upload_script).write_text("\n".join(lines) + "\n", encoding="utf-8")
+        with open(a.upload_script, "w", encoding="utf-8", newline="\n") as fh:  # bash needs LF even on Windows
+            fh.write("\n".join(lines) + "\n")
         print(f"→ {a.upload_script} (run it with the release tag to upload {count} assets)")
 
 
