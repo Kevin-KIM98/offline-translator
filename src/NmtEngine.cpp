@@ -4,6 +4,7 @@
 #include "translator/MiniJson.hpp"
 
 #include <algorithm>
+#include <cstring>
 #include <map>
 #include <mutex>
 #include <sstream>
@@ -376,8 +377,24 @@ bool NmtEngine::translateDirect(const std::string& text, const std::string& src,
 
     const std::string sep = isCjk(tgt) ? "" : " ";
     for (std::size_t i = 0; i < translated.size(); ++i) {
-        if (i) out += sep;
-        out += trim(translated[i]);
+        std::string t = trim(translated[i]);
+        if (t.empty()) continue;
+        if (isCjk(tgt)) {
+            // Some ja/zh models drop sentence-final punctuation; restore it from the source
+            // sentence so consecutive sentences don't run together ("こんにちはいい天気だ").
+            static const char* const kTerminals[] = {".", "!", "?", "ã", "ï¼", "ï¼"};
+            bool ends = false;
+            for (const char* term : kTerminals)
+                if (t.size() >= std::strlen(term) && t.compare(t.size() - std::strlen(term), std::strlen(term), term) == 0) ends = true;
+            if (!ends) {
+                const std::string& src = sentences[i];
+                const bool q = !src.empty() && (src.back() == '?' || (src.size() >= 3 && src.compare(src.size() - 3, 3, "ï¼") == 0));
+                const bool ex = !src.empty() && (src.back() == '!' || (src.size() >= 3 && src.compare(src.size() - 3, 3, "ï¼") == 0));
+                t += q ? "ï¼" : ex ? "ï¼" : "ã";
+            }
+        }
+        if (!out.empty()) out += sep;
+        out += t;
     }
     if (error) error->clear();
     return true;

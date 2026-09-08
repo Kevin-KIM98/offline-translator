@@ -19,9 +19,14 @@ public:
     Json() = default;
     Json(std::nullptr_t) {}
     Json(bool b) : type_(Type::Bool), bool_(b) {}
+    // One overload per distinct integer type so int64_t/uint64_t/size_t/long long all resolve
+    // unambiguously on every platform (int64_t is `long` on Linux, `long long` on Windows).
     Json(int v) : type_(Type::Number), num_(static_cast<double>(v)) {}
-    Json(std::int64_t v) : type_(Type::Number), num_(static_cast<double>(v)) {}
-    Json(std::uint64_t v) : type_(Type::Number), num_(static_cast<double>(v)) {}
+    Json(unsigned v) : type_(Type::Number), num_(static_cast<double>(v)) {}
+    Json(long v) : type_(Type::Number), num_(static_cast<double>(v)) {}
+    Json(unsigned long v) : type_(Type::Number), num_(static_cast<double>(v)) {}
+    Json(long long v) : type_(Type::Number), num_(static_cast<double>(v)) {}
+    Json(unsigned long long v) : type_(Type::Number), num_(static_cast<double>(v)) {}
     Json(double v) : type_(Type::Number), num_(v) {}
     Json(const char* s) : type_(Type::String), str_(s) {}
     Json(std::string s) : type_(Type::String), str_(std::move(s)) {}
