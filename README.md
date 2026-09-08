@@ -28,7 +28,7 @@ releases — no server of your own is needed.
 2. `app/build.gradle.kts`:
 
 ```kotlin
-implementation(files("libs/offline-translator-0.2.0.aar"))
+implementation(files("libs/offline-translator-0.3.1.aar"))
 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 ```
 

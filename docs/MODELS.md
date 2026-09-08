@@ -7,10 +7,26 @@ of (or in addition to) the per-pair Marian models. One GGUF file covers every di
 Korean, English, Spanish, Vietnamese, Thai, Japanese and Chinese, and the source language may be
 left to the model (`"auto"`).
 
-| model | file | size | CPU latency (desktop, 4 threads, ~25-token sentence) | notes |
+| model | file | size | CPU latency (desktop, 4 threads, 2–3 sentences) | notes |
 |---|---|---|---|---|
-| Qwen2.5-1.5B-Instruct Q4_K_M | `qwen2.5-1.5b-instruct-q4_k_m.gguf` | 1.04 GB | 1.3–3.7 s | fluent; occasional wrong time/date words into Korean |
-| Qwen2.5-3B-Instruct Q4_K_M | `qwen2.5-3b-instruct-q4_k_m.gguf` | 1.93 GB | ≈ 2× slower | noticeably better into Korean / Thai |
+| Qwen2.5-1.5B-Instruct Q4_K_M | `qwen2.5-1.5b-instruct-q4_k_m.gguf` | 1.12 GB | 1.4–3.4 s | shipped default; fluent, occasional tense/time slips (Thai "พรุ่งนี้" → "오늘") |
+| Qwen2.5-3B-Instruct Q4_K_M | `qwen2.5-3b-instruct-q4_k_m.gguf` | 2.10 GB | 3.4–6.1 s | clearly better into Korean from English; same Thai time slips |
+
+Measured with the engine's safeguards on (see below). Samples, 1.5B: ko→th
+"สวัสดีครับ กำหนดการประชุมในวันพรุ่งนี้จะเริ่มเวลา 3:00 น. สถานีใต้ดินที่ใกล้ที่สุดอยู่ที่ไหนครับ",
+ko→vi "Xin chào. Hội nghị của tôi sẽ bắt đầu vào 3 giờ chiều ngày mai. Ga gần nhất ở đâu?",
+ja→zh "你好。明天的会议定在下午3点开始。最近的车站在哪里？". 3B en→ko: "안녕하세요. 내일의 회의는 오후 3시에
+시작합니다. 이 제품은 배터리 수명이 길고 화면도 밝아서 외부 사용에도 좋습니다."
+
+**Why small LLMs need guard rails.** Unconstrained, both models regularly drift into Chinese
+mid-sentence when the target is Thai or Korean, append translator's notes, or loop
+("ครับ ครับ ครับ…"). `LlmEngine` therefore (1) puts a one-shot demonstration in the target script
+into the chat, (2) applies a llama.cpp logit bias that forbids every vocabulary token written
+in a script foreign to the target (Han/Kana for Korean, Hangul/Han for Thai, …; control/EOS
+tokens excluded), (3) adds a repetition penalty and stops at the first line break or a
+4× repeated token, (4) strips note markers, and (5) retries once with a stricter instruction
+if the output still mixes scripts. With these on, the script mixing disappeared in all tested
+directions.
 
 Grab them from `Qwen/Qwen2.5-*-Instruct-GGUF` on Hugging Face and add an `llm` entry to the manifest:
 
@@ -85,13 +101,16 @@ converter did not (the normal case for transformers-converted Marian models).
 
 | pair | model | size | notes |
 |---|---|---|---|
-| STT | whisper `small-q5_1` | 190 MB | all five languages |
+| STT | whisper `small-q5_1` | 190 MB | all seven languages |
 | ko-en, ja-en, zh-en, es-en | OPUS-MT base INT8 | ≈ 80 MB each | pre-converted (Hugging Face `jiangzhuo9357/*-ct2`) |
 | en-zh, en-es | OPUS-MT base INT8 | ≈ 80 MB each | same source |
 | en-ja | `opus-tatoeba-en-ja` INT8 | 78 MB | `opus-mt-en-jap` is trained on Bible text and unusable for modern Japanese |
 | en-ko | `opus-mt-tc-big-en-ko` INT8, converted from the original Marian weights | ≈ 215 MB | see below |
+| vi-en, en-vi | OPUS-MT base INT8 (`dekthedev/*-ct2-int8`) | 73 MB each | |
+| th-en | OPUS-MT base INT8 (converted from `Helsinki-NLP/opus-mt-th-en`) | 82 MB | no Marian en→th exists → the LLM handles it |
+| LLM | Qwen2.5-1.5B-Instruct Q4_K_M | 1.12 GB | any direction without a Marian route; downloaded only when needed |
 
-Every other direction (ko↔ja, ko↔zh, ko↔es, ja↔zh, …) pivots through English automatically.
+Every other direction pivots through English automatically when both halves exist (ko↔ja, ko↔zh, vi→ko, th→ko, …); directions that cannot be pivoted (anything → Thai, and any pair the LLM-only backend is asked for) go to the LLM.
 
 **tc-big caveat.** The Hugging Face uploads of `opus-mt-tc-big-en-ko` / `-ko-en` carry a
 `vocab.json` that does not match their SentencePiece models, so *both* transformers itself and
