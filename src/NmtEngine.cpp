@@ -379,6 +379,14 @@ bool NmtEngine::translateDirect(const std::string& text, const std::string& src,
     for (std::size_t i = 0; i < translated.size(); ++i) {
         std::string t = trim(translated[i]);
         if (t.empty()) continue;
+        if (tgt == "ko") {
+            // Marian renders a bare "Hello." as the phone greeting "여보세요?"; in conversation
+            // the face-to-face greeting is meant.
+            std::string lowerSrc;
+            for (const char c : sentences[i]) lowerSrc.push_back(static_cast<char>((c >= 'A' && c <= 'Z') ? c - 'A' + 'a' : c));
+            const bool greeting = lowerSrc == "hello." || lowerSrc == "hello" || lowerSrc == "hello!" || lowerSrc == "hi." || lowerSrc == "hi" || lowerSrc == "hi!";
+            if (greeting && t.find("\xEC\x97\xAC\xEB\xB3\xB4\xEC\x84\xB8\xEC\x9A\x94") == 0) t = "\xEC\x95\x88\xEB\x85\x95\xED\x95\x98\xEC\x84\xB8\xEC\x9A\x94.";
+        }
         if (isCjk(tgt)) {
             // Some ja/zh models drop sentence-final punctuation; restore it from the source
             // sentence so consecutive sentences don't run together ("こんにちはいい天気だ").

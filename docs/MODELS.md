@@ -50,6 +50,33 @@ Pre-converted CTranslate2 OPUS-MT models are published on Hugging Face and load 
 The engine reads `config.json`'s `add_source_eos` flag and appends `</s>` itself when the
 converter did not (the normal case for transformers-converted Marian models).
 
+### What the default manifest ships (`assets/manifest.json`)
+
+| pair | model | size | notes |
+|---|---|---|---|
+| STT | whisper `small-q5_1` | 190 MB | all five languages |
+| ko-en, ja-en, zh-en, es-en | OPUS-MT base INT8 | ≈ 80 MB each | pre-converted (Hugging Face `jiangzhuo9357/*-ct2`) |
+| en-zh, en-es | OPUS-MT base INT8 | ≈ 80 MB each | same source |
+| en-ja | `opus-tatoeba-en-ja` INT8 | 78 MB | `opus-mt-en-jap` is trained on Bible text and unusable for modern Japanese |
+| en-ko | `opus-mt-tc-big-en-ko` INT8, converted from the original Marian weights | ≈ 215 MB | see below |
+
+Every other direction (ko↔ja, ko↔zh, ko↔es, ja↔zh, …) pivots through English automatically.
+
+**tc-big caveat.** The Hugging Face uploads of `opus-mt-tc-big-en-ko` / `-ko-en` carry a
+`vocab.json` that does not match their SentencePiece models, so *both* transformers itself and
+every CTranslate2 conversion derived from them (including several community `-ct2` repos) emit
+`<unk>` garbage. Convert those from the original OPUS-MT release instead:
+
+```
+# https://object.pouta.csc.fi/Tatoeba-MT-models/eng-kor/opusTCv20210807-sepvoc_transformer-big_2022-07-28.zip
+ct2-marian-converter --model_path model.npz --vocab_paths source.vocab.yml target.vocab.yml \
+    --output_dir en-ko --quantization int8
+cp source.spm target.spm en-ko/
+```
+
+(`python -m ctranslate2.converters.marian` is the same tool.) The server is slow; `curl -r`
+range requests in parallel help.
+
 ### Pair coverage & pivoting
 
 Helsinki-NLP publishes direct models for most X↔en pairs but not every X↔ko pair. The

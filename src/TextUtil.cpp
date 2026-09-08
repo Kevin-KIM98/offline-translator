@@ -288,8 +288,20 @@ std::string postProcessTranslation(const std::string& input, const std::string& 
     }
 
     if (lang == "ko") {
-        // Korean keeps spaces between words but not before punctuation; nothing else to do.
-        return trim(out);
+        // Korean keeps spaces between words but not before punctuation. Some models glue the
+        // next sentence to the period ("시작됩니다.이 제품은") — reinsert the space.
+        std::string spaced;
+        const auto kc = utf8Chars(out);
+        for (std::size_t i = 0; i < kc.size(); ++i) {
+            spaced += kc[i];
+            if ((kc[i] == "." || kc[i] == "!" || kc[i] == "?") && i + 1 < kc.size()) {
+                const std::string& nx = kc[i + 1];
+                const bool digit = nx.size() == 1 && std::isdigit(static_cast<unsigned char>(nx[0]));
+                if (nx != " " && !isAsciiPunct(nx) && !isCjkPunct(nx) && nx != "\"" && nx != "'" && nx != ")" && !(kc[i] == "." && digit))
+                    spaced += " ";
+            }
+        }
+        return trim(spaced);
     }
     if (cjkTarget) {
         // Prefer full-width sentence punctuation in Japanese / Chinese output.

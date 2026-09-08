@@ -77,6 +77,21 @@ Measured on a desktop CPU (no GPU), Korean speech → English, whisper `small`:
 
 Even the 32 MB `tiny` model now produces a correct, punctuated transcript for this sample.
 
+Text translation samples with the shipped models (desktop CPU, beam 4):
+
+| direction | input | output |
+|---|---|---|
+| ko→en | 안녕하세요. 오늘 날씨가 정말 좋네요. 내일 회의는 오후 세 시에 시작합니다. | Hello. It's a great day. Tomorrow's meeting starts at three o'clock in the afternoon. |
+| en→ko | Hello. Tomorrow's meeting starts at 3 p.m. This product has a long battery life and a bright screen, so it is good for outdoor use. | 안녕하세요. 내일의 회의는 오후 3시에 시작됩니다. 이 제품은 긴 배터리 수명과 밝은 화면을 가지고 있으므로 야외 사용에 좋습니다. |
+| ja→en | こんにちは。今日はいい天気ですね。明日の会議は午後3時に始まります。 | Hello. It's a nice day, isn't it? Tomorrow's meeting begins at 3 p.m. |
+| en→ja | Hello. It's a great day. Is this product good for outdoor use? | こんにちは。いい天気だ。この製品は屋外で使うのに良いでしょうか。 |
+| ja→ko (pivot via en) | こんにちは。明日の会議は午後3時に始まります。一番近い駅はどこですか？ | 안녕하세요. 내일 모임은 오후 3시에 시작합니다. 가장 가까운 역은 어디인가요? |
+| es→ko (pivot via en) | Hola. ¿Dónde está la estación de metro más cercana? | 안녕하세요. 가장 가까운 지하철 역은 어디죠? |
+
+Models are hosted on the [`models-v1` release](https://github.com/Kevin-KIM98/offline-translator/releases/tag/models-v1)
+and described by [assets/manifest.json](assets/manifest.json) (per-file SHA-256). A first launch with
+Korean + English downloads about 500 MB; each additional language adds roughly 160 MB.
+
 ## Repository layout
 
 ```

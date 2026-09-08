@@ -229,6 +229,7 @@ void testTextUtil() {
     CHECK_EQ(postProcessTranslation("the meeting starts at 3:00 p.m. see you e.g. tomorrow.", "en"),
              "The meeting starts at 3:00 p.m. See you e.g. tomorrow.");
     CHECK_EQ(postProcessTranslation("안녕하세요 . 반갑습니다 !", "ko"), "안녕하세요. 반갑습니다!");
+    CHECK_EQ(postProcessTranslation("시작됩니다.이 제품은 3.5kg입니다.", "ko"), "시작됩니다. 이 제품은 3.5kg입니다.");
     CHECK_EQ(postProcessTranslation("こんにちは 。 元気 です か ?", "ja"), "こんにちは。元気ですか？");
     CHECK_EQ(postProcessTranslation("你好 , 世界 .", "zh"), "你好，世界。");
     CHECK_EQ(postProcessTranslation("¿cómo estás? bien.", "es"), "¿Cómo estás? Bien.");
