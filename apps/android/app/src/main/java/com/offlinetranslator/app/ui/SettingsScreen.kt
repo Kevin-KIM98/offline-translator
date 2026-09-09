@@ -1,5 +1,6 @@
 package com.offlinetranslator.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -49,6 +50,8 @@ import com.offlinetranslator.app.ui.theme.LocalSpeakerColors
 fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
     var picking by remember { mutableStateOf<Side?>(null) }
     val speakers = LocalSpeakerColors.current
+
+    BackHandler(onBack = onBack)
 
     LaunchedEffect(Unit) { vm.refreshInstalled() }
     val engineInfo = remember(state.phase) { vm.engineInfo() }

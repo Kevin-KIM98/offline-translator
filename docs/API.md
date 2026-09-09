@@ -164,6 +164,22 @@ for each model with needs_download:
 SHA-256 over the manifest entry's version + file hashes, so any manifest change is detected
 without re-hashing gigabytes at startup.
 
+## Session callbacks (Kotlin / Swift, 0.3.3+)
+
+`TranslatorSession` wraps mic → engine → TTS on both platforms. It reports:
+
+| callback | when |
+|---|---|
+| `onResult` | an utterance was transcribed and translated |
+| `onNoSpeech` | an utterance held no speech, so `onResult` will not fire — clear any "translating" indicator here |
+| `onError` | the engine or the microphone failed |
+| `onSpeechState` | TTS playback started / finished (only when `speakResults` is on) |
+| `onAudioLevel` | microphone loudness 0..1, ~25×/s, on the audio thread |
+
+`speakResults` and `speechRate` are settable while running, so an app can mute mid-sentence.
+Set `speakResults = false` and call `speak(text, lang)` yourself when the UI needs to replay
+individual lines. `start()` may be called repeatedly (push-to-talk); it keeps a single worker.
+
 ## Build capabilities
 
 `tr_build_capabilities()` → `{"rnnoise":true,"whisper":true,"ctranslate2":true,"sentencepiece":true,"version":"0.1.0"}`.
