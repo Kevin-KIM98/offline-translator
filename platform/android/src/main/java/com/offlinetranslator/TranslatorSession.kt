@@ -22,11 +22,12 @@ import kotlinx.coroutines.withContext
 class TranslatorSession(
     context: Context,
     config: PipelineConfig,
-    private val speakResults: Boolean = true,
+    speakResults: Boolean = true,
 ) : AutoCloseable {
 
     val translator = OfflineTranslator(config)
-    private val tts = OfflineTTSManager(context)
+    /** OS speech synthesis, shared with [speak]; use it to check installed voices. */
+    val tts = OfflineTTSManager(context)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val ready = Channel<Unit>(Channel.CONFLATED)
     private var worker: Job? = null
@@ -34,12 +35,40 @@ class TranslatorSession(
     @Volatile var sourceLang: String = "auto"
     @Volatile var targetLang: String = "en"
 
+    /** Speak each translation through the OS TTS. Can be toggled while running (mute). */
+    @Volatile var speakResults: Boolean = speakResults
+
+    /** Playback speed for spoken translations (1.0 = normal). */
+    @Volatile var speechRate: Float = 1.0f
+
     var onResult: ((TranslationResult) -> Unit)? = null
     var onError: ((String) -> Unit)? = null
     var onSpeechState: ((speaking: Boolean) -> Unit)? = null
 
+    /**
+     * Microphone loudness in 0..1, ~25×/s while capturing, for a level meter.
+     * Called on the audio thread — hop to your UI dispatcher.
+     */
+    var onAudioLevel: ((Float) -> Unit)? = null
+
+    private var levelFrames = 0
+
     private val capture = AudioCapture(context, onFrames = { pcm, n ->
         // Runs on the audio thread: cheap denoise + segmentation only.
+        onAudioLevel?.let { cb ->
+            if (++levelFrames >= 2) {
+                levelFrames = 0
+                var sum = 0.0
+                for (i in 0 until n) {
+                    val s = pcm[i].toDouble() / 32768.0
+                    sum += s * s
+                }
+                val rms = if (n > 0) kotlin.math.sqrt(sum / n) else 0.0
+                // Perceptual-ish curve: -50 dBFS .. 0 dBFS mapped to 0..1.
+                val db = 20.0 * kotlin.math.log10(rms.coerceAtLeast(1e-6))
+                cb(((db + 50.0) / 50.0).coerceIn(0.0, 1.0).toFloat())
+            }
+        }
         if (translator.feedAudio(pcm, n)) ready.trySend(Unit)
     }, onError = { onError?.invoke(it) })
 
@@ -50,6 +79,8 @@ class TranslatorSession(
         this.targetLang = targetLang
         if (capture.isRunning) return true
         translator.resetAudio()
+        // Push-to-talk restarts capture many times; keep a single consumer of [ready].
+        if (worker?.isActive == true) return capture.start()
         worker = scope.launch {
             for (unit in ready) {
                 while (translator.pendingCount > 0) {
@@ -61,7 +92,7 @@ class TranslatorSession(
                     onResult?.invoke(r)
                     if (r.ok && speakResults && r.translatedText.isNotBlank()) {
                         onSpeechState?.invoke(true)
-                        tts.speakAndWait(r.translatedText, r.targetLang)
+                        tts.speakAndWait(r.translatedText, r.targetLang, speechRate)
                         onSpeechState?.invoke(false)
                     }
                 }
@@ -77,6 +108,7 @@ class TranslatorSession(
 
     fun stop() {
         capture.stop()
+        onAudioLevel?.invoke(0f)
         endUtterance()
     }
 
@@ -85,7 +117,10 @@ class TranslatorSession(
         translator.translateText(text, src, tgt)
     }
 
-    suspend fun speak(text: String, lang: String) = tts.speakAndWait(text, lang)
+    suspend fun speak(text: String, lang: String, rate: Float = speechRate) = tts.speakAndWait(text, lang, rate)
+
+    /** Cuts off whatever the TTS is currently saying. */
+    fun stopSpeaking() = tts.stop()
 
     override fun close() {
         stop()
