@@ -1,0 +1,2 @@
+"CFBundleDisplayName" = "오프라인 통역기";
+"NSMicrophoneUsageDescription" = "음성은 기기 안에서만 인식하고 통역합니다. 어디로도 전송되지 않습니다.";

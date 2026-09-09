@@ -13,6 +13,7 @@ options:
     iOS: "15.0"
   createIntermediateGroups: true
   groupSortPosition: top
+  developmentLanguage: en
 
 settings:
   base:
@@ -46,6 +47,10 @@ targets:
       path: OfflineInterpreter/Info.plist
       properties:
         CFBundleDisplayName: Interpreter
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations:
+          - en
+          - ko
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen:

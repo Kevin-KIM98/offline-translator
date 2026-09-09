@@ -112,11 +112,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) {
                     val repository = repo ?: ModelRepository(getApplication<Application>()).also { repo = it }
                     repository.refreshManifest()
-                    if (!repository.hasManifest()) error("모델 목록을 받지 못했습니다. 네트워크를 확인해 주세요.")
+                    if (!repository.hasManifest()) error(str(R.string.err_no_manifest))
                     repository.statusForLanguages(_state.value.langs, llmMode = llmMode())
                 }
             }
-            r.onFailure { e -> _state.update { it.copy(phase = Phase.Fatal(e.message ?: "초기화 실패")) } }
+            r.onFailure { e -> _state.update { it.copy(phase = Phase.Fatal(e.message ?: str(R.string.err_init))) } }
             r.onSuccess { status ->
                 val pending = status.filter { it.needsDownload }
                 if (pending.isEmpty()) openSession() else _state.update { it.copy(phase = Phase.Setup(pending)) }
@@ -136,7 +136,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val free = withContext(Dispatchers.IO) { repository.freeBytes() }
             if (free < total + 50L * 1024 * 1024) {
                 _state.update {
-                    it.copy(phase = Phase.Setup(pending, "저장 공간이 부족합니다. ${mb(total)} 이상 필요합니다."))
+                    it.copy(phase = Phase.Setup(pending, str(R.string.err_storage, mb(total))))
                 }
                 return@launch
             }
@@ -158,7 +158,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         is InstallEvent.AllDone -> {}
                     }
                 }
-            }.onFailure { e -> failure = e.message ?: "다운로드 실패" }
+            }.onFailure { e -> failure = e.message ?: str(R.string.err_download_failed) }
 
             val err = failure
             if (err != null) {
@@ -178,7 +178,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     .getOrNull()
             } ?: emptyList()
             _state.update {
-                it.copy(phase = Phase.Setup(pending, "다운로드를 멈췄습니다. 다시 받으면 이어서 내려받습니다."))
+                it.copy(phase = Phase.Setup(pending, str(R.string.err_download_stopped)))
             }
         }
     }
@@ -198,7 +198,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     TranslatorSession(getApplication<Application>(), config, speakResults = false)
                 }
             }
-            built.onFailure { e -> _state.update { it.copy(phase = Phase.Fatal(e.message ?: "엔진을 열지 못했습니다")) } }
+            built.onFailure { e -> _state.update { it.copy(phase = Phase.Fatal(e.message ?: str(R.string.err_engine_open))) } }
             built.onSuccess { s ->
                 s.speechRate = _state.value.speechRate
                 s.onResult = { r -> onEngineResult(r) }
@@ -219,7 +219,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun onEngineResult(r: TranslationResult) {
         val s = _state.value
         if (!r.ok) {
-            _state.update { it.copy(message = r.error ?: "번역 실패", working = false) }
+            _state.update { it.copy(message = r.error ?: str(R.string.err_translate), working = false) }
             return
         }
         if (r.sourceText.isBlank()) {
@@ -233,7 +233,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             viewModelScope.launch {
                 val back = session?.translate(r.sourceText, r.sourceLang, s.langA)
                 if (back == null || !back.ok) {
-                    _state.update { it.copy(message = back?.error ?: "번역 실패", working = false) }
+                    _state.update { it.copy(message = back?.error ?: str(R.string.err_translate), working = false) }
                 } else {
                     addTurn(back, Side.B)
                 }
@@ -281,7 +281,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val src = if (side == Side.A) s.langA else s.langB
         val tgt = if (side == Side.A) s.langB else s.langA
         if (session?.start(sourceLang = src, targetLang = tgt) != true) {
-            _state.update { it.copy(message = "마이크를 열 수 없습니다") }
+            _state.update { it.copy(message = str(R.string.err_mic)) }
             return
         }
         _state.update { it.copy(listening = side, speakingTurn = null) }
@@ -309,7 +309,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val s = _state.value
         if (s.phase != Phase.Ready) return
         if (session?.start(sourceLang = "auto", targetLang = s.langB) != true) {
-            _state.update { it.copy(message = "마이크를 열 수 없습니다", handsFree = false) }
+            _state.update { it.copy(message = str(R.string.err_mic), handsFree = false) }
             return
         }
         _state.update { it.copy(listening = Side.A) }
@@ -354,7 +354,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val tgt = if (from == Side.A) s.langB else s.langA
             val r = session?.translate(text, src, tgt)
             if (r == null || !r.ok) {
-                _state.update { it.copy(working = false, message = r?.error ?: "번역 실패") }
+                _state.update { it.copy(working = false, message = r?.error ?: str(R.string.err_translate)) }
                 onDone(null)
             } else {
                 val turn = Turn(nextTurnId++, from, text, src, r.translatedText, tgt, r.route, r.totalMs)
@@ -415,10 +415,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun removeModel(id: String) {
+        val name = _state.value.installed.firstOrNull { it.id == id }
+            ?.let { modelTitle(getApplication<Application>(), it) } ?: id
         viewModelScope.launch {
             withContext(Dispatchers.IO) { repo?.remove(id) }
             refreshInstalled()
-            _state.update { it.copy(message = "삭제했습니다: $id") }
+            _state.update { it.copy(message = str(R.string.msg_removed, name)) }
         }
     }
 
@@ -426,20 +428,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun engineInfo(): List<Pair<String, String>> {
         val caps = runCatching { OfflineTranslator.buildCapabilities }.getOrNull()
         val pipeline = runCatching { session?.translator?.capabilities }.getOrNull()
+        val unknown = str(R.string.value_unknown)
         fun flag(key: String) = when (caps?.optBoolean(key)) {
-            true -> "사용"
-            false -> "미사용"
-            null -> "-"
+            true -> str(R.string.value_included)
+            false -> str(R.string.value_not_included)
+            null -> unknown
         }
         return listOf(
-            "엔진 버전" to (runCatching { OfflineTranslator.version }.getOrNull() ?: "-"),
-            "모델 목록" to (repo?.manifestVersion ?: "-"),
-            "음성인식 whisper" to flag("whisper"),
-            "번역 CTranslate2" to flag("ctranslate2"),
-            "LLM llama.cpp" to flag("llama"),
-            "잡음 제거 RNNoise" to flag("rnnoise"),
-            "LLM 로드됨" to when (pipeline?.optBoolean("llm_loaded")) {
-                true -> "예"; false -> "아니오"; null -> "-"
+            str(R.string.info_engine_version) to (runCatching { OfflineTranslator.version }.getOrNull() ?: unknown),
+            str(R.string.info_manifest) to (repo?.manifestVersion?.ifEmpty { unknown } ?: unknown),
+            str(R.string.info_whisper) to flag("whisper"),
+            str(R.string.info_ct2) to flag("ctranslate2"),
+            str(R.string.info_llama) to flag("llama"),
+            str(R.string.info_rnnoise) to flag("rnnoise"),
+            str(R.string.info_llm_loaded) to when (pipeline?.optBoolean("llm_loaded")) {
+                true -> str(R.string.value_yes)
+                false -> str(R.string.value_no)
+                null -> unknown
             },
         )
     }
@@ -454,12 +459,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         Thread { runCatching { s?.close() }; runCatching { r?.close() } }.start()
     }
 
-    private fun label(m: ModelStatus): String = when (m.kind) {
-        "stt" -> "음성인식 모델"
-        "llm" -> "다국어 LLM"
-        "nmt" -> "번역 모델 ${m.pair}"
-        else -> m.id
-    }
+    private fun str(id: Int, vararg args: Any): String =
+        getApplication<Application>().getString(id, *args)
+
+    private fun label(m: ModelStatus): String = modelTitle(getApplication<Application>(), m)
 
     private fun labelOf(list: List<ModelStatus>, id: String): String =
         list.firstOrNull { it.id == id }?.let { label(it) } ?: id

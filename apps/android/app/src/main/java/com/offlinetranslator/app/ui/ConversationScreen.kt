@@ -66,6 +66,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -73,6 +74,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.offlinetranslator.app.Lang
 import com.offlinetranslator.app.MainViewModel
+import com.offlinetranslator.app.R
 import com.offlinetranslator.app.Side
 import com.offlinetranslator.app.Turn
 import com.offlinetranslator.app.UiState
@@ -94,6 +96,7 @@ fun ConversationScreen(
     var typing by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val clipboard = LocalClipboardManager.current
+    val copiedMessage = stringResource(R.string.copied)
 
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -179,7 +182,7 @@ fun ConversationScreen(
                             onReplay = { if (state.speakingTurn == turn.id) vm.stopSpeaking() else vm.speakTurn(turn) },
                             onCopy = {
                                 clipboard.setText(AnnotatedString(turn.translatedText))
-                                vm.showMessage("번역문을 복사했습니다")
+                                vm.showMessage(copiedMessage)
                             },
                         )
                     }
@@ -198,7 +201,7 @@ fun ConversationScreen(
         val current = if (side == Side.A) state.langA else state.langB
         val other = if (side == Side.A) state.langB else state.langA
         LanguagePickerSheet(
-            title = if (side == Side.A) "왼쪽 화자의 언어" else "오른쪽 화자의 언어",
+            title = stringResource(if (side == Side.A) R.string.picker_left else R.string.picker_right),
             current = current,
             disabled = other,
             onPick = { code ->
@@ -236,11 +239,11 @@ private fun LanguageBar(
         ) {
             LanguageChip(Lang.of(state.langA).name, speakers.sideA, Modifier.weight(1f), onPickA)
             IconButton(onClick = onSwap) {
-                Icon(Icons.Filled.SwapHoriz, "언어 방향 바꾸기", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Filled.SwapHoriz, stringResource(R.string.swap_languages), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             LanguageChip(Lang.of(state.langB).name, speakers.sideB, Modifier.weight(1f), onPickB)
             IconButton(onClick = onSettings) {
-                Icon(Icons.Filled.Settings, "설정", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Filled.Settings, stringResource(R.string.settings), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -270,18 +273,18 @@ private fun ActionRow(state: UiState, onTyping: () -> Unit, onClear: () -> Unit,
         FilterChip(
             selected = state.handsFree,
             onClick = onHandsFree,
-            label = { Text("핸즈프리") },
+            label = { Text(stringResource(R.string.hands_free)) },
             leadingIcon = { Icon(Icons.Filled.GraphicEq, null, Modifier.size(18.dp)) },
             colors = FilterChipDefaults.filterChipColors(),
         )
         Spacer(Modifier.weight(1f))
         IconButton(onClick = onTyping) {
-            Icon(Icons.Filled.Keyboard, "키보드로 입력", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.Filled.Keyboard, stringResource(R.string.keyboard_input), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         IconButton(onClick = onClear, enabled = state.turns.isNotEmpty()) {
             Icon(
                 Icons.Filled.DeleteSweep,
-                "대화 지우기",
+                stringResource(R.string.clear_conversation),
                 tint = if (state.turns.isEmpty()) MaterialTheme.colorScheme.outline
                 else MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -300,13 +303,13 @@ private fun HandsFreePanel(state: UiState, onStop: () -> Unit) {
         Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    "핸즈프리로 듣는 중",
+                    stringResource(R.string.hands_free_title),
                     style = MaterialTheme.typography.labelLarge,
                     color = speakers.sideA,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "말이 끝나면 자동으로 통역합니다. 두 사람이 번갈아 말해도 됩니다.",
+                    stringResource(R.string.hands_free_body),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -315,7 +318,7 @@ private fun HandsFreePanel(state: UiState, onStop: () -> Unit) {
             }
             Spacer(Modifier.width(12.dp))
             IconButton(onClick = onStop) {
-                Icon(Icons.Filled.StopCircle, "중지", tint = speakers.sideA, modifier = Modifier.size(34.dp))
+                Icon(Icons.Filled.StopCircle, stringResource(R.string.hands_free_stop), tint = speakers.sideA, modifier = Modifier.size(34.dp))
             }
         }
     }
@@ -332,19 +335,19 @@ private fun MicPermissionCard(onRequest: () -> Unit, onOpenSettings: () -> Unit)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.MicOff, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.width(10.dp))
-                Text("마이크 권한이 필요합니다", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.mic_needed_title), style = MaterialTheme.typography.labelLarge)
             }
             Spacer(Modifier.height(6.dp))
             Text(
-                "음성은 기기 안에서만 처리되며 어디로도 전송되지 않습니다.",
+                stringResource(R.string.mic_needed_body),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(12.dp))
             Row {
-                Button(onClick = onRequest) { Text("권한 허용") }
+                Button(onClick = onRequest) { Text(stringResource(R.string.mic_allow)) }
                 Spacer(Modifier.width(8.dp))
-                TextButton(onClick = onOpenSettings) { Text("설정에서 변경") }
+                TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.mic_open_settings)) }
             }
         }
     }
@@ -354,7 +357,7 @@ private fun MicPermissionCard(onRequest: () -> Unit, onOpenSettings: () -> Unit)
 private fun WorkingBar() {
     Column(Modifier.fillMaxWidth()) {
         Text(
-            "통역하는 중",
+            stringResource(R.string.translating),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(start = 20.dp, bottom = 4.dp),
@@ -377,15 +380,14 @@ private fun EmptyState(state: UiState) {
         )
         Spacer(Modifier.height(10.dp))
         Text(
-            "아래 버튼을 길게 누른 채 말하고, 말이 끝나면 손을 떼세요.\n" +
-                "번역이 화면에 뜨고 소리로도 나옵니다.",
+            stringResource(R.string.empty_hint),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(18.dp))
         Text(
-            "인터넷 없이 동작합니다.",
+            stringResource(R.string.empty_offline),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
         )
@@ -426,16 +428,19 @@ private fun TurnCard(turn: Turn, speaking: Boolean, onReplay: () -> Unit, onCopy
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        turn.translatedText.ifBlank { "(번역 없음)" },
+                        turn.translatedText.ifBlank { stringResource(R.string.no_translation) },
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            "${Lang.of(turn.sourceLang).name} → ${Lang.of(turn.targetLang).name} · " +
-                                "${turn.totalMs.toInt()} ms" +
-                                if (turn.route.isEmpty()) "" else " · ${turn.route.joinToString("→")}",
+                            stringResource(
+                                R.string.turn_footer,
+                                Lang.of(turn.sourceLang).name,
+                                Lang.of(turn.targetLang).name,
+                                turn.totalMs.toInt(),
+                            ) + if (turn.route.isEmpty()) "" else " · " + turn.route.joinToString("→"),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.outline,
                             modifier = Modifier.weight(1f),
@@ -449,7 +454,7 @@ private fun TurnCard(turn: Turn, speaking: Boolean, onReplay: () -> Unit, onCopy
                         ) {
                             Icon(
                                 if (speaking) Icons.Filled.StopCircle else Icons.Filled.VolumeUp,
-                                contentDescription = if (speaking) "멈추기" else "다시 듣기",
+                                contentDescription = stringResource(if (speaking) R.string.stop_playback else R.string.replay),
                                 tint = if (speaking) accent else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp),
                             )
@@ -472,7 +477,7 @@ private fun TextInputSheet(state: UiState, onDismiss: () -> Unit, onSubmit: (Str
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) {
         Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 20.dp).imePadding().navigationBarsPadding()) {
-            Text("키보드로 통역", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.text_sheet_title), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(Side.A to state.langA, Side.B to state.langB).forEach { (s, code) ->
@@ -491,7 +496,7 @@ private fun TextInputSheet(state: UiState, onDismiss: () -> Unit, onSubmit: (Str
                 value = text,
                 onValueChange = { text = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("번역할 문장을 입력하세요") },
+                placeholder = { Text(stringResource(R.string.text_placeholder)) },
                 minLines = 3,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { if (text.isNotBlank()) onSubmit(text, side) }),
@@ -502,7 +507,7 @@ private fun TextInputSheet(state: UiState, onDismiss: () -> Unit, onSubmit: (Str
                 enabled = text.isNotBlank() && !state.working,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("번역", fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.text_translate), fontWeight = FontWeight.SemiBold)
             }
         }
     }

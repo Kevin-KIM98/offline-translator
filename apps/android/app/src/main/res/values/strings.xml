@@ -1,4 +1,109 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Default (English). Korean lives in values-ko/strings.xml. -->
 <resources>
     <string name="app_name">Offline Interpreter</string>
+
+    <!-- Startup -->
+    <string name="checking_models">Checking models</string>
+    <string name="opening_engine">Preparing the interpreter</string>
+    <string name="start_failed_title">Cannot start</string>
+    <string name="retry">Try again</string>
+
+    <!-- First-run setup -->
+    <string name="setup_title">Before you start</string>
+    <string name="setup_subtitle">Translating between %1$s and %2$s needs these models, downloaded once. After that everything runs without a network.</string>
+    <string name="setup_llm_note">The pair you picked has no dedicated translation model, so the multilingual LLM is installed as well. Choosing other languages in settings needs far less space.</string>
+    <string name="setup_wifi_hint">Wi-Fi is recommended. An interrupted download resumes.</string>
+    <string name="setup_download">Download %1$s</string>
+    <string name="setup_change_languages">Change languages</string>
+    <string name="download_title">Downloading models</string>
+    <string name="verify_title">Checking files</string>
+    <string name="download_progress">%1$s / %2$s  ·  %3$d%%</string>
+    <string name="download_keep_open">Keep this screen open.\nIf you close the app, the download resumes where it stopped.</string>
+    <string name="download_stop">Stop</string>
+
+    <!-- Model names -->
+    <string name="model_stt">Speech recognition</string>
+    <string name="model_llm">Multilingual LLM</string>
+    <string name="model_nmt_pair">%1$s to %2$s translation</string>
+    <string name="model_nmt_generic">Translation model %1$s</string>
+    <string name="model_stt_sub">whisper · shared by all seven languages</string>
+    <string name="model_llm_sub">Qwen2.5 · every language pair</string>
+    <string name="model_nmt_sub">OPUS-MT</string>
+
+    <!-- Conversation -->
+    <string name="talk_listening">Listening</string>
+    <string name="talk_hold">Hold to speak</string>
+    <string name="swap_languages">Swap direction</string>
+    <string name="settings">Settings</string>
+    <string name="hands_free">Hands-free</string>
+    <string name="keyboard_input">Type instead</string>
+    <string name="clear_conversation">Clear conversation</string>
+    <string name="hands_free_title">Listening hands-free</string>
+    <string name="hands_free_body">Each utterance is translated as soon as you stop speaking. Both people can simply talk.</string>
+    <string name="hands_free_stop">Stop</string>
+    <string name="mic_needed_title">Microphone access is needed</string>
+    <string name="mic_needed_body">Speech is processed on this device only and is never sent anywhere.</string>
+    <string name="mic_allow">Allow</string>
+    <string name="mic_open_settings">Open settings</string>
+    <string name="translating">Translating</string>
+    <string name="empty_hint">Hold a button below while you speak, then let go.\nThe translation appears here and is read aloud.</string>
+    <string name="empty_offline">Works with no network.</string>
+    <string name="no_translation">(no translation)</string>
+    <string name="replay">Play again</string>
+    <string name="stop_playback">Stop</string>
+    <string name="picker_left">Language on the left</string>
+    <string name="picker_right">Language on the right</string>
+    <string name="copied">Translation copied</string>
+    <string name="text_sheet_title">Translate typed text</string>
+    <string name="text_placeholder">Type a sentence to translate</string>
+    <string name="text_translate">Translate</string>
+    <string name="turn_footer">%1$s → %2$s · %3$d ms</string>
+
+    <!-- Settings -->
+    <string name="settings_languages">Languages</string>
+    <string name="settings_speaker_left">Left speaker</string>
+    <string name="settings_speaker_right">Right speaker</string>
+    <string name="settings_sound">Sound</string>
+    <string name="settings_speak">Read translations aloud</string>
+    <string name="settings_speak_sub">Uses the voices installed on this device</string>
+    <string name="settings_rate">Speaking rate</string>
+    <string name="settings_rate_value">%1$.1f×</string>
+    <string name="settings_backend">Translation engine</string>
+    <string name="backend_auto">Automatic</string>
+    <string name="backend_marian">Dedicated</string>
+    <string name="backend_llm">LLM</string>
+    <string name="backend_auto_desc">Uses the dedicated model for a language pair when one exists, and the LLM otherwise. Fastest.</string>
+    <string name="backend_marian_desc">Dedicated translation models only. Directions without one, such as anything into Thai, will not translate.</string>
+    <string name="backend_llm_desc">Translates every direction with a single LLM. Slower, but it detects the spoken language itself. Needs 1.1 GB.</string>
+    <string name="settings_installed">Installed models</string>
+    <string name="settings_none_installed">No models installed yet.</string>
+    <string name="delete">Delete</string>
+    <string name="settings_total">Total %1$s</string>
+    <string name="settings_about">About</string>
+    <string name="info_engine_version">Engine version</string>
+    <string name="info_manifest">Model list</string>
+    <string name="info_whisper">Speech recognition (whisper)</string>
+    <string name="info_ct2">Translation (CTranslate2)</string>
+    <string name="info_llama">LLM (llama.cpp)</string>
+    <string name="info_rnnoise">Noise suppression (RNNoise)</string>
+    <string name="info_llm_loaded">LLM loaded</string>
+    <string name="value_included">included</string>
+    <string name="value_not_included">not included</string>
+    <string name="value_yes">yes</string>
+    <string name="value_no">no</string>
+    <string name="value_unknown">-</string>
+    <string name="settings_privacy">Everything runs on this device. Audio and text are never transmitted.</string>
+    <string name="back">Back</string>
+
+    <!-- Errors and notices -->
+    <string name="err_no_manifest">Could not fetch the model list. Check your network.</string>
+    <string name="err_init">Startup failed</string>
+    <string name="err_storage">Not enough storage. %1$s or more is needed.</string>
+    <string name="err_download_stopped">Download stopped. Starting it again resumes where it left off.</string>
+    <string name="err_download_failed">Download failed</string>
+    <string name="err_engine_open">Could not start the engine</string>
+    <string name="err_translate">Translation failed</string>
+    <string name="err_mic">Could not open the microphone</string>
+    <string name="msg_removed">Removed: %1$s</string>
 </resources>

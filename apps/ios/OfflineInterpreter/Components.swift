@@ -18,7 +18,7 @@ struct TalkButton: View {
         VStack(spacing: 6) {
             Image(systemName: "mic.fill").font(.system(size: 24, weight: .medium))
             Text(label).font(.headline).lineLimit(1).minimumScaleFactor(0.6)
-            Text(active ? "말하는 중" : "길게 눌러 말하기")
+            Text(active ? L("talk_listening") : L("talk_hold"))
                 .font(.caption2)
                 .opacity(0.75)
                 .lineLimit(1)
@@ -122,7 +122,7 @@ struct LanguagePicker: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("닫기") { dismiss() }
+                    Button(L("picker_close")) { dismiss() }
                 }
             }
         }

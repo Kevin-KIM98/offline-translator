@@ -17,7 +17,7 @@ struct ConversationView: View {
         }
         .sheet(item: $picking) { side in
             LanguagePicker(
-                title: side == .a ? "왼쪽 화자의 언어" : "오른쪽 화자의 언어",
+                title: side == .a ? L("picker_left") : L("picker_right"),
                 current: side == .a ? model.langA : model.langB,
                 disabled: side == .a ? model.langB : model.langA
             ) { code in
@@ -31,11 +31,11 @@ struct ConversationView: View {
         .sheet(isPresented: $typing) {
             TextInputSheet().environmentObject(model)
         }
-        .alert("오류", isPresented: Binding(
+        .alert(L("error_title"), isPresented: Binding(
             get: { model.message != nil },
             set: { if !$0 { model.message = nil } }
         )) {
-            Button("확인") { model.message = nil }
+            Button(L("ok")) { model.message = nil }
         } message: {
             Text(model.message ?? "")
         }
@@ -78,11 +78,11 @@ struct ConversationView: View {
                 Spacer()
                 Text("\(Lang.of(model.langA).name) ↔ \(Lang.of(model.langB).name)")
                     .font(.title3.weight(.semibold))
-                Text("아래 버튼을 길게 누른 채 말하고, 말이 끝나면 손을 떼세요.\n번역이 화면에 뜨고 소리로도 나옵니다.")
+                Text(L("empty_hint"))
                     .font(.subheadline)
                     .foregroundColor(Palette.muted(scheme))
                     .multilineTextAlignment(.center)
-                Text("인터넷 없이 동작합니다.")
+                Text(L("empty_offline"))
                     .font(.caption)
                     .foregroundColor(Palette.sideA(scheme))
                     .padding(.top, 8)
@@ -103,12 +103,12 @@ struct ConversationView: View {
                                 Button {
                                     UIPasteboard.general.string = turn.translatedText
                                 } label: {
-                                    Label("번역문 복사", systemImage: "doc.on.doc")
+                                    Label(L("copy_translation"), systemImage: "doc.on.doc")
                                 }
                                 Button {
                                     UIPasteboard.general.string = turn.sourceText
                                 } label: {
-                                    Label("원문 복사", systemImage: "text.quote")
+                                    Label(L("copy_source"), systemImage: "text.quote")
                                 }
                             }
                         }
@@ -129,7 +129,7 @@ struct ConversationView: View {
             if model.working {
                 HStack(spacing: 8) {
                     ProgressView().scaleEffect(0.7)
-                    Text("통역하는 중").font(.caption).foregroundColor(Palette.sideA(scheme))
+                    Text(L("translating")).font(.caption).foregroundColor(Palette.sideA(scheme))
                     Spacer()
                 }
             }
@@ -138,7 +138,7 @@ struct ConversationView: View {
                 Button {
                     model.setHandsFree(!model.handsFree)
                 } label: {
-                    Label("핸즈프리", systemImage: "waveform")
+                    Label(L("hands_free"), systemImage: "waveform")
                         .font(.subheadline)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
@@ -192,15 +192,15 @@ struct ConversationView: View {
 
     private var micCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("마이크 권한이 필요합니다", systemImage: "mic.slash")
+            Label(L("mic_needed_title"), systemImage: "mic.slash")
                 .font(.subheadline.weight(.semibold))
-            Text("음성은 기기 안에서만 처리되며 어디로도 전송되지 않습니다.")
+            Text(L("mic_needed_body"))
                 .font(.caption)
                 .foregroundColor(Palette.muted(scheme))
             HStack {
-                Button("권한 허용") { Task { await model.requestPermission() } }
+                Button(L("mic_allow")) { Task { await model.requestPermission() } }
                     .buttonStyle(.borderedProminent)
-                Button("설정 열기") {
+                Button(L("mic_open_settings")) {
                     if let url = URL(string: UIApplication.openSettingsURLString) {
                         UIApplication.shared.open(url)
                     }
@@ -216,10 +216,10 @@ struct ConversationView: View {
     private var handsFreePanel: some View {
         HStack {
             VStack(alignment: .leading, spacing: 6) {
-                Text("핸즈프리로 듣는 중")
+                Text(L("hands_free_title"))
                     .font(.subheadline.weight(.semibold))
                     .foregroundColor(Palette.sideA(scheme))
-                Text("말이 끝나면 자동으로 통역합니다. 두 사람이 번갈아 말해도 됩니다.")
+                Text(L("hands_free_body"))
                     .font(.caption)
                     .foregroundColor(Palette.muted(scheme))
                 LevelBars(level: model.level, accent: Palette.sideA(scheme)).padding(.top, 4)
@@ -258,7 +258,7 @@ private struct TurnCard: View {
                     Text(turn.sourceText)
                         .font(.footnote)
                         .foregroundColor(Palette.muted(scheme))
-                    Text(turn.translatedText.isEmpty ? "(번역 없음)" : turn.translatedText)
+                    Text(turn.translatedText.isEmpty ? L("no_translation") : turn.translatedText)
                         .font(.title3.weight(.semibold))
                     HStack {
                         Text(footer)
@@ -282,7 +282,7 @@ private struct TurnCard: View {
 
     private var footer: String {
         let route = turn.route.isEmpty ? "" : " · " + turn.route.joined(separator: "→")
-        return "\(Lang.of(turn.sourceLang).name) → \(Lang.of(turn.targetLang).name) · \(Int(turn.totalMs)) ms" + route
+        return L("turn_footer", Lang.of(turn.sourceLang).name, Lang.of(turn.targetLang).name, Int(turn.totalMs)) + route
     }
 }
 
@@ -296,7 +296,7 @@ private struct TextInputSheet: View {
     var body: some View {
         NavigationView {
             VStack(alignment: .leading, spacing: 12) {
-                Picker("언어", selection: $side) {
+                Picker(L("settings_languages"), selection: $side) {
                     Text(Lang.of(model.langA).name).tag(Side.a)
                     Text(Lang.of(model.langB).name).tag(Side.b)
                 }
@@ -311,7 +311,7 @@ private struct TextInputSheet: View {
                     model.translateText(text, from: side)
                     dismiss()
                 } label: {
-                    Text("번역").frame(maxWidth: .infinity).padding(.vertical, 6)
+                    Text(L("text_translate")).frame(maxWidth: .infinity).padding(.vertical, 6)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -319,10 +319,10 @@ private struct TextInputSheet: View {
                 Spacer()
             }
             .padding(20)
-            .navigationTitle("키보드로 통역")
+            .navigationTitle(L("text_sheet_title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("닫기") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(L("picker_close")) { dismiss() } }
             }
         }
     }

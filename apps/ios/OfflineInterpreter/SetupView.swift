@@ -13,8 +13,8 @@ struct SetupView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("통역을 시작하기 전에").font(.title3.weight(.semibold))
-            Text("\(Lang.of(model.langA).name)와 \(Lang.of(model.langB).name)를 통역하려면 아래 모델을 한 번만 내려받으면 됩니다. 그 뒤로는 인터넷 없이 동작합니다.")
+            Text(L("setup_title")).font(.title3.weight(.semibold))
+            Text(L("setup_subtitle", Lang.of(model.langA).name, Lang.of(model.langB).name))
                 .font(.subheadline)
                 .foregroundColor(Palette.muted(scheme))
                 .padding(.top, 8)
@@ -39,7 +39,7 @@ struct SetupView: View {
                     }
 
                     if pending.contains(where: { $0.kind == "llm" }) {
-                        Text("선택한 언어 조합에는 직접 번역 모델이 없어서 다국어 LLM이 함께 설치됩니다. 설정에서 다른 언어를 고르면 용량을 줄일 수 있습니다.")
+                        Text(L("setup_llm_note"))
                             .font(.caption)
                             .foregroundColor(Palette.muted(scheme))
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -60,7 +60,7 @@ struct SetupView: View {
                     .padding(.bottom, 12)
             }
 
-            Label("Wi-Fi에서 받는 것을 권합니다. 중단해도 이어받습니다.", systemImage: "wifi")
+            Label(L("setup_wifi_hint"), systemImage: "wifi")
                 .font(.caption)
                 .foregroundColor(Palette.muted(scheme))
                 .padding(.bottom, 12)
@@ -68,13 +68,13 @@ struct SetupView: View {
             Button {
                 model.download()
             } label: {
-                Label("\(formatBytes(total)) 내려받기", systemImage: "arrow.down.circle")
+                Label(L("setup_download", formatBytes(total)), systemImage: "arrow.down.circle")
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
             }
             .buttonStyle(.borderedProminent)
 
-            Button("언어 바꾸기", action: onSettings)
+            Button(L("setup_change_languages"), action: onSettings)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 6)
         }
@@ -95,7 +95,7 @@ struct DownloadView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(verifying ? "파일을 검사하는 중" : "모델을 내려받는 중").font(.title3.weight(.semibold))
+            Text(verifying ? L("verify_title") : L("download_title")).font(.title3.weight(.semibold))
             Text(label)
                 .font(.subheadline)
                 .foregroundColor(Palette.muted(scheme))
@@ -104,19 +104,19 @@ struct DownloadView: View {
             ProgressView(value: fraction)
                 .padding(.top, 20)
 
-            Text("\(formatBytes(done)) / \(formatBytes(total))  ·  \(Int(fraction * 100))%")
+            Text(L("download_progress", formatBytes(done), formatBytes(total), Int(fraction * 100)))
                 .font(.caption)
                 .foregroundColor(Palette.muted(scheme))
                 .padding(.top, 10)
 
-            Text("이 화면을 켜 둔 채로 기다려 주세요.\n앱을 닫으면 받은 지점부터 다시 이어집니다.")
+            Text(L("download_keep_open"))
                 .font(.caption)
                 .foregroundColor(Palette.muted(scheme))
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 28)
 
-            Button("멈추기") { model.cancelDownload() }
+            Button(L("download_stop")) { model.cancelDownload() }
                 .frame(maxWidth: .infinity)
                 .padding(.top, 12)
         }

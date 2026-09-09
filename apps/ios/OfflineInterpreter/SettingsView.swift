@@ -10,22 +10,22 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section("언어") {
+                Section(L("settings_languages")) {
                     Button { picking = .a } label: {
-                        row("왼쪽 화자", Lang.of(model.langA).name, Palette.sideA(scheme))
+                        row(L("settings_speaker_left"), Lang.of(model.langA).name, Palette.sideA(scheme))
                     }
                     Button { picking = .b } label: {
-                        row("오른쪽 화자", Lang.of(model.langB).name, Palette.sideB(scheme))
+                        row(L("settings_speaker_right"), Lang.of(model.langB).name, Palette.sideB(scheme))
                     }
                 }
 
-                Section("소리") {
-                    Toggle("번역 읽어주기", isOn: $model.speak)
+                Section(L("settings_sound")) {
+                    Toggle(L("settings_speak"), isOn: $model.speak)
                     VStack(alignment: .leading) {
                         HStack {
-                            Text("말하기 속도")
+                            Text(L("settings_rate"))
                             Spacer()
-                            Text(String(format: "%.1f×", model.speechRate))
+                            Text(L("settings_rate_value", model.speechRate))
                                 .foregroundColor(Palette.muted(scheme))
                         }
                         Slider(value: $model.speechRate, in: 0.6...1.6, step: 0.2)
@@ -33,9 +33,9 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Picker("번역 엔진", selection: $model.backend) {
-                        Text("자동").tag(OTTranslationBackend.auto)
-                        Text("전용 모델").tag(OTTranslationBackend.marian)
+                    Picker(L("settings_backend"), selection: $model.backend) {
+                        Text(L("backend_auto")).tag(OTTranslationBackend.auto)
+                        Text(L("backend_marian")).tag(OTTranslationBackend.marian)
                         Text("LLM").tag(OTTranslationBackend.LLM)
                     }
                     .pickerStyle(.segmented)
@@ -43,13 +43,13 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundColor(Palette.muted(scheme))
                 } header: {
-                    Text("번역 엔진")
+                    Text(L("settings_backend"))
                 }
 
-                Section("설치된 모델") {
+                Section(L("settings_installed")) {
                     let ready = model.installed.filter { $0.state == .ready }
                     if ready.isEmpty {
-                        Text("아직 설치된 모델이 없습니다.").foregroundColor(Palette.muted(scheme))
+                        Text(L("settings_none_installed")).foregroundColor(Palette.muted(scheme))
                     } else {
                         ForEach(ready, id: \.identifier) { status in
                             HStack {
@@ -69,7 +69,7 @@ struct SettingsView: View {
                             }
                         }
                         HStack {
-                            Text("합계").foregroundColor(Palette.muted(scheme))
+                            Text(L("settings_total")).foregroundColor(Palette.muted(scheme))
                             Spacer()
                             Text(formatBytes(ready.reduce(0) { $0 + $1.totalBytes }))
                                 .foregroundColor(Palette.muted(scheme))
@@ -77,7 +77,7 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("정보") {
+                Section(L("settings_about")) {
                     ForEach(model.engineInfo) { row in
                         HStack {
                             Text(row.key)
@@ -88,20 +88,20 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Text("모든 처리는 기기 안에서 이루어집니다. 음성과 문장은 어디로도 전송되지 않습니다.")
+                    Text(L("settings_privacy"))
                         .font(.caption)
                         .foregroundColor(Palette.muted(scheme))
                 }
             }
-            .navigationTitle("설정")
+            .navigationTitle(L("settings"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("완료") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button(L("settings_done")) { dismiss() } }
             }
             .onAppear { model.refreshInstalled() }
             .sheet(item: $picking) { side in
                 LanguagePicker(
-                    title: side == .a ? "왼쪽 화자의 언어" : "오른쪽 화자의 언어",
+                    title: side == .a ? L("picker_left") : L("picker_right"),
                     current: side == .a ? model.langA : model.langB,
                     disabled: side == .a ? model.langB : model.langA
                 ) { code in
@@ -126,11 +126,11 @@ struct SettingsView: View {
     private var backendExplanation: String {
         switch model.backend {
         case .marian:
-            return "전용 번역 모델만 사용합니다. 태국어처럼 모델이 없는 방향은 번역되지 않습니다."
+            return L("backend_marian_desc")
         case .LLM:
-            return "모든 방향을 LLM 하나로 번역합니다. 느리지만 언어를 자동으로 알아냅니다. 1.1 GB가 필요합니다."
+            return L("backend_llm_desc")
         default:
-            return "언어쌍 전용 모델이 있으면 그것을 쓰고, 없으면 LLM으로 번역합니다. 가장 빠릅니다."
+            return L("backend_auto_desc")
         }
     }
 }

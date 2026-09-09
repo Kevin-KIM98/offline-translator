@@ -1,4 +1,108 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">오프라인 통역기</string>
+
+    <!-- Startup -->
+    <string name="checking_models">모델을 확인하는 중</string>
+    <string name="opening_engine">통역 엔진을 준비하는 중</string>
+    <string name="start_failed_title">시작할 수 없습니다</string>
+    <string name="retry">다시 시도</string>
+
+    <!-- First-run setup -->
+    <string name="setup_title">통역을 시작하기 전에</string>
+    <string name="setup_subtitle">%1$s와 %2$s를 통역하려면 아래 모델을 한 번만 내려받으면 됩니다. 그 뒤로는 인터넷 없이 동작합니다.</string>
+    <string name="setup_llm_note">선택한 언어 조합에는 전용 번역 모델이 없어서 다국어 LLM이 함께 설치됩니다. 설정에서 다른 언어를 고르면 용량을 크게 줄일 수 있습니다.</string>
+    <string name="setup_wifi_hint">Wi-Fi에서 받는 것을 권합니다. 중단해도 이어받습니다.</string>
+    <string name="setup_download">%1$s 내려받기</string>
+    <string name="setup_change_languages">언어 바꾸기</string>
+    <string name="download_title">모델을 내려받는 중</string>
+    <string name="verify_title">파일을 검사하는 중</string>
+    <string name="download_progress">%1$s / %2$s  ·  %3$d%%</string>
+    <string name="download_keep_open">이 화면을 켜 둔 채로 기다려 주세요.\n앱을 닫아도 받은 지점부터 다시 이어집니다.</string>
+    <string name="download_stop">멈추기</string>
+
+    <!-- Model names -->
+    <string name="model_stt">음성 인식</string>
+    <string name="model_llm">다국어 통역 LLM</string>
+    <string name="model_nmt_pair">%1$s → %2$s 번역</string>
+    <string name="model_nmt_generic">번역 모델 %1$s</string>
+    <string name="model_stt_sub">whisper · 7개 언어 공용</string>
+    <string name="model_llm_sub">Qwen2.5 · 모든 언어 조합</string>
+    <string name="model_nmt_sub">OPUS-MT</string>
+
+    <!-- Conversation -->
+    <string name="talk_listening">말하는 중</string>
+    <string name="talk_hold">길게 눌러 말하기</string>
+    <string name="swap_languages">언어 방향 바꾸기</string>
+    <string name="settings">설정</string>
+    <string name="hands_free">핸즈프리</string>
+    <string name="keyboard_input">키보드로 입력</string>
+    <string name="clear_conversation">대화 지우기</string>
+    <string name="hands_free_title">핸즈프리로 듣는 중</string>
+    <string name="hands_free_body">말이 끝나면 자동으로 통역합니다. 두 사람이 번갈아 말해도 됩니다.</string>
+    <string name="hands_free_stop">중지</string>
+    <string name="mic_needed_title">마이크 권한이 필요합니다</string>
+    <string name="mic_needed_body">음성은 기기 안에서만 처리되며 어디로도 전송되지 않습니다.</string>
+    <string name="mic_allow">권한 허용</string>
+    <string name="mic_open_settings">설정에서 변경</string>
+    <string name="translating">통역하는 중</string>
+    <string name="empty_hint">아래 버튼을 길게 누른 채 말하고, 말이 끝나면 손을 떼세요.\n번역이 화면에 뜨고 소리로도 나옵니다.</string>
+    <string name="empty_offline">인터넷 없이 동작합니다.</string>
+    <string name="no_translation">(번역 없음)</string>
+    <string name="replay">다시 듣기</string>
+    <string name="stop_playback">멈추기</string>
+    <string name="picker_left">왼쪽 화자의 언어</string>
+    <string name="picker_right">오른쪽 화자의 언어</string>
+    <string name="copied">번역문을 복사했습니다</string>
+    <string name="text_sheet_title">키보드로 통역</string>
+    <string name="text_placeholder">번역할 문장을 입력하세요</string>
+    <string name="text_translate">번역</string>
+    <string name="turn_footer">%1$s → %2$s · %3$d ms</string>
+
+    <!-- Settings -->
+    <string name="settings_languages">언어</string>
+    <string name="settings_speaker_left">왼쪽 화자</string>
+    <string name="settings_speaker_right">오른쪽 화자</string>
+    <string name="settings_sound">소리</string>
+    <string name="settings_speak">번역 읽어주기</string>
+    <string name="settings_speak_sub">기기에 설치된 음성으로 재생합니다</string>
+    <string name="settings_rate">말하기 속도</string>
+    <string name="settings_rate_value">%1$.1f×</string>
+    <string name="settings_backend">번역 엔진</string>
+    <string name="backend_auto">자동</string>
+    <string name="backend_marian">전용 모델</string>
+    <string name="backend_llm">LLM</string>
+    <string name="backend_auto_desc">언어쌍 전용 모델이 있으면 그것을 쓰고, 없으면 LLM으로 번역합니다. 가장 빠릅니다.</string>
+    <string name="backend_marian_desc">전용 번역 모델만 사용합니다. 태국어처럼 모델이 없는 방향은 번역되지 않습니다.</string>
+    <string name="backend_llm_desc">모든 방향을 LLM 하나로 번역합니다. 느리지만 말한 언어를 스스로 알아냅니다. 1.1 GB가 필요합니다.</string>
+    <string name="settings_installed">설치된 모델</string>
+    <string name="settings_none_installed">아직 설치된 모델이 없습니다.</string>
+    <string name="delete">삭제</string>
+    <string name="settings_total">합계 %1$s</string>
+    <string name="settings_about">정보</string>
+    <string name="info_engine_version">엔진 버전</string>
+    <string name="info_manifest">모델 목록</string>
+    <string name="info_whisper">음성 인식 (whisper)</string>
+    <string name="info_ct2">번역 (CTranslate2)</string>
+    <string name="info_llama">LLM (llama.cpp)</string>
+    <string name="info_rnnoise">잡음 제거 (RNNoise)</string>
+    <string name="info_llm_loaded">LLM 로드됨</string>
+    <string name="value_included">포함</string>
+    <string name="value_not_included">미포함</string>
+    <string name="value_yes">예</string>
+    <string name="value_no">아니오</string>
+    <string name="value_unknown">-</string>
+    <string name="settings_privacy">모든 처리는 기기 안에서 이루어집니다. 음성과 문장은 어디로도 전송되지 않습니다.</string>
+    <string name="back">뒤로</string>
+
+    <!-- Errors and notices -->
+    <string name="err_no_manifest">모델 목록을 받지 못했습니다. 네트워크를 확인해 주세요.</string>
+    <string name="err_init">초기화에 실패했습니다</string>
+    <string name="err_storage">저장 공간이 부족합니다. %1$s 이상 필요합니다.</string>
+    <string name="err_download_stopped">다운로드를 멈췄습니다. 다시 받으면 이어서 내려받습니다.</string>
+    <string name="err_download_failed">다운로드에 실패했습니다</string>
+    <string name="err_engine_open">엔진을 열지 못했습니다</string>
+    <string name="err_translate">번역에 실패했습니다</string>
+    <string name="err_mic">마이크를 열 수 없습니다</string>
+    <string name="msg_removed">삭제했습니다: %1$s</string>
 </resources>

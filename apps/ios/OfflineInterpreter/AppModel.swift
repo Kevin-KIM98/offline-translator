@@ -129,7 +129,7 @@ final class AppModel: ObservableObject {
 
         _ = await downloader.refreshManifest()
         guard downloader.hasManifest else {
-            phase = .fatal("모델 목록을 받지 못했습니다. 네트워크를 확인해 주세요.")
+            phase = .fatal(L("err_no_manifest"))
             return
         }
         let pending = downloader.status(languages: languages, llmMode: llmMode).filter(\.needsDownload)
@@ -156,7 +156,7 @@ final class AppModel: ObservableObject {
         guard case let .setup(pending, _) = phase, let downloader else { return }
         let total = pending.reduce(UInt64(0)) { $0 + $1.totalBytes }
         guard downloader.freeBytes() > total + 50_000_000 else {
-            phase = .setup(pending: pending, error: "저장 공간이 부족합니다. \(formatBytes(total)) 이상 필요합니다.")
+            phase = .setup(pending: pending, error: L("err_storage", formatBytes(total)))
             return
         }
         downloadTask?.cancel()
@@ -195,7 +195,7 @@ final class AppModel: ObservableObject {
         downloadTask?.cancel()
         downloadTask = nil
         let pending = downloader?.status(languages: languages, llmMode: llmMode).filter(\.needsDownload) ?? []
-        phase = .setup(pending: pending, error: "다운로드를 멈췄습니다. 다시 받으면 이어서 내려받습니다.")
+        phase = .setup(pending: pending, error: L("err_download_stopped"))
     }
 
     private func openSession() async {
@@ -203,7 +203,7 @@ final class AppModel: ObservableObject {
         session?.shutdown()
         session = nil
         guard let downloader else {
-            phase = .fatal("모델 관리자가 없습니다")
+            phase = .fatal(L("err_no_downloader"))
             return
         }
         do {
@@ -232,7 +232,7 @@ final class AppModel: ObservableObject {
 
     private func handle(_ r: OTTranslationResult) {
         guard r.ok else {
-            message = r.error ?? "번역 실패"
+            message = r.error ?? L("err_translate")
             working = false
             return
         }
@@ -249,7 +249,7 @@ final class AppModel: ObservableObject {
                 if back.ok {
                     self.append(back, side: .b)
                 } else {
-                    self.message = back.error ?? "번역 실패"
+                    self.message = back.error ?? L("err_translate")
                     self.working = false
                 }
             }
@@ -378,7 +378,7 @@ final class AppModel: ObservableObject {
             let r = await session.translate(text, from: src, to: tgt)
             guard r.ok else {
                 self.working = false
-                self.message = r.error ?? "번역 실패"
+                self.message = r.error ?? L("err_translate")
                 return
             }
             let turn = Turn(id: self.nextTurnId, side: side, sourceText: text, sourceLang: src,
@@ -414,7 +414,7 @@ final class AppModel: ObservableObject {
     func remove(_ status: OTModelStatus) {
         _ = downloader?.manager.removeModel(status.identifier)
         refreshInstalled()
-        message = "삭제했습니다: \(Self.label(status))"
+        message = L("msg_removed", Self.label(status))
     }
 
     struct InfoRow: Identifiable {
@@ -426,18 +426,20 @@ final class AppModel: ObservableObject {
     var engineInfo: [InfoRow] {
         let caps = OTTranslationPipeline.buildCapabilities()
         func flag(_ key: String) -> String {
-            guard let value = caps[key] as? Bool else { return "-" }
-            return value ? "사용" : "미사용"
+            guard let value = caps[key] as? Bool else { return L("value_unknown") }
+            return value ? L("value_included") : L("value_not_included")
         }
-        let loaded = (session?.pipeline.capabilities["llm_loaded"] as? Bool).map { $0 ? "예" : "아니오" } ?? "-"
+        let unknown = L("value_unknown")
+        let loaded = (session?.pipeline.capabilities["llm_loaded"] as? Bool)
+            .map { $0 ? L("value_yes") : L("value_no") } ?? unknown
         return [
-            InfoRow(key: "엔진 버전", value: OTTranslationPipeline.version()),
-            InfoRow(key: "모델 목록", value: downloader?.manager.manifestVersion ?? "-"),
-            InfoRow(key: "음성인식 whisper", value: flag("whisper")),
-            InfoRow(key: "번역 CTranslate2", value: flag("ctranslate2")),
-            InfoRow(key: "LLM llama.cpp", value: flag("llama")),
-            InfoRow(key: "잡음 제거 RNNoise", value: flag("rnnoise")),
-            InfoRow(key: "LLM 로드됨", value: loaded),
+            InfoRow(key: L("info_engine_version"), value: OTTranslationPipeline.version()),
+            InfoRow(key: L("info_manifest"), value: downloader?.manager.manifestVersion ?? unknown),
+            InfoRow(key: L("info_whisper"), value: flag("whisper")),
+            InfoRow(key: L("info_ct2"), value: flag("ctranslate2")),
+            InfoRow(key: L("info_llama"), value: flag("llama")),
+            InfoRow(key: L("info_rnnoise"), value: flag("rnnoise")),
+            InfoRow(key: L("info_llm_loaded"), value: loaded),
         ]
     }
 
@@ -445,23 +447,23 @@ final class AppModel: ObservableObject {
 
     static func label(_ m: OTModelStatus) -> String {
         switch m.kind {
-        case "stt": return "음성 인식"
-        case "llm": return "다국어 통역 LLM"
+        case "stt": return L("model_stt")
+        case "llm": return L("model_llm")
         case "nmt":
             let parts = m.pair.split(separator: "-")
             if parts.count == 2 {
-                return "\(Lang.of(String(parts[0])).name) → \(Lang.of(String(parts[1])).name) 번역"
+                return L("model_nmt_pair", Lang.of(String(parts[0])).name, Lang.of(String(parts[1])).name)
             }
-            return "번역 모델 \(m.pair)"
+            return L("model_nmt_generic", m.pair)
         default: return m.identifier
         }
     }
 
     static func subtitle(_ m: OTModelStatus) -> String {
         switch m.kind {
-        case "stt": return "whisper · 7개 언어 공용"
-        case "llm": return "Qwen2.5 · 모든 언어 조합"
-        case "nmt": return "OPUS-MT"
+        case "stt": return L("model_stt_sub")
+        case "llm": return L("model_llm_sub")
+        case "nmt": return L("model_nmt_sub")
         default: return m.kind
         }
     }

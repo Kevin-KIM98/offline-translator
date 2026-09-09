@@ -32,6 +32,9 @@ slower there than on a device.
 | keyboard | type a sentence instead of speaking it |
 | settings | languages, speak-aloud and speed, translation backend, installed models with sizes and delete, engine build info |
 
+The interface is English by default and Korean on a Korean device; language names in the
+picker always appear in their own script.
+
 Nothing leaves the device. The only network use is the one-time model download.
 
 ## Structure

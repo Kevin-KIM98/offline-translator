@@ -35,8 +35,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.offlinetranslator.app.R
 import com.offlinetranslator.app.Lang
 
 /**
@@ -100,7 +102,7 @@ fun TalkButton(
                 maxLines = 1,
             )
             Text(
-                if (active) "말하는 중" else "길게 눌러 말하기",
+                stringResource(if (active) R.string.talk_listening else R.string.talk_hold),
                 style = MaterialTheme.typography.labelMedium,
                 color = content.copy(alpha = 0.75f),
                 maxLines = 1,

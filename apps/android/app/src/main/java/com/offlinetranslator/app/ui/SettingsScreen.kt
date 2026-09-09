@@ -36,20 +36,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.offlinetranslator.ModelState
 import com.offlinetranslator.TranslationBackend
 import com.offlinetranslator.app.Lang
 import com.offlinetranslator.app.MainViewModel
+import com.offlinetranslator.app.R
 import com.offlinetranslator.app.Side
 import com.offlinetranslator.app.UiState
 import com.offlinetranslator.app.mb
+import com.offlinetranslator.app.modelTitle
 import com.offlinetranslator.app.ui.theme.LocalSpeakerColors
 
 @Composable
 fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
     var picking by remember { mutableStateOf<Side?>(null) }
     val speakers = LocalSpeakerColors.current
+    val context = LocalContext.current
 
     BackHandler(onBack = onBack)
 
@@ -62,9 +67,9 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "뒤로", tint = MaterialTheme.colorScheme.onSurface)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back), tint = MaterialTheme.colorScheme.onSurface)
             }
-            Text("설정", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings), style = MaterialTheme.typography.titleMedium)
         }
 
         Column(
@@ -74,21 +79,21 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
                 .padding(horizontal = 20.dp)
                 .navigationBarsPadding(),
         ) {
-            SectionLabel("언어")
+            SectionLabel(stringResource(R.string.settings_languages))
             Card {
-                SettingRow("왼쪽 화자", Lang.of(state.langA).name, speakers.sideA) { picking = Side.A }
+                SettingRow(stringResource(R.string.settings_speaker_left), Lang.of(state.langA).name, speakers.sideA) { picking = Side.A }
                 Divider()
-                SettingRow("오른쪽 화자", Lang.of(state.langB).name, speakers.sideB) { picking = Side.B }
+                SettingRow(stringResource(R.string.settings_speaker_right), Lang.of(state.langB).name, speakers.sideB) { picking = Side.B }
             }
 
             Spacer(Modifier.height(20.dp))
-            SectionLabel("소리")
+            SectionLabel(stringResource(R.string.settings_sound))
             Card {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("번역 읽어주기", style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.settings_speak), style = MaterialTheme.typography.bodyLarge)
                         Text(
-                            "기기에 설치된 음성으로 재생합니다",
+                            stringResource(R.string.settings_speak_sub),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -98,9 +103,9 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
                 Divider()
                 Column(Modifier.padding(16.dp)) {
                     Row {
-                        Text("말하기 속도", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        Text(stringResource(R.string.settings_rate), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                         Text(
-                            String.format("%.1f×", state.speechRate),
+                            stringResource(R.string.settings_rate_value, state.speechRate),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -115,23 +120,20 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
             }
 
             Spacer(Modifier.height(20.dp))
-            SectionLabel("번역 엔진")
+            SectionLabel(stringResource(R.string.settings_backend))
             Card {
                 Column(Modifier.padding(16.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        BackendChip("자동", TranslationBackend.AUTO, state.backend, vm::setBackend)
-                        BackendChip("전용 모델", TranslationBackend.MARIAN, state.backend, vm::setBackend)
-                        BackendChip("LLM", TranslationBackend.LLM, state.backend, vm::setBackend)
+                        BackendChip(stringResource(R.string.backend_auto), TranslationBackend.AUTO, state.backend, vm::setBackend)
+                        BackendChip(stringResource(R.string.backend_marian), TranslationBackend.MARIAN, state.backend, vm::setBackend)
+                        BackendChip(stringResource(R.string.backend_llm), TranslationBackend.LLM, state.backend, vm::setBackend)
                     }
                     Spacer(Modifier.height(10.dp))
                     Text(
                         when (state.backend) {
-                            TranslationBackend.AUTO ->
-                                "언어쌍 전용 모델이 있으면 그것을 쓰고, 없으면 LLM으로 번역합니다. 가장 빠릅니다."
-                            TranslationBackend.MARIAN ->
-                                "전용 번역 모델만 사용합니다. 태국어처럼 모델이 없는 방향은 번역되지 않습니다."
-                            TranslationBackend.LLM ->
-                                "모든 방향을 LLM 하나로 번역합니다. 느리지만 언어를 자동으로 알아냅니다. 1.1 GB가 필요합니다."
+                            TranslationBackend.AUTO -> stringResource(R.string.backend_auto_desc)
+                            TranslationBackend.MARIAN -> stringResource(R.string.backend_marian_desc)
+                            TranslationBackend.LLM -> stringResource(R.string.backend_llm_desc)
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -140,11 +142,11 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
             }
 
             Spacer(Modifier.height(20.dp))
-            SectionLabel("설치된 모델")
+            SectionLabel(stringResource(R.string.settings_installed))
             Card {
                 if (state.installed.isEmpty()) {
                     Text(
-                        "아직 설치된 모델이 없습니다.",
+                        stringResource(R.string.settings_none_installed),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(16.dp),
@@ -155,7 +157,7 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
                         if (i > 0) Divider()
                         Row(Modifier.padding(start = 16.dp, end = 6.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
-                                Text(modelTitle(m), style = MaterialTheme.typography.bodyMedium)
+                                Text(modelTitle(context, m), style = MaterialTheme.typography.bodyMedium)
                                 Text(
                                     mb(m.totalBytes),
                                     style = MaterialTheme.typography.labelMedium,
@@ -165,7 +167,7 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
                             IconButton(onClick = { vm.removeModel(m.id) }) {
                                 Icon(
                                     Icons.Filled.DeleteOutline,
-                                    "삭제",
+                                    stringResource(R.string.delete),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp),
                                 )
@@ -175,7 +177,7 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
                     if (ready.isNotEmpty()) {
                         Divider()
                         Text(
-                            "합계 ${mb(ready.sumOf { it.totalBytes })}",
+                            stringResource(R.string.settings_total, mb(ready.sumOf { it.totalBytes })),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(16.dp),
@@ -185,7 +187,7 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
             }
 
             Spacer(Modifier.height(20.dp))
-            SectionLabel("정보")
+            SectionLabel(stringResource(R.string.settings_about))
             Card {
                 engineInfo.forEachIndexed { i, (k, v) ->
                     if (i > 0) Divider()
@@ -202,7 +204,7 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
 
             Spacer(Modifier.height(16.dp))
             Text(
-                "모든 처리는 기기 안에서 이루어집니다. 음성과 문장은 어디로도 전송되지 않습니다.",
+                stringResource(R.string.settings_privacy),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
             )
@@ -214,7 +216,7 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
         val current = if (side == Side.A) state.langA else state.langB
         val other = if (side == Side.A) state.langB else state.langA
         LanguagePickerSheet(
-            title = if (side == Side.A) "왼쪽 화자의 언어" else "오른쪽 화자의 언어",
+            title = stringResource(if (side == Side.A) R.string.picker_left else R.string.picker_right),
             current = current,
             disabled = other,
             onPick = { code ->

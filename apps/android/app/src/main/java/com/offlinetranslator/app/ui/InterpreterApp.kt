@@ -21,9 +21,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.offlinetranslator.app.R
 import com.offlinetranslator.app.MainViewModel
 import com.offlinetranslator.app.Phase
 import kotlinx.coroutines.flow.StateFlow
@@ -46,8 +48,8 @@ fun InterpreterApp(
             SettingsScreen(vm, state, onBack = { showSettings = false })
         } else {
             when (val phase = state.phase) {
-                is Phase.Checking -> Busy("모델을 확인하는 중")
-                is Phase.Opening -> Busy("통역 엔진을 준비하는 중")
+                is Phase.Checking -> Busy(stringResource(R.string.checking_models))
+                is Phase.Opening -> Busy(stringResource(R.string.opening_engine))
                 is Phase.Setup -> SetupScreen(state, phase, onDownload = vm::download, onOpenSettings = { showSettings = true })
                 is Phase.Downloading -> DownloadScreen(phase, onCancel = vm::cancelDownload)
                 is Phase.Fatal -> Failure(phase.message, onRetry = vm::boot)
@@ -82,7 +84,7 @@ private fun Failure(message: String, onRetry: () -> Unit) {
     Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                "시작할 수 없습니다",
+                stringResource(R.string.start_failed_title),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onBackground,
             )
@@ -94,7 +96,7 @@ private fun Failure(message: String, onRetry: () -> Unit) {
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(24.dp))
-            Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text("다시 시도") }
+            Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.retry)) }
         }
     }
 }

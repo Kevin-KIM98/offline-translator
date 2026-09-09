@@ -22,9 +22,9 @@ struct RootView: View {
     private var content: some View {
         switch model.phase {
         case .checking:
-            Busy(message: "모델을 확인하는 중")
+            Busy(message: L("checking_models"))
         case .opening:
-            Busy(message: "통역 엔진을 준비하는 중")
+            Busy(message: L("opening_engine"))
         case let .setup(pending, error):
             SetupView(pending: pending, error: error, onSettings: { showSettings = true })
         case let .downloading(label, done, total, verifying):
@@ -56,13 +56,13 @@ private struct Failure: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Text("시작할 수 없습니다").font(.headline)
+            Text(L("start_failed_title")).font(.headline)
             Text(message)
                 .font(.subheadline)
                 .foregroundColor(Palette.muted(scheme))
                 .multilineTextAlignment(.center)
             Button(action: onRetry) {
-                Text("다시 시도").frame(maxWidth: .infinity)
+                Text(L("retry")).frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .padding(.top, 12)

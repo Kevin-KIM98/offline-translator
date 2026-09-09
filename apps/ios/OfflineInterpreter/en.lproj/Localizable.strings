@@ -1,0 +1,101 @@
+/* Startup */
+"checking_models" = "Checking models";
+"opening_engine" = "Preparing the interpreter";
+"start_failed_title" = "Cannot start";
+"retry" = "Try again";
+
+/* First-run setup */
+"setup_title" = "Before you start";
+"setup_subtitle" = "Translating between %1$@ and %2$@ needs these models, downloaded once. After that everything runs without a network.";
+"setup_llm_note" = "The pair you picked has no dedicated translation model, so the multilingual LLM is installed as well. Choosing other languages in settings needs far less space.";
+"setup_wifi_hint" = "Wi-Fi is recommended. An interrupted download resumes.";
+"setup_download" = "Download %1$@";
+"setup_change_languages" = "Change languages";
+"download_title" = "Downloading models";
+"verify_title" = "Checking files";
+"download_progress" = "%1$@ / %2$@  ·  %3$d%%";
+"download_keep_open" = "Keep this screen open.\nIf you close the app, the download resumes where it stopped.";
+"download_stop" = "Stop";
+
+/* Model names */
+"model_stt" = "Speech recognition";
+"model_llm" = "Multilingual LLM";
+"model_nmt_pair" = "%1$@ to %2$@ translation";
+"model_nmt_generic" = "Translation model %1$@";
+"model_stt_sub" = "whisper · shared by all seven languages";
+"model_llm_sub" = "Qwen2.5 · every language pair";
+"model_nmt_sub" = "OPUS-MT";
+
+/* Conversation */
+"talk_listening" = "Listening";
+"talk_hold" = "Hold to speak";
+"swap_languages" = "Swap direction";
+"settings" = "Settings";
+"hands_free" = "Hands-free";
+"keyboard_input" = "Type instead";
+"clear_conversation" = "Clear conversation";
+"hands_free_title" = "Listening hands-free";
+"hands_free_body" = "Each utterance is translated as soon as you stop speaking. Both people can simply talk.";
+"hands_free_stop" = "Stop";
+"mic_needed_title" = "Microphone access is needed";
+"mic_needed_body" = "Speech is processed on this device only and is never sent anywhere.";
+"mic_allow" = "Allow";
+"mic_open_settings" = "Open settings";
+"translating" = "Translating";
+"empty_hint" = "Hold a button below while you speak, then let go.\nThe translation appears here and is read aloud.";
+"empty_offline" = "Works with no network.";
+"no_translation" = "(no translation)";
+"picker_left" = "Language on the left";
+"picker_right" = "Language on the right";
+"picker_close" = "Close";
+"copy_translation" = "Copy translation";
+"copy_source" = "Copy original";
+"text_sheet_title" = "Translate typed text";
+"text_placeholder" = "Type a sentence to translate";
+"text_translate" = "Translate";
+"turn_footer" = "%1$@ → %2$@ · %3$d ms";
+"error_title" = "Error";
+"ok" = "OK";
+
+/* Settings */
+"settings_done" = "Done";
+"settings_languages" = "Languages";
+"settings_speaker_left" = "Left speaker";
+"settings_speaker_right" = "Right speaker";
+"settings_sound" = "Sound";
+"settings_speak" = "Read translations aloud";
+"settings_rate" = "Speaking rate";
+"settings_rate_value" = "%.1f×";
+"settings_backend" = "Translation engine";
+"backend_auto" = "Automatic";
+"backend_marian" = "Dedicated";
+"backend_llm" = "LLM";
+"backend_auto_desc" = "Uses the dedicated model for a language pair when one exists, and the LLM otherwise. Fastest.";
+"backend_marian_desc" = "Dedicated translation models only. Directions without one, such as anything into Thai, will not translate.";
+"backend_llm_desc" = "Translates every direction with a single LLM. Slower, but it detects the spoken language itself. Needs 1.1 GB.";
+"settings_installed" = "Installed models";
+"settings_none_installed" = "No models installed yet.";
+"delete" = "Delete";
+"settings_total" = "Total";
+"settings_about" = "About";
+"info_engine_version" = "Engine version";
+"info_manifest" = "Model list";
+"info_whisper" = "Speech recognition (whisper)";
+"info_ct2" = "Translation (CTranslate2)";
+"info_llama" = "LLM (llama.cpp)";
+"info_rnnoise" = "Noise suppression (RNNoise)";
+"info_llm_loaded" = "LLM loaded";
+"value_included" = "included";
+"value_not_included" = "not included";
+"value_yes" = "yes";
+"value_no" = "no";
+"value_unknown" = "-";
+"settings_privacy" = "Everything runs on this device. Audio and text are never transmitted.";
+
+/* Errors and notices */
+"err_no_manifest" = "Could not fetch the model list. Check your network.";
+"err_storage" = "Not enough storage. %1$@ or more is needed.";
+"err_download_stopped" = "Download stopped. Starting it again resumes where it left off.";
+"err_no_downloader" = "The model manager is not available";
+"err_translate" = "Translation failed";
+"msg_removed" = "Removed: %1$@";
