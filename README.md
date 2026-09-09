@@ -227,3 +227,11 @@ AAR on Ubuntu, the XCFramework on macOS, rewrites `Package.swift` with the new c
 * C++ core + all five engines (RNNoise, whisper.cpp, CTranslate2, SentencePiece, llama.cpp) verified on Windows/MSVC 2022: 260/260 unit tests, Korean speech → English end to end (one-shot and streaming), LLM translation across all seven languages.
 * "Training": the LLM is a pre-trained multilingual model configured by prompting; `scripts/finetune_lora.py` is the supervised fine-tuning path (LoRA → merged GGUF) for domain data — it requires a GPU and was not run as part of this repo.
 * Android AAR / iOS XCFramework are built by CI; the Kotlin/Swift layers compile against the C API but have not yet been exercised on a physical device from this workstation — please report device issues.
+* **Known issue — invented sentences in silence.** With no one speaking, the segmenter still
+  hands room noise to whisper, which returns a fluent sentence. Measured on a quiet desktop:
+  every result was a fragment of the language's default prompt ("안녕하세요. 오늘 회의는 오후 3시에
+  시작합니다.") or a stock subtitle phrase. Lowering `noSpeechThreshold` to 0.3 does not help, because
+  whisper reports these as confident speech, and `--no-default-prompt` only changes what it invents.
+  The fix belongs in the voice-activity gate, which should not emit an utterance at that energy in
+  the first place. Reproduce with `translator_cli listen --models <dir> --src ko --tgt en --seconds 12`
+  in a quiet room.
