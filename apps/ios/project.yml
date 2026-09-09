@@ -13,8 +13,6 @@ options:
     iOS: "15.0"
   createIntermediateGroups: true
   groupSortPosition: top
-  # Recent XcodeGen defaults to format 77, which only Xcode 16 can open. 56 opens in Xcode 14+.
-  objectVersion: 56
 
 settings:
   base:

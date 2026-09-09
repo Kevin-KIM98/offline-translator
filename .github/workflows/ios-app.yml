@@ -19,12 +19,15 @@ on:
 jobs:
   build:
     name: Simulator build
-    runs-on: macos-14
+    runs-on: macos-15
     defaults:
       run:
         working-directory: apps/ios
     steps:
       - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: xcodebuild -version && swift --version
 
       - name: Install XcodeGen
         run: brew install xcodegen

@@ -17,7 +17,8 @@ Pick your development team in *Signing & Capabilities* and run on a device. The 
 from the Swift package at the repository root, which pulls the prebuilt XCFramework from the
 matching GitHub release.
 
-Requirements: iOS 15 or newer, Xcode 15 or newer. The simulator works for the UI, but speech
+Requirements: iOS 15 or newer, and Xcode 16 (current XcodeGen writes the Xcode 16 project
+format). The simulator works for the UI, but speech
 recognition is much slower there than on a real device.
 
 ## What the app does
