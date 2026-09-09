@@ -1,5 +1,7 @@
 #if canImport(OfflineTranslatorObjC)
-import OfflineTranslatorObjC
+// Re-exported: the public API below exposes OT* types, so importing OfflineTranslator alone
+// has to bring them into scope.
+@_exported import OfflineTranslatorObjC
 #endif
 import AVFoundation
 import Foundation
