@@ -29,8 +29,11 @@ public final class OfflineTTSManager: NSObject, AVSpeechSynthesizerDelegate {
         }
         // Prefer enhanced/premium voices when downloaded; they sound far better than compact.
         let candidates = AVSpeechSynthesisVoice.speechVoices().filter { $0.language == code }
-        return candidates.first { $0.quality == .premium }
-            ?? candidates.first { $0.quality == .enhanced }
+        if #available(iOS 16.0, macOS 13.0, *),
+           let premium = candidates.first(where: { $0.quality == .premium }) {
+            return premium
+        }
+        return candidates.first { $0.quality == .enhanced }
             ?? AVSpeechSynthesisVoice(language: code)
     }
 

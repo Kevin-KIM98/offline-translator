@@ -202,6 +202,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             built.onSuccess { s ->
                 s.speechRate = _state.value.speechRate
                 s.onResult = { r -> onEngineResult(r) }
+                // Silence produces no result; without this the "translating" bar never clears.
+                s.onNoSpeech = { _state.update { it.copy(working = false) } }
                 s.onError = { msg -> _state.update { it.copy(message = msg, working = false) } }
                 s.onAudioLevel = { lv -> _state.update { it.copy(level = lv) } }
                 session = s
@@ -278,7 +280,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         session?.stopSpeaking()
         val src = if (side == Side.A) s.langA else s.langB
         val tgt = if (side == Side.A) s.langB else s.langA
-        session?.start(sourceLang = src, targetLang = tgt)
+        if (session?.start(sourceLang = src, targetLang = tgt) != true) {
+            _state.update { it.copy(message = "마이크를 열 수 없습니다") }
+            return
+        }
         _state.update { it.copy(listening = side, speakingTurn = null) }
         watchWork()
     }
@@ -303,7 +308,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun startHandsFree() {
         val s = _state.value
         if (s.phase != Phase.Ready) return
-        session?.start(sourceLang = "auto", targetLang = s.langB)
+        if (session?.start(sourceLang = "auto", targetLang = s.langB) != true) {
+            _state.update { it.copy(message = "마이크를 열 수 없습니다", handsFree = false) }
+            return
+        }
         _state.update { it.copy(listening = Side.A) }
         watchWork()
     }
@@ -315,8 +323,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             while (isActive) {
                 val pending = session?.translator?.pendingCount ?: 0
                 if (pending > 0) _state.update { it.copy(working = true) }
+                // Idle: the microphone is closed and nothing is being translated.
                 val now = _state.value
-                if (pending == 0 && now.listening == null && !now.working) return@launch
+                if (now.listening == null && !now.working) return@launch
                 delay(200)
             }
         }

@@ -44,6 +44,9 @@ public final class TranslatorSession {
     public var speechRate: Float = AVSpeechUtteranceDefaultSpeechRate
 
     public var onResult: ((OTTranslationResult) -> Void)?
+    /// An utterance was processed but held no speech, so `onResult` will not fire for it.
+    /// UIs that show a "translating" indicator need this to clear it.
+    public var onNoSpeech: (() -> Void)?
     public var onError: ((String) -> Void)?
     public var onSpeechState: ((Bool) -> Void)?
     /// Microphone loudness in 0...1, ~25×/s while capturing, for a level meter.
@@ -84,7 +87,7 @@ public final class TranslatorSession {
                     let r = pipeline.processPending(withSourceLang: src, targetLang: tgt)
                     await MainActor.run {
                         if !r.ok { self.onError?(r.error ?? "unknown error") }
-                        if !r.isEmpty { self.onResult?(r) }
+                        if r.isEmpty { self.onNoSpeech?() } else { self.onResult?(r) }
                     }
                     if r.ok, speak, !r.isEmpty, !r.translatedText.isEmpty {
                         await MainActor.run { self.onSpeechState?(true) }

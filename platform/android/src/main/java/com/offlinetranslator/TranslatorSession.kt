@@ -42,6 +42,12 @@ class TranslatorSession(
     @Volatile var speechRate: Float = 1.0f
 
     var onResult: ((TranslationResult) -> Unit)? = null
+
+    /**
+     * An utterance was processed but held no speech, so [onResult] will not fire for it.
+     * UIs that show a "translating" indicator need this to clear it.
+     */
+    var onNoSpeech: (() -> Unit)? = null
     var onError: ((String) -> Unit)? = null
     var onSpeechState: ((speaking: Boolean) -> Unit)? = null
 
@@ -88,7 +94,10 @@ class TranslatorSession(
                     tts.stop()
                     val r = translator.processPending(this@TranslatorSession.sourceLang, this@TranslatorSession.targetLang)
                     if (!r.ok) onError?.invoke(r.error ?: "unknown error")
-                    if (r.isEmpty) continue
+                    if (r.isEmpty) {
+                        onNoSpeech?.invoke()
+                        continue
+                    }
                     onResult?.invoke(r)
                     if (r.ok && speakResults && r.translatedText.isNotBlank()) {
                         onSpeechState?.invoke(true)

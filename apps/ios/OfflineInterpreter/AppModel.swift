@@ -212,6 +212,8 @@ final class AppModel: ObservableObject {
             created.speakResults = false
             created.speechRate = AVSpeechUtteranceDefaultSpeechRate * Float(speechRate)
             created.onResult = { [weak self] r in self?.handle(r) }
+            // Silence produces no result; without this the "translating" row never clears.
+            created.onNoSpeech = { [weak self] in self?.working = false }
             created.onError = { [weak self] msg in
                 self?.message = msg
                 self?.working = false
