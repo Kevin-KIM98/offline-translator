@@ -45,6 +45,8 @@
 "empty_hint" = "Hold a button below while you speak, then let go.\nThe translation appears here and is read aloud.";
 "empty_offline" = "Works with no network.";
 "no_translation" = "(no translation)";
+"replay" = "Play again";
+"stop_playback" = "Stop";
 "picker_left" = "Language on the left";
 "picker_right" = "Language on the right";
 "picker_close" = "Close";

@@ -49,10 +49,12 @@ struct ConversationView: View {
             Button { model.swapLanguages() } label: {
                 Image(systemName: "arrow.left.arrow.right").foregroundColor(Palette.muted(scheme))
             }
+            .accessibilityLabel(L("swap_languages"))
             chip(Lang.of(model.langB).name, Palette.sideB(scheme)) { picking = .b }
             Button(action: onSettings) {
                 Image(systemName: "gearshape").foregroundColor(Palette.muted(scheme))
             }
+            .accessibilityLabel(L("settings"))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -153,9 +155,11 @@ struct ConversationView: View {
                 Button { typing = true } label: {
                     Image(systemName: "keyboard").foregroundColor(Palette.muted(scheme))
                 }
+                .accessibilityLabel(L("keyboard_input"))
                 Button { model.clearConversation() } label: {
                     Image(systemName: "trash").foregroundColor(Palette.muted(scheme))
                 }
+                .accessibilityLabel(L("clear_conversation"))
                 .disabled(model.turns.isEmpty)
             }
 
@@ -230,6 +234,7 @@ struct ConversationView: View {
                     .font(.system(size: 34))
                     .foregroundColor(Palette.sideA(scheme))
             }
+            .accessibilityLabel(L("hands_free_stop"))
         }
         .padding(18)
         .background(RoundedRectangle(cornerRadius: 22).fill(Palette.sideA(scheme).opacity(0.12)))
@@ -269,6 +274,7 @@ private struct TurnCard: View {
                             Image(systemName: speaking ? "stop.circle" : "speaker.wave.2")
                                 .foregroundColor(speaking ? accent : Palette.muted(scheme))
                         }
+                        .accessibilityLabel(L(speaking ? "stop_playback" : "replay"))
                     }
                 }
                 .padding(14)
@@ -305,6 +311,15 @@ private struct TextInputSheet: View {
                 TextEditor(text: $text)
                     .frame(minHeight: 120)
                     .padding(6)
+                    .overlay(alignment: .topLeading) {
+                        if text.isEmpty {
+                            Text(L("text_placeholder"))
+                                .foregroundColor(Palette.muted(scheme).opacity(0.7))
+                                .padding(.horizontal, 11)
+                                .padding(.vertical, 14)
+                                .allowsHitTesting(false)
+                        }
+                    }
                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(Palette.muted(scheme).opacity(0.4)))
 
                 Button {

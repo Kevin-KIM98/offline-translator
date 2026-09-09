@@ -45,6 +45,8 @@
 "empty_hint" = "아래 버튼을 길게 누른 채 말하고, 말이 끝나면 손을 떼세요.\n번역이 화면에 뜨고 소리로도 나옵니다.";
 "empty_offline" = "인터넷 없이 동작합니다.";
 "no_translation" = "(번역 없음)";
+"replay" = "다시 듣기";
+"stop_playback" = "멈추기";
 "picker_left" = "왼쪽 화자의 언어";
 "picker_right" = "오른쪽 화자의 언어";
 "picker_close" = "닫기";

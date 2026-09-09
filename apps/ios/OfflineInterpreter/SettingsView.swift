@@ -36,7 +36,7 @@ struct SettingsView: View {
                     Picker(L("settings_backend"), selection: $model.backend) {
                         Text(L("backend_auto")).tag(OTTranslationBackend.auto)
                         Text(L("backend_marian")).tag(OTTranslationBackend.marian)
-                        Text("LLM").tag(OTTranslationBackend.LLM)
+                        Text(L("backend_llm")).tag(OTTranslationBackend.LLM)
                     }
                     .pickerStyle(.segmented)
                     Text(backendExplanation)
@@ -65,6 +65,7 @@ struct SettingsView: View {
                                 } label: {
                                     Image(systemName: "trash").foregroundColor(Palette.muted(scheme))
                                 }
+                                .accessibilityLabel(L("delete"))
                                 .buttonStyle(.borderless)
                             }
                         }
