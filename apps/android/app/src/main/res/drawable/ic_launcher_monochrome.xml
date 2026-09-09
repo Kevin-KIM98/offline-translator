@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Two speech bubbles facing each other: one utterance in, one out.
-     Same mark as apps/ios AppIcon. The middle path is a gap in the icon background colour
-     so the two bubbles stay distinct where they overlap. -->
+<!-- Themed-icon variant: the same two bubbles without the background-coloured gap, which
+     would vanish once the system tints the whole drawable one colour. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -13,11 +12,8 @@
         android:scaleX="0.60"
         android:scaleY="0.60">
         <path
-            android:fillColor="#4FCDBE"
+            android:fillColor="#FFFFFF"
             android:pathData="M22,16 L52,16 A12,12 0 0 1 64,28 L64,42 A12,12 0 0 1 52,54 L40,54 L17,65 L26,54 L22,54 A12,12 0 0 1 10,42 L10,28 A12,12 0 0 1 22,16 Z" />
-        <path
-            android:fillColor="#0E1513"
-            android:pathData="M56,48.8 L86,48.8 A15.2,15.2 0 0 1 101.2,64 L101.2,78 A15.2,15.2 0 0 1 86,93.2 L70.4,93.2 L83.4,100.8 L56,93.2 A15.2,15.2 0 0 1 40.8,78 L40.8,64 A15.2,15.2 0 0 1 56,48.8 Z" />
         <path
             android:fillColor="#FFFFFF"
             android:pathData="M56,52 L86,52 A12,12 0 0 1 98,64 L98,78 A12,12 0 0 1 86,90 L70,90 L80,99 L56,90 A12,12 0 0 1 44,78 L44,64 A12,12 0 0 1 56,52 Z" />

@@ -19,10 +19,6 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("speak", true)
         set(v) = sp.edit().putBoolean("speak", v).apply()
 
-    var handsFree: Boolean
-        get() = sp.getBoolean("handsFree", false)
-        set(v) = sp.edit().putBoolean("handsFree", v).apply()
-
     var speechRate: Float
         get() = sp.getFloat("speechRate", 1.0f)
         set(v) = sp.edit().putFloat("speechRate", v).apply()

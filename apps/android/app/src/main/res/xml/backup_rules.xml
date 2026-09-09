@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Back up preferences only. Models are ~1 GB and are re-downloadable. -->
+<!-- Back up preferences only. Models are ~1 GB and are re-downloadable, and nothing else
+     under files/ is backed up because only the sharedpref domain is included. -->
 <full-backup-content>
     <include domain="sharedpref" path="." />
-    <exclude domain="file" path="models" />
 </full-backup-content>

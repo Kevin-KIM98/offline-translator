@@ -1,0 +1,64 @@
+# Xcode project definition for the sample interpreter app.
+#
+#   brew install xcodegen
+#   cd apps/ios && xcodegen generate && open OfflineInterpreter.xcodeproj
+#
+# The engine comes from the Swift package at the repository root, so the app always builds
+# against the checked-out version of the wrapper plus the XCFramework of the pinned release.
+name: OfflineInterpreter
+
+options:
+  bundleIdPrefix: com.offlinetranslator
+  deploymentTarget:
+    iOS: "15.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+
+packages:
+  OfflineTranslator:
+    path: ../..
+
+targets:
+  OfflineInterpreter:
+    type: application
+    platform: iOS
+    sources:
+      - path: OfflineInterpreter
+    dependencies:
+      - package: OfflineTranslator
+        product: OfflineTranslator
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.offlinetranslator.interpreter
+        PRODUCT_NAME: OfflineInterpreter
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: OfflineInterpreter/Info.plist
+      properties:
+        CFBundleDisplayName: Interpreter
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        NSMicrophoneUsageDescription: >-
+          Speech is recognised and translated entirely on this device. Nothing is uploaded.
+        UIBackgroundModes:
+          - audio
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        ITSAppUsesNonExemptEncryption: false

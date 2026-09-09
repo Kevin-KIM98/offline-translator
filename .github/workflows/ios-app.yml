@@ -1,0 +1,42 @@
+# Builds the sample interpreter app (apps/ios). The Xcode project is generated from
+# apps/ios/project.yml by XcodeGen, so no .pbxproj is checked in.
+name: iOS app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/ios/**"
+      - "platform/ios/**"
+      - "Package.swift"
+      - ".github/workflows/ios-app.yml"
+  pull_request:
+    paths:
+      - "apps/ios/**"
+      - "platform/ios/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Simulator build
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: apps/ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the Xcode project
+        run: xcodegen generate
+
+      - name: Build
+        run: |
+          xcodebuild build \
+            -project OfflineInterpreter.xcodeproj \
+            -scheme OfflineInterpreter \
+            -destination 'generic/platform=iOS Simulator' \
+            -clonedSourcePackagesDirPath .spm \
+            CODE_SIGNING_ALLOWED=NO

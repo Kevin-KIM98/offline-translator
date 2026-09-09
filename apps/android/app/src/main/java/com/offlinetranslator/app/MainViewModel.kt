@@ -84,7 +84,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             langA = prefs.langA,
             langB = prefs.langB,
             speak = prefs.speak,
-            handsFree = prefs.handsFree,
             speechRate = prefs.speechRate,
             backend = prefs.backend,
         )
@@ -291,8 +290,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(listening = null, working = true, level = 0f) }
     }
 
+    // Deliberately not persisted: the microphone should never open on launch by itself.
     fun setHandsFree(on: Boolean) {
-        prefs.handsFree = on
         _state.update { it.copy(handsFree = on) }
         if (on) startHandsFree() else {
             session?.stop()

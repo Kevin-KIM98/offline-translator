@@ -20,7 +20,20 @@ Everything runs inside one native library with a C ABI; thin Kotlin and Swift la
 microphone, model download and TTS. Models are fetched on first launch from this repo's GitHub
 releases — no server of your own is needed.
 
-## Install in an app
+## Try it: the app
+
+`apps/` holds a finished two-way interpreter for both platforms — first-run model download,
+push-to-talk per speaker, a replayable transcript, hands-free mode, keyboard input and model
+management. Install the APK from the [latest release](https://github.com/Kevin-KIM98/offline-translator/releases)
+on an arm64 Android 8+ device, or build either app from source:
+
+```
+cd apps/android && ./gradlew assembleDebug          # no NDK needed
+```
+
+See [apps/android](apps/android/README.md) and [apps/ios](apps/ios/README.md).
+
+## Install in your own app
 
 ### Android (2 lines)
 
@@ -28,7 +41,7 @@ releases — no server of your own is needed.
 2. `app/build.gradle.kts`:
 
 ```kotlin
-implementation(files("libs/offline-translator-0.3.1.aar"))
+implementation(files("libs/offline-translator-0.3.2.aar"))
 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 ```
 
