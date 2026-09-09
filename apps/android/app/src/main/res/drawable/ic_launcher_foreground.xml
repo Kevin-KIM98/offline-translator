@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Two speech bubbles facing each other: one utterance in, one out. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.62"
+        android:scaleY="0.62">
+        <path
+            android:fillColor="#5FD3C4"
+            android:pathData="M32,26 L60,26 A10,10 0 0 1 70,36 L70,52 A10,10 0 0 1 60,62 L42,62 L27,73 L34,62 L32,62 A10,10 0 0 1 22,52 L22,36 A10,10 0 0 1 32,26 Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M48,46 L76,46 A10,10 0 0 1 86,56 L86,72 A10,10 0 0 1 76,82 L74,82 L81,93 L66,82 L48,82 A10,10 0 0 1 38,72 L38,56 A10,10 0 0 1 48,46 Z" />
+    </group>
+</vector>

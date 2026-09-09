@@ -4,3 +4,7 @@
 *.bin binary
 *.spm binary
 *.wav binary
+gradlew text eol=lf
+*.jar binary
+*.aar binary
+*.apk binary

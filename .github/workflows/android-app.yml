@@ -1,0 +1,74 @@
+# Builds the sample interpreter app (apps/android) against the published engine AAR and
+# uploads an installable APK.
+#
+#   * every push touching the app  → APK as a workflow artifact
+#   * manual run with `release_tag` → APK also attached to that GitHub release
+name: Android app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/android/**"
+      - ".github/workflows/android-app.yml"
+  pull_request:
+    paths:
+      - "apps/android/**"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to attach the APK to (e.g. v0.3.2). Leave empty to only build."
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" > /dev/null
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Build release APK
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Name the artifacts
+        id: apk
+        run: |
+          version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          mkdir -p out
+          cp app/build/outputs/apk/debug/app-debug.apk "out/offline-interpreter-$version.apk"
+          cp app/build/outputs/apk/release/app-release.apk "out/offline-interpreter-$version-release.apk"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          ls -l out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: offline-interpreter-apk
+          path: apps/android/out/*.apk
+          if-no-files-found: error
+
+      - name: Attach to release
+        if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ inputs.release_tag }}" \
+            "out/offline-interpreter-${{ steps.apk.outputs.version }}.apk" --clobber
