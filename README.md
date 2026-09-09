@@ -41,7 +41,7 @@ See [apps/android](apps/android/README.md) and [apps/ios](apps/ios/README.md).
 2. `app/build.gradle.kts`:
 
 ```kotlin
-implementation(files("libs/offline-translator-0.3.2.aar"))
+implementation(files("libs/offline-translator-0.3.3.aar"))
 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 ```
 
