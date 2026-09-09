@@ -104,7 +104,9 @@ public final class TranslatorSession {
 
     /// Push-to-talk release: close the current utterance immediately.
     public func endUtterance() {
-        if pipeline.flushAudio() { wakeups.continuation.yield() }
+        // Nothing is queued when the audio was too short or too quiet to be speech. That is not
+        // an error, but a UI showing progress needs to hear about it or it waits forever.
+        if pipeline.flushAudio() { wakeups.continuation.yield() } else { onNoSpeech?() }
     }
 
     public func stop() {

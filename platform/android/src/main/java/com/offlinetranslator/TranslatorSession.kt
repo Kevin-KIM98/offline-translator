@@ -112,7 +112,9 @@ class TranslatorSession(
 
     /** Push-to-talk release: close the current utterance immediately. */
     fun endUtterance() {
-        if (translator.flushAudio()) ready.trySend(Unit)
+        // Nothing is queued when the audio was too short or too quiet to be speech. That is not
+        // an error, but a UI showing progress needs to hear about it or it waits forever.
+        if (translator.flushAudio()) ready.trySend(Unit) else onNoSpeech?.invoke()
     }
 
     fun stop() {
