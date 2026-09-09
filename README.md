@@ -24,8 +24,9 @@ releases — no server of your own is needed.
 
 `apps/` holds a finished two-way interpreter for both platforms — first-run model download,
 push-to-talk per speaker, a replayable transcript, hands-free mode, keyboard input and model
-management. Install the APK from the [latest release](https://github.com/Kevin-KIM98/offline-translator/releases)
-on an arm64 Android 8+ device, or build either app from source:
+management. Grab
+[offline-interpreter-1.0.0.apk](https://github.com/Kevin-KIM98/offline-translator/releases/download/v0.3.3/offline-interpreter-1.0.0.apk)
+for an arm64 Android 8+ device, or build either app from source:
 
 ```
 cd apps/android && ./gradlew assembleDebug          # no NDK needed
