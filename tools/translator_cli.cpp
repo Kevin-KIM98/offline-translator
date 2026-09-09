@@ -1,12 +1,13 @@
 // Desktop CLI for exercising the engine without a phone.
 //
-//   translator_cli status    --models <dir> [--manifest <file|url-json>] [--deep]
+//   translator_cli status    --models <dir> [--manifest <file|url-json>] [--deep] [--langs ko,en]
 //   translator_cli verify    --file <path> --sha256 <hex> [--size N]
 //   translator_cli install   --models <dir> --id <model-id> --staged <path> [--no-verify]
 //   translator_cli sha256    <file>
 //   translator_cli transcribe --models <dir> --wav <file> [--lang auto]
 //   translator_cli translate --models <dir> --text "..." --src ko --tgt en
 //   translator_cli speech    --models <dir> --wav <file> [--src auto] --tgt en [--stream] [--no-denoise]
+//   translator_cli listen    --models <dir> [--src auto] --tgt en [--device N] [--seconds N]
 //
 // WAV input: PCM16 or float32, mono/stereo, any rate (resampled to 16 kHz).
 #include "translator/FileUtil.hpp"
@@ -15,13 +16,37 @@
 #include "translator/Sha256.hpp"
 #include "translator/TranslationPipeline.hpp"
 
+#include <atomic>
+#include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <iostream>
 #include <map>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
+
+#if TRANSLATOR_HAS_MINIAUDIO
+// Capture only: the rest of miniaudio (decoding, playback graph, engine) would triple the
+// compile time of this one file.
+#define MA_NO_DECODING
+#define MA_NO_ENCODING
+#define MA_NO_GENERATION
+#define MA_NO_RESOURCE_MANAGER
+#define MA_NO_NODE_GRAPH
+#define MA_NO_ENGINE
+#define MINIAUDIO_IMPLEMENTATION
+#include "miniaudio.h"
+#if defined(_WIN32)
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
+#endif
 
 using namespace translator;
 
@@ -59,12 +84,15 @@ void usage() {
     std::fputs(
         "translator_cli <command> [options]\n"
         "  status     --models <dir> [--manifest <file>] [--deep]\n"
+        "             [--langs ko,en] [--llm if-needed|always|never]  only what those languages need\n"
         "  verify     --file <path> --sha256 <hex> [--size N]\n"
         "  install    --models <dir> --id <model-id> --staged <path> [--no-verify]\n"
         "  sha256     <file>\n"
         "  transcribe --models <dir> --wav <file> [--lang auto] [--threads N]\n"
         "  translate  --models <dir> --text \"...\" --src ko --tgt en [--llm <gguf>] [--backend auto|marian|llm]\n"
-        "  speech     --models <dir> --wav <file> [--src auto] --tgt en [--stream] [--no-denoise]\n",
+        "  speech     --models <dir> --wav <file> [--src auto] --tgt en [--stream] [--no-denoise]\n"
+        "  listen     --models <dir> [--src auto] --tgt en [--device N] [--seconds N] [--list-devices]\n"
+        "             live microphone; speak, pause, and each utterance is translated\n",
         stderr);
 }
 
@@ -168,12 +196,50 @@ bool loadManager(const Args& a, ModelManager& mm) {
     return true;
 }
 
+std::vector<std::string> splitCsv(const std::string& csv) {
+    std::vector<std::string> out;
+    std::string cur;
+    for (const char c : csv) {
+        if (c == ',' || c == ' ') {
+            if (!cur.empty()) out.push_back(cur);
+            cur.clear();
+        } else {
+            cur += c;
+        }
+    }
+    if (!cur.empty()) out.push_back(cur);
+    return out;
+}
+
 int cmdStatus(const Args& a) {
     if (!a.has("models")) { usage(); return 2; }
     ModelManager mm(a.get("models"));
     if (!loadManager(a, mm)) return 1;
     const bool deep = a.has("deep");
-    std::printf("%s\n", mm.statusJson(deep).dump(2).c_str());
+
+    if (!a.has("langs")) {
+        std::printf("%s\n", mm.statusJson(deep).dump(2).c_str());
+        return 0;
+    }
+
+    // Same selection the phone apps make: only what these languages need, plus the LLM when
+    // some direction has no Marian route.
+    const std::string mode = a.get("llm", "if-needed");
+    const ModelManager::LlmMode llmMode = mode == "always" ? ModelManager::LlmMode::Always
+                                        : mode == "never"  ? ModelManager::LlmMode::Never
+                                                           : ModelManager::LlmMode::IfNeeded;
+    Json j = Json::object();
+    j.set("manifest_version", mm.manifestVersion());
+    j.set("models_root", a.get("models"));
+    Json arr = Json::array();
+    std::uint64_t pending = 0;
+    for (const auto& st : mm.statusForLanguages(splitCsv(a.get("langs")), deep, llmMode)) {
+        if (st.needsDownload()) pending += st.entry.totalBytes();
+        arr.push_back(st.toJson());
+    }
+    j.set("pending_bytes", pending);
+    j.set("models", arr);
+    std::printf("%s\n", j.dump(2).c_str());
     return 0;
 }
 
@@ -237,6 +303,7 @@ bool makePipeline(const Args& a, TranslationPipeline& p, bool needWhisper) {
     cfg.enableDenoise = !a.has("no-denoise");
     if (a.has("beam")) cfg.beamSize = std::atoi(a.get("beam").c_str());
     if (a.has("stt-beam")) cfg.sttBeamSize = std::atoi(a.get("stt-beam").c_str());
+    if (a.has("no-speech")) cfg.noSpeechThreshold = static_cast<float>(std::atof(a.get("no-speech").c_str()));
     if (a.has("no-context")) cfg.useContextPrompt = false;
     if (a.has("full-audio-ctx")) cfg.sttAdaptiveAudioContext = false;
     if (a.has("no-default-prompt")) cfg.useDefaultPrompts = false;
@@ -316,6 +383,205 @@ int cmdSpeech(const Args& a) {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
+// listen: live microphone → denoise → VAD → STT → translation
+// ---------------------------------------------------------------------------
+
+#if TRANSLATOR_HAS_MINIAUDIO
+
+struct CaptureBuffer {
+    std::mutex mutex;
+    std::vector<float> samples;
+    std::atomic<float> level{0.0f};
+};
+
+void captureCallback(ma_device* device, void* /*output*/, const void* input, ma_uint32 frameCount) {
+    auto* buffer = static_cast<CaptureBuffer*>(device->pUserData);
+    const float* in = static_cast<const float*>(input);
+    if (!buffer || !in || frameCount == 0) return;
+
+    double sum = 0.0;
+    for (ma_uint32 i = 0; i < frameCount; ++i) sum += static_cast<double>(in[i]) * in[i];
+    buffer->level.store(static_cast<float>(std::sqrt(sum / frameCount)), std::memory_order_relaxed);
+
+    std::lock_guard<std::mutex> lock(buffer->mutex);
+    buffer->samples.insert(buffer->samples.end(), in, in + frameCount);
+}
+
+bool stderrIsTerminal() {
+#if defined(_WIN32)
+    return _isatty(_fileno(stderr)) != 0;
+#else
+    return isatty(fileno(stderr)) != 0;
+#endif
+}
+
+void drawMeter(float rms, int utterances, bool busy) {
+    // Carriage returns only make sense on a terminal; piped output would collect one line
+    // per redraw.
+    static const bool tty = stderrIsTerminal();
+    if (!tty) return;
+    // -50 dBFS .. 0 dBFS across 20 cells.
+    const double db = 20.0 * std::log10(std::max(rms, 1e-6f));
+    const int cells = static_cast<int>(std::max(0.0, std::min(1.0, (db + 50.0) / 50.0)) * 20.0);
+    std::string bar(20, '.');
+    for (int i = 0; i < cells; ++i) bar[static_cast<std::size_t>(i)] = '#';
+    std::fprintf(stderr, "\r  mic [%s]  utterances: %d  %s   ", bar.c_str(), utterances,
+                 busy ? "(translating)" : "(Enter to stop)");
+    std::fflush(stderr);
+}
+
+int cmdListen(const Args& a) {
+    ma_context context;
+    if (ma_context_init(nullptr, 0, nullptr, &context) != MA_SUCCESS) {
+        std::fprintf(stderr, "cannot initialise the audio backend\n");
+        return 1;
+    }
+
+    ma_device_info* captureInfos = nullptr;
+    ma_uint32 captureCount = 0;
+    ma_context_get_devices(&context, nullptr, nullptr, &captureInfos, &captureCount);
+
+    if (a.has("list-devices")) {
+        std::printf("capture devices:\n");
+        for (ma_uint32 i = 0; i < captureCount; ++i) {
+            std::printf("  %u: %s%s\n", i, captureInfos[i].name, captureInfos[i].isDefault ? "  (default)" : "");
+        }
+        ma_context_uninit(&context);
+        return 0;
+    }
+
+    if (!a.has("models") || !a.has("tgt")) {
+        ma_context_uninit(&context);
+        usage();
+        return 2;
+    }
+
+    TranslationPipeline pipeline;
+    if (!makePipeline(a, pipeline, true)) {
+        ma_context_uninit(&context);
+        return 1;
+    }
+
+    const std::string src = a.get("src", "auto");
+    const std::string tgt = a.get("tgt");
+    const int seconds = std::atoi(a.get("seconds", "0").c_str());
+
+    CaptureBuffer buffer;
+    ma_device_config config = ma_device_config_init(ma_device_type_capture);
+    config.capture.format = ma_format_f32;
+    config.capture.channels = 1;
+    config.sampleRate = 16000;
+    config.dataCallback = captureCallback;
+    config.pUserData = &buffer;
+    if (a.has("device")) {
+        const int index = std::atoi(a.get("device").c_str());
+        if (index < 0 || static_cast<ma_uint32>(index) >= captureCount) {
+            std::fprintf(stderr, "no capture device %d (see --list-devices)\n", index);
+            ma_context_uninit(&context);
+            return 2;
+        }
+        config.capture.pDeviceID = &captureInfos[index].id;
+    }
+
+    ma_device device;
+    if (ma_device_init(&context, &config, &device) != MA_SUCCESS) {
+        std::fprintf(stderr, "cannot open the microphone\n");
+        ma_context_uninit(&context);
+        return 1;
+    }
+    if (ma_device_start(&device) != MA_SUCCESS) {
+        std::fprintf(stderr, "cannot start capture\n");
+        ma_device_uninit(&device);
+        ma_context_uninit(&context);
+        return 1;
+    }
+
+    std::fprintf(stderr, "listening on \"%s\" at %u Hz — %s to %s\n", device.capture.name,
+                 device.sampleRate, src.c_str(), tgt.c_str());
+    std::fprintf(stderr, "speak, then pause; each utterance is translated. Enter stops.\n");
+
+    std::atomic<bool> stop{false};
+    std::thread waiter([&stop]() {
+        // Only a real line stops the loop; an immediate EOF (stdin redirected from /dev/null,
+        // or a non-interactive run) must not look like the user pressed Enter.
+        std::string line;
+        if (std::getline(std::cin, line)) stop.store(true);
+    });
+    waiter.detach();
+
+    const auto started = std::chrono::steady_clock::now();
+    auto lastDraw = started;
+    std::vector<float> chunk;
+    int utterances = 0;
+
+    auto drain = [&](const char* label) {
+        while (pipeline.hasPendingUtterance()) {
+            drawMeter(buffer.level.load(std::memory_order_relaxed), utterances, true);
+            const TranslationResult r = pipeline.processPendingUtterance(src, tgt);
+            if (r.ok && r.sourceText.empty()) continue;  // silence
+            ++utterances;
+            if (stderrIsTerminal()) std::fprintf(stderr, "\r%60s\r", "");
+            if (!r.ok) {
+                std::printf("[%d] error: %s\n", utterances, r.error.c_str());
+                continue;
+            }
+            std::string route;
+            for (const auto& hop : r.route) route += (route.empty() ? "  via " : "->") + hop;
+            std::printf("[%d%s] %s (%s)\n     -> %s (%s)  %.0f ms%s\n", utterances, label,
+                        r.sourceText.c_str(), r.sourceLang.c_str(),
+                        r.translatedText.c_str(), r.targetLang.c_str(), r.totalMs, route.c_str());
+            std::fflush(stdout);
+        }
+    };
+
+    while (!stop.load()) {
+        {
+            std::lock_guard<std::mutex> lock(buffer.mutex);
+            chunk.swap(buffer.samples);
+            buffer.samples.clear();
+        }
+        if (!chunk.empty()) {
+            if (pipeline.feedAudio(chunk.data(), chunk.size())) drain("");
+            chunk.clear();
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+
+        const auto now = std::chrono::steady_clock::now();
+        if (now - lastDraw > std::chrono::milliseconds(120)) {
+            lastDraw = now;
+            drawMeter(buffer.level.load(std::memory_order_relaxed), utterances, false);
+        }
+        if (seconds > 0 && now - started >= std::chrono::seconds(seconds)) break;
+    }
+
+    ma_device_stop(&device);
+    {
+        std::lock_guard<std::mutex> lock(buffer.mutex);
+        if (!buffer.samples.empty()) pipeline.feedAudio(buffer.samples.data(), buffer.samples.size());
+        buffer.samples.clear();
+    }
+    if (pipeline.flushAudio()) drain(" flushed");
+    if (stderrIsTerminal()) std::fprintf(stderr, "\r%60s\r", "");
+    std::fprintf(stderr, "%d utterance(s)\n", utterances);
+
+    ma_device_uninit(&device);
+    ma_context_uninit(&context);
+    return 0;
+}
+
+#else
+
+int cmdListen(const Args&) {
+    std::fprintf(stderr,
+                 "this build has no microphone support: third_party/miniaudio/miniaudio.h was\n"
+                 "missing at configure time. Run scripts/fetch_third_party.sh and rebuild.\n");
+    return 2;
+}
+
+#endif
+
 } // namespace
 
 #if defined(_WIN32)
@@ -355,6 +621,7 @@ int main(int argc, char** argv) {
     if (a.command == "transcribe") return cmdTranscribe(a);
     if (a.command == "translate") return cmdTranslate(a);
     if (a.command == "speech") return cmdSpeech(a);
+    if (a.command == "listen") return cmdListen(a);
     usage();
     return 2;
 }

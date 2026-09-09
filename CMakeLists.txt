@@ -163,6 +163,25 @@ if(TRANSLATOR_BUILD_CLI)
     add_executable(translator_cli tools/translator_cli.cpp)
     target_link_libraries(translator_cli PRIVATE translator_static)
     _translator_tool(translator_cli)
+
+    # Live microphone for `translator_cli listen`, so the pipeline can be exercised on a
+    # desktop before touching a phone. Header-only; absent builds still compile.
+    set(_miniaudio_dir ${CMAKE_CURRENT_SOURCE_DIR}/third_party/miniaudio)
+    if(EXISTS ${_miniaudio_dir}/miniaudio.h)
+        target_compile_definitions(translator_cli PRIVATE TRANSLATOR_HAS_MINIAUDIO=1)
+        target_include_directories(translator_cli PRIVATE ${_miniaudio_dir})
+        find_package(Threads REQUIRED)
+        target_link_libraries(translator_cli PRIVATE Threads::Threads)
+        if(APPLE)
+            target_link_libraries(translator_cli PRIVATE
+                "-framework CoreFoundation" "-framework CoreAudio" "-framework AudioToolbox")
+        elseif(UNIX)
+            target_link_libraries(translator_cli PRIVATE ${CMAKE_DL_LIBS} m)
+        endif()
+    else()
+        target_compile_definitions(translator_cli PRIVATE TRANSLATOR_HAS_MINIAUDIO=0)
+        message(STATUS "miniaudio not found - 'translator_cli listen' will be unavailable")
+    endif()
 endif()
 
 if(TRANSLATOR_BUILD_TESTS)

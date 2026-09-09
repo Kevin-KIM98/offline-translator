@@ -49,6 +49,15 @@ if ((Test-Path $dl) -and -not (Test-Path $rnData)) {
     }
 }
 
+# miniaudio is a single public-domain header; the desktop CLI uses it for `listen`.
+$ma = Join-Path $TP "miniaudio\miniaudio.h"
+if (-not (Test-Path $ma)) {
+    Write-Host ">> downloading miniaudio"
+    New-Item -ItemType Directory -Force (Split-Path $ma) | Out-Null
+    $maRef = if ($env:MINIAUDIO_REF) { $env:MINIAUDIO_REF } else { "0.11.25" }
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/mackron/miniaudio/$maRef/miniaudio.h" -OutFile $ma
+}
+
 Write-Host ""
 Write-Host "third_party/ ready:"
 Get-ChildItem $TP -Directory | ForEach-Object { Write-Host "  $($_.Name)" }

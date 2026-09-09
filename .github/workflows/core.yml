@@ -1,0 +1,66 @@
+# Builds the C++ core, the desktop CLI and the unit tests on every change to them.
+#
+# Until this existed, core changes were only compiled when someone dispatched a release,
+# so a break could sit on main unnoticed.
+name: Core
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "include/**"
+      - "tools/**"
+      - "tests/**"
+      - "cmake/**"
+      - "CMakeLists.txt"
+      - "scripts/fetch_third_party.*"
+      - ".github/workflows/core.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "include/**"
+      - "tools/**"
+      - "tests/**"
+      - "cmake/**"
+      - "CMakeLists.txt"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-14]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch engines
+        shell: bash
+        run: bash scripts/fetch_third_party.sh --shallow
+
+      - name: Configure and build
+        shell: bash
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+            -DTRANSLATOR_STRICT_DEPS=ON -DTRANSLATOR_BUILD_SHARED=OFF \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+          cmake --build build --config Release --target translator_cli translator_tests --parallel 4
+
+      - name: Unit tests
+        shell: bash
+        run: |
+          if [ -f build/Release/translator_tests.exe ]; then build/Release/translator_tests.exe; else build/translator_tests; fi
+
+      - name: CLI smoke test
+        shell: bash
+        run: |
+          cli=build/translator_cli
+          [ -f build/Release/translator_cli.exe ] && cli=build/Release/translator_cli.exe
+          echo "hello" > sample.txt
+          "$cli" sha256 sample.txt
+          # A runner has no microphone and often no sound server, so this is informational:
+          # it shows whether the capture backend came up, without failing the build.
+          "$cli" listen --list-devices || echo "(no audio backend on this runner)"

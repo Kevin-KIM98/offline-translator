@@ -34,6 +34,41 @@ cd apps/android && ./gradlew assembleDebug          # no NDK needed
 
 See [apps/android](apps/android/README.md) and [apps/ios](apps/ios/README.md).
 
+## Test on a desktop first
+
+The whole pipeline runs on Windows, macOS and Linux, so recognition and translation quality can
+be judged before any phone is involved. Build the CLI, fetch the models a language pair needs,
+then talk into the machine's microphone:
+
+```bash
+scripts/fetch_third_party.sh --shallow
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release --target translator_cli
+
+python scripts/fetch_models.py --models pc-models --langs ko,en
+./build/Release/translator_cli listen --models pc-models --src ko --tgt en
+```
+
+`listen` shows a level meter, and prints each utterance as soon as you stop speaking:
+
+```
+[1] 가장 가까운 지하철역이 어디인가요? (ko)
+     -> Where's the nearest subway station? (en)  1420 ms  via ko-en
+```
+
+`fetch_models.py` picks exactly the models the phone would for those languages — including the
+LLM when a direction has no dedicated model — and hands verification and installation to the
+same C++ code the apps use, so a directory it produces is what a device would end up with.
+Downloads resume; re-run it after an interruption. `--dry-run` lists sizes without downloading.
+
+Useful flags: `--list-devices` and `--device N` to pick a microphone, `--seconds N` for an
+unattended run, `--backend llm` to force the LLM, `--src auto` to let whisper detect the
+language. Without a microphone, `translator_cli speech --wav <file> --tgt en --stream` runs the
+same path over a recording.
+
+Text-to-speech is not part of this: it comes from the phone OS, so it can only be judged on a
+device.
+
 ## Install in your own app
 
 ### Android (2 lines)
