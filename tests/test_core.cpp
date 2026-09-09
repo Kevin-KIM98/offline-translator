@@ -186,6 +186,43 @@ void testSegmenter() {
     CHECK(seg.hasUtterance());
     seg.reset();
     CHECK(!seg.hasUtterance());
+
+    // Loudness gate: RNNoise reports a high voice probability for room noise too, and whisper
+    // answers a noise-only segment with an invented sentence. Anything close to the tracked
+    // noise floor must never become an utterance.
+    {
+        SpeechSegmenter gate(cfg);
+        std::vector<float> quiet(kFrameSize, 0.002f);   // about -54 dBFS
+        std::vector<float> hush(kFrameSize, 0.001f);    // about -60 dBFS, the "room"
+        auto feed = [&](std::vector<float>& frame, int frames, float vad) {
+            bool ready = false;
+            for (int i = 0; i < frames; ++i) ready |= gate.pushFrame(frame.data(), vad);
+            return ready;
+        };
+
+        CHECK(!feed(hush, 40, 0.05f));                  // let the noise floor settle
+        CHECK(gate.noiseFloorDbfs() < -50.0f);
+        CHECK(!feed(quiet, 40, 0.95f));                 // "voiced" but only 6 dB over the floor
+        CHECK(!feed(hush, 30, 0.05f));                  // closes the segment
+        CHECK(!gate.hasUtterance());                    // dropped, not queued
+        CHECK_EQ(gate.droppedQuietCount(), std::size_t(1));
+
+        // The same segment at a normal speaking level is kept.
+        std::vector<float> loud(kFrameSize, 0.2f);      // about -14 dBFS
+        CHECK(!feed(loud, 40, 0.95f));
+        CHECK(feed(hush, 30, 0.05f));
+        CHECK(gate.hasUtterance());
+        CHECK_EQ(gate.droppedQuietCount(), std::size_t(1));
+    }
+
+    // A digitally silent input has no floor to compare against, so the absolute minimum applies.
+    {
+        SpeechSegmenter gate(cfg);
+        std::vector<float> nothing(kFrameSize, 0.0f);
+        for (int i = 0; i < 60; ++i) gate.pushFrame(nothing.data(), 0.95f);
+        gate.flush();
+        CHECK(!gate.hasUtterance());
+    }
 }
 
 void testTextUtil() {

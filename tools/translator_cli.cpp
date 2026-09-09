@@ -92,8 +92,28 @@ void usage() {
         "  translate  --models <dir> --text \"...\" --src ko --tgt en [--llm <gguf>] [--backend auto|marian|llm]\n"
         "  speech     --models <dir> --wav <file> [--src auto] --tgt en [--stream] [--no-denoise]\n"
         "  listen     --models <dir> [--src auto] --tgt en [--device N] [--seconds N] [--list-devices]\n"
+        "             [--record <out.wav>] keeps what the microphone heard, for replay\n"
         "             live microphone; speak, pause, and each utterance is translated\n",
         stderr);
+}
+
+bool writeWav(const std::string& path, const std::vector<float>& pcm, std::string& err) {
+    std::ofstream out(path, std::ios::binary);
+    if (!out) {
+        err = "cannot write " + path;
+        return false;
+    }
+    const std::uint32_t rate = 16000, dataBytes = static_cast<std::uint32_t>(pcm.size() * 2);
+    auto u32 = [&](std::uint32_t v) { out.write(reinterpret_cast<const char*>(&v), 4); };
+    auto u16 = [&](std::uint16_t v) { out.write(reinterpret_cast<const char*>(&v), 2); };
+    out.write("RIFF", 4); u32(36 + dataBytes); out.write("WAVE", 4);
+    out.write("fmt ", 4); u32(16); u16(1); u16(1); u32(rate); u32(rate * 2); u16(2); u16(16);
+    out.write("data", 4); u32(dataBytes);
+    for (const float f : pcm) {
+        const float clamped = f < -1.0f ? -1.0f : (f > 1.0f ? 1.0f : f);
+        u16(static_cast<std::uint16_t>(static_cast<std::int16_t>(clamped * 32767.0f)));
+    }
+    return out.good();
 }
 
 // ---------------------------------------------------------------------------
@@ -513,6 +533,8 @@ int cmdListen(const Args& a) {
     const auto started = std::chrono::steady_clock::now();
     auto lastDraw = started;
     std::vector<float> chunk;
+    std::vector<float> recording;
+    const std::string recordPath = a.get("record", "");
     int utterances = 0;
 
     auto drain = [&](const char* label) {
@@ -542,6 +564,7 @@ int cmdListen(const Args& a) {
             buffer.samples.clear();
         }
         if (!chunk.empty()) {
+            if (!recordPath.empty()) recording.insert(recording.end(), chunk.begin(), chunk.end());
             if (pipeline.feedAudio(chunk.data(), chunk.size())) drain("");
             chunk.clear();
         } else {
@@ -565,6 +588,15 @@ int cmdListen(const Args& a) {
     if (pipeline.flushAudio()) drain(" flushed");
     if (stderrIsTerminal()) std::fprintf(stderr, "\r%60s\r", "");
     std::fprintf(stderr, "%d utterance(s)\n", utterances);
+    if (!recordPath.empty()) {
+        std::string werr;
+        if (writeWav(recordPath, recording, werr)) {
+            std::fprintf(stderr, "wrote %s (%.1f s)\n", recordPath.c_str(),
+                         static_cast<double>(recording.size()) / 16000.0);
+        } else {
+            std::fprintf(stderr, "%s\n", werr.c_str());
+        }
+    }
 
     ma_device_uninit(&device);
     ma_context_uninit(&context);
