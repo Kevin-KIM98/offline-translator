@@ -2,7 +2,9 @@ package com.offlinetranslator.app.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,6 +65,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -89,6 +93,7 @@ fun ConversationScreen(
     var picking by remember { mutableStateOf<Side?>(null) }
     var typing by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    val clipboard = LocalClipboardManager.current
 
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -172,6 +177,10 @@ fun ConversationScreen(
                             turn = turn,
                             speaking = state.speakingTurn == turn.id,
                             onReplay = { if (state.speakingTurn == turn.id) vm.stopSpeaking() else vm.speakTurn(turn) },
+                            onCopy = {
+                                clipboard.setText(AnnotatedString(turn.translatedText))
+                                vm.showMessage("번역문을 복사했습니다")
+                            },
                         )
                     }
                 }
@@ -383,8 +392,9 @@ private fun EmptyState(state: UiState) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TurnCard(turn: Turn, speaking: Boolean, onReplay: () -> Unit) {
+private fun TurnCard(turn: Turn, speaking: Boolean, onReplay: () -> Unit, onCopy: () -> Unit) {
     val speakers = LocalSpeakerColors.current
     val accent = if (turn.side == Side.A) speakers.sideA else speakers.sideB
     Row(Modifier.fillMaxWidth()) {
@@ -397,7 +407,9 @@ private fun TurnCard(turn: Turn, speaking: Boolean, onReplay: () -> Unit) {
                 bottomEnd = 18.dp,
             ),
             color = MaterialTheme.colorScheme.surface,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .combinedClickable(onClick = {}, onLongClick = onCopy),
         ) {
             Row(Modifier.height(IntrinsicSize.Min)) {
                 Box(

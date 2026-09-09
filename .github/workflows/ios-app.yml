@@ -42,4 +42,4 @@ jobs:
             -scheme OfflineInterpreter \
             -destination 'generic/platform=iOS Simulator' \
             -clonedSourcePackagesDirPath .spm \
-            CODE_SIGNING_ALLOWED=NO
+            ARCHS=arm64 CODE_SIGNING_ALLOWED=NO

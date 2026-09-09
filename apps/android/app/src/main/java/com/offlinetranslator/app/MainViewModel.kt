@@ -403,6 +403,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(turns = emptyList()) }
     }
 
+    fun showMessage(text: String) = _state.update { it.copy(message = text) }
+
     fun dismissMessage() = _state.update { it.copy(message = null) }
 
     fun refreshInstalled() {

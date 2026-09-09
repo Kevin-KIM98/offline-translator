@@ -99,6 +99,18 @@ struct ConversationView: View {
                                 if model.speakingTurn == turn.id { model.stopSpeaking() } else { model.speakTurn(turn) }
                             }
                             .id(turn.id)
+                            .contextMenu {
+                                Button {
+                                    UIPasteboard.general.string = turn.translatedText
+                                } label: {
+                                    Label("번역문 복사", systemImage: "doc.on.doc")
+                                }
+                                Button {
+                                    UIPasteboard.general.string = turn.sourceText
+                                } label: {
+                                    Label("원문 복사", systemImage: "text.quote")
+                                }
+                            }
                         }
                     }
                     .padding(16)

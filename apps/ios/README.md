@@ -18,8 +18,9 @@ from the Swift package at the repository root, which pulls the prebuilt XCFramew
 matching GitHub release.
 
 Requirements: iOS 15 or newer, and Xcode 16 (current XcodeGen writes the Xcode 16 project
-format). The simulator works for the UI, but speech
-recognition is much slower there than on a real device.
+format). The engine's XCFramework carries an arm64 simulator slice only, so simulator builds
+need an Apple Silicon Mac. The simulator is fine for the UI, but speech recognition is much
+slower there than on a device.
 
 ## What the app does
 
