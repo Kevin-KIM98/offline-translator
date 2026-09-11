@@ -8,6 +8,9 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <vector>
+
+#include "translator/Types.hpp"
 
 namespace translator {
 
@@ -19,6 +22,7 @@ struct LlmOptions {
     int gpuLayers = 99;          // offload everything when a GPU backend (Metal/Vulkan) is compiled in
     bool useMmap = true;
     std::string systemPrompt;    // override the built-in translation instruction (advanced)
+    LlmExamples examples = LlmExamples::Diverse;  // demonstrations placed before the text
 };
 
 struct LlmResult {
@@ -53,6 +57,8 @@ public:
     static std::string buildInstruction(const std::string& src, const std::string& tgt, const std::string& systemPrompt);
     // One-shot demonstration sentence in `code` ("Where is the nearest station?"), empty if unknown.
     static std::string exampleSentence(const std::string& code);
+    // Three demonstration sentences in `code` for LlmExamples::Diverse, empty if unknown.
+    static std::vector<std::string> exampleSet(const std::string& code);
     // Fraction of letters in `text` that belong to a script foreign to `lang` (Han in Korean,
     // Hangul in Thai, ...). Used to catch small-model language mixing; exposed for tests.
     static double foreignScriptRatio(const std::string& text, const std::string& lang);

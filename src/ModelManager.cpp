@@ -498,23 +498,33 @@ std::vector<ModelStatus> ModelManager::statusForLanguages(const std::vector<std:
     auto hasPair = [&](const std::string& a, const std::string& b) {
         return std::find(pairs.begin(), pairs.end(), a + "-" + b) != pairs.end();
     };
+    // Every direction between two chosen languages needs a route: a direct pair, two pairs through
+    // English, or the LLM. What gets downloaded is exactly the pairs those routes use, including
+    // the English hops that a choice like {ko, ja} never names itself.
     bool llmNeeded = false;
+    std::vector<std::string> wantedPairs;
+    auto want = [&](const std::string& pair) {
+        if (std::find(wantedPairs.begin(), wantedPairs.end(), pair) == wantedPairs.end()) wantedPairs.push_back(pair);
+    };
     for (const auto& a : langs)
         for (const auto& b : langs) {
             if (a == b) continue;
-            const bool direct = hasPair(a, b);
-            const bool viaEn = a != "en" && b != "en" && hasPair(a, "en") && hasPair("en", b);
-            if (!direct && !viaEn) llmNeeded = true;
+            if (hasPair(a, b)) {
+                want(a + "-" + b);
+            } else if (a != "en" && b != "en" && hasPair(a, "en") && hasPair("en", b)) {
+                want(a + "-en");
+                want("en-" + b);
+            } else {
+                llmNeeded = true;
+                // The pipeline gives the LLM English when a dedicated model can produce it.
+                if (a != "en" && b != "en" && hasPair(a, "en")) want(a + "-en");
+            }
         }
 
     for (const auto& e : entries_) {
         bool wanted = true;
         if (e.kind == ModelEntry::Kind::Nmt) {
-            const auto dash = e.pair.find('-');
-            const std::string src = e.pair.substr(0, dash), tgt = dash == std::string::npos ? "" : e.pair.substr(dash + 1);
-            const bool srcIn = std::find(langs.begin(), langs.end(), src) != langs.end();
-            const bool tgtIn = std::find(langs.begin(), langs.end(), tgt) != langs.end();
-            wanted = srcIn && tgtIn;
+            wanted = std::find(wantedPairs.begin(), wantedPairs.end(), e.pair) != wantedPairs.end();
         } else if (e.kind == ModelEntry::Kind::Llm) {
             wanted = llmMode == LlmMode::Always || (llmMode == LlmMode::IfNeeded && llmNeeded);
         }

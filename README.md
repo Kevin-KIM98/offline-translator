@@ -111,10 +111,19 @@ try session.start(sourceLang: "ko", targetLang: "en")
 Both `prepare` calls are safe on every launch: models already on the device are verified against
 the manifest and skipped. Text-only translation is `session.translate(...)`.
 
-`languages` decides what gets downloaded: `["ko","en"]` ≈ 0.5 GB (STT + two Marian pairs);
-`["ko","th"]` adds the LLM (1.1 GB) because no Marian model translates into Thai. Pass
-`backend = LLM` (Kotlin `TranslationBackend.LLM`, Swift `.LLM`) to translate everything with the
-LLM — slower, but a single model for all 42 directions with automatic source-language detection.
+`languages` decides what gets downloaded: every direction between the chosen languages gets the
+models its route uses.
+
+| `languages` | download | how it translates |
+|---|---|---|
+| `["ko","en"]` | ≈ 0.5 GB | two dedicated Korean–English models |
+| `["ko","ja"]` | ≈ 0.66 GB | four dedicated models, both directions through English |
+| `["ko","th"]` | ≈ 1.7 GB | Thai→Korean through English; Korean→Thai by the LLM, which is handed Marian's English |
+
+Up to 0.3.6 a choice like `["ko","ja"]` selected no English models and so downloaded speech
+recognition alone; nothing could translate. Pass `backend = LLM` (Kotlin
+`TranslationBackend.LLM`, Swift `.LLM`) to translate everything with the LLM — slower, but a single
+model for all 42 directions with automatic source-language detection.
 
 ### Self-hosting models
 
@@ -128,7 +137,7 @@ Point `manifestUrl` at your own copy of `assets/manifest.json` (regenerate it wi
 | noise suppression + VAD | RNNoise | 30 ms frames, utterance segmentation with pre-roll / hangover |
 | speech recognition | whisper.cpp `small-q5_1` (190 MB) | beam 5, punctuated per-language prompts, conversation context, hallucination filter, adaptive encoder window |
 | translation (Marian) | CTranslate2 OPUS-MT INT8 (≈ 80 MB / pair, 11 pairs) | beam 4, repetition control, sentence batching, English-pivot routing, per-language post-processing |
-| translation (LLM) | llama.cpp + Qwen2.5-1.5B-Instruct Q4_K_M (1.1 GB) | any→any in one hop, source auto-detect, chat-template prompting, greedy decoding, output cleanup; `scripts/finetune_lora.py` adapts it to your domain |
+| translation (LLM) | llama.cpp + Qwen2.5-1.5B-Instruct Q4_K_M (1.1 GB) | directions no dedicated model covers, starting from Marian's English where a pair reaches it; three demonstrations, script guard, greedy decoding, output cleanup; any→any with source auto-detect when used on its own; `scripts/finetune_lora.py` adapts it to your domain |
 | speech output | AVSpeechSynthesizer / android.speech.tts | offline OS voices |
 
 Measured on a desktop CPU (no GPU), Korean speech → English, whisper `small`:

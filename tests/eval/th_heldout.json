@@ -1,0 +1,15 @@
+{
+  "description": "Held-out check for translation into Thai. Written before any experiment ran and never used to choose a configuration, so it shows whether a change generalises beyond th_conversation.json.",
+  "sentences": [
+    {"id": 1,  "ko": "내일 오후 세 시에 호텔 로비에서 만나기로 했어요.", "en": "We agreed to meet in the hotel lobby at three tomorrow afternoon.", "th": "เรานัดเจอกันที่ล็อบบี้โรงแรมตอนบ่ายสามโมงพรุ่งนี้ครับ"},
+    {"id": 2,  "ko": "공항까지 가는 가장 빠른 방법을 알려주세요.", "en": "Please tell me the fastest way to get to the airport.", "th": "ช่วยบอกวิธีไปสนามบินที่เร็วที่สุดหน่อยครับ"},
+    {"id": 3,  "ko": "이 음식에 고기가 들어 있나요?", "en": "Does this dish have meat in it?", "th": "อาหารจานนี้มีเนื้อสัตว์ไหมครับ"},
+    {"id": 4,  "ko": "오늘 밤에 빈 방이 있나요?", "en": "Do you have a room available tonight?", "th": "คืนนี้มีห้องว่างไหมครับ"},
+    {"id": 5,  "ko": "휴대폰 충전기를 빌릴 수 있을까요?", "en": "Could I borrow a phone charger?", "th": "ขอยืมที่ชาร์จโทรศัพท์หน่อยได้ไหมครับ"},
+    {"id": 6,  "ko": "다음 기차는 몇 시에 출발해요?", "en": "What time does the next train leave?", "th": "รถไฟขบวนถัดไปออกกี่โมงครับ"},
+    {"id": 7,  "ko": "영수증 좀 주시겠어요?", "en": "Could I get a receipt?", "th": "ขอใบเสร็จหน่อยได้ไหมครับ"},
+    {"id": 8,  "ko": "머리가 너무 아파요.", "en": "I have a bad headache.", "th": "ผมปวดหัวมากครับ"},
+    {"id": 9,  "ko": "이 길로 쭉 가면 돼요?", "en": "Should I just go straight down this road?", "th": "ตรงไปตามถนนเส้นนี้เลยใช่ไหมครับ"},
+    {"id": 10, "ko": "창가 자리로 바꿔 주실 수 있나요?", "en": "Could you change my seat to a window seat?", "th": "ช่วยเปลี่ยนที่นั่งให้เป็นริมหน้าต่างได้ไหมครับ"}
+  ]
+}

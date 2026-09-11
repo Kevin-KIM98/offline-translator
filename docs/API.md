@@ -44,20 +44,28 @@ tr_pipeline* p = tr_pipeline_create(&cfg);        // NULL → tr_last_global_err
 | field | default | effect |
 |---|---|---|
 | `llm_model_path` | NULL | GGUF instruction model (Qwen2.5-Instruct). NULL → Marian only |
-| `translation_backend` | 0 | 0 **auto**: Marian pair when one exists (direct or via English), else the LLM · 1 Marian only · 2 LLM only |
+| `translation_backend` | 0 | 0 **auto**: Marian pair when one exists (direct or via English), else the LLM, which is handed Marian's English when a pair reaches English (0.3.7+) · 1 Marian only · 2 LLM only |
 | `llm_context_size` | 1024 | prompt + output tokens |
 | `llm_max_output_tokens` | 256 | hard cap (also bounded by input length) |
 | `llm_temperature` | 0 | 0 = greedy (recommended) |
 | `llm_gpu_layers` | 99 | Metal / Vulkan offload when compiled in |
 | `llm_system_prompt` | NULL | override the built-in interpreter instruction |
 
+The C++ `PipelineConfig` has two more LLM settings that the C ABI leaves at their defaults:
+`llmExamples` (`Diverse`, three unrelated demonstrations; `Single` is the 0.3.6 behaviour, whose one
+travel question leaked into similar sentences; `None`) and `llmPivotThroughEnglish` (`true`).
+
 With the LLM, `source_lang` may be `"auto"` for text translation too: the model is told to detect
-the language. `route` in the result is `["llm"]` when the LLM produced the translation.
+the language. `route` in the result is `["llm"]` when the LLM translated the original text, and
+`["ko-en", "llm"]` when a Marian hop produced the English it translated from.
 `tr_build_capabilities()` reports `"llama": true` when llama.cpp is compiled in;
 `tr_pipeline_capabilities()` adds `"llm_loaded"` and `"backend"`.
 
-`tr_mm_status_for_languages_json(m, "ko,th", deep, llm_mode)` — `llm_mode` 0 includes the manifest's
-`llm` entry only when some requested direction has no Marian route (direct or via English),
+`tr_mm_status_for_languages_json(m, "ko,th", deep, llm_mode)` returns the models the requested
+directions route through: direct pairs, both hops of a route through English, and the
+source-to-English pair ahead of an LLM direction. Up to 0.3.6 only pairs whose two languages were
+both requested were returned, so `"ko,ja"` came back with speech recognition alone. `llm_mode` 0
+includes the manifest's `llm` entry only when some requested direction has no Marian route,
 1 always, 2 never. `tr_mm_llm_model_path(m)` gives the install path.
 
 ### Streaming (microphone)

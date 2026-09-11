@@ -289,6 +289,10 @@ void testLlmEngine() {
     CHECK(pa.find("into Thai") != std::string::npos);
     CHECK_EQ(LlmEngine::buildInstruction("ko", "en", "custom"), "custom");
     CHECK(!LlmEngine::exampleSentence("th").empty());
+    // Diverse demonstrations pair up by index, so every language needs the same count.
+    for (const char* code : {"ko", "en", "es", "vi", "th", "ja", "zh"})
+        CHECK_EQ(LlmEngine::exampleSet(code).size(), std::size_t(3));
+    CHECK(LlmEngine::exampleSet("xx").empty());
     CHECK(LlmEngine::exampleSentence("xx").empty());
     CHECK(LlmEngine::foreignScriptRatio("안녕하세요 반갑습니다", "ko") < 0.01);
     CHECK(LlmEngine::foreignScriptRatio("안녕하세요 户外使用 밝기", "ko") > 0.15);
@@ -519,7 +523,75 @@ void testModelManager() {
     const auto forKoEn = mm.statusForLanguages({"ko", "en"});
     CHECK_EQ(forKoEn.size(), std::size_t(3));
     const auto forKoJa = mm.statusForLanguages({"ko", "ja"});
-    CHECK_EQ(forKoJa.size(), std::size_t(2)); // STT + LLM (no ko-ja route)
+    // No ja model in this manifest, so ko to ja needs the LLM, which starts from Marian's English.
+    CHECK_EQ(forKoJa.size(), std::size_t(3)); // STT + LLM + ko-en
+
+    // Routes through English. {ko, ja} names neither ko-en nor en-ja, yet those are the only way
+    // between the two; selecting by "both languages chosen" left such a choice with speech
+    // recognition and no translation model at all.
+    {
+        auto zipPair = [](const std::string& pair) {
+            Json p = Json::object();
+            p.set("pair", pair);
+            p.set("dir_name", pair);
+            p.set("size_bytes", 100);
+            p.set("sha256", Sha256::hashString(pair));
+            p.set("download_url", "https://assets.example.com/models/nmt/" + pair + ".zip");
+            return p;
+        };
+        Json m = Json::object();
+        m.set("manifest_version", "1.2.0");
+        m.set("base_url", "https://assets.example.com/models");
+        Json stt = Json::object();
+        stt.set("id", "whisper-route-test");
+        stt.set("version", "1");
+        stt.set("filename", "whisper-route-test.bin");
+        stt.set("size_bytes", 10);
+        stt.set("sha256", Sha256::hashString("stt"));
+        stt.set("download_url", "stt/whisper-route-test.bin");
+        m.set("stt", stt);
+        Json nmt = Json::array();
+        for (const char* pair : {"ko-en", "en-ko", "ja-en", "en-ja", "th-en"}) nmt.push_back(zipPair(pair));
+        m.set("nmt", nmt);
+        Json llm = Json::object();
+        llm.set("id", "llm-route-test");
+        llm.set("version", "1");
+        llm.set("filename", "llm-route-test.gguf");
+        llm.set("size_bytes", 10);
+        llm.set("sha256", Sha256::hashString("llm"));
+        llm.set("download_url", "llm/llm-route-test.gguf");
+        m.set("llm", llm);
+
+        ModelManager routes(fs::join(root, "routes"));
+        CHECK(routes.loadManifestJson(m.dump(), &err));
+        auto ids = [&](const std::vector<std::string>& langs) {
+            std::vector<std::string> out;
+            for (const auto& st : routes.statusForLanguages(langs)) out.push_back(st.entry.id);
+            return out;
+        };
+        auto has = [](const std::vector<std::string>& v, const std::string& id) {
+            for (const auto& x : v) if (x == id) return true;
+            return false;
+        };
+
+        const auto koJa = ids({"ko", "ja"});
+        CHECK(has(koJa, "nmt-ko-en"));
+        CHECK(has(koJa, "nmt-en-ja"));
+        CHECK(has(koJa, "nmt-ja-en"));
+        CHECK(has(koJa, "nmt-en-ko"));
+        CHECK(!has(koJa, "llm-route-test"));     // both directions route through English
+
+        const auto koTh = ids({"ko", "th"});
+        CHECK(has(koTh, "nmt-th-en"));           // th to ko goes through English
+        CHECK(has(koTh, "nmt-en-ko"));
+        CHECK(has(koTh, "llm-route-test"));      // ko to th has no dedicated route
+        CHECK(has(koTh, "nmt-ko-en"));           // ...so the LLM starts from Marian's English
+        CHECK(!has(koTh, "nmt-en-ja"));
+
+        const auto koEn = ids({"ko", "en"});
+        CHECK_EQ(koEn.size(), std::size_t(3));   // speech + ko-en + en-ko
+        CHECK(!has(koEn, "llm-route-test"));
+    }
 
     // Cache + reload.
     CHECK(mm.saveManifest(&err));

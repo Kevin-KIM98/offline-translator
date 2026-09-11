@@ -20,13 +20,18 @@ ja→zh "你好。明天的会议定在下午3点开始。最近的车站在哪�
 
 **Why small LLMs need guard rails.** Unconstrained, both models regularly drift into Chinese
 mid-sentence when the target is Thai or Korean, append translator's notes, or loop
-("ครับ ครับ ครับ…"). `LlmEngine` therefore (1) puts a one-shot demonstration in the target script
+("ครับ ครับ ครับ…"). `LlmEngine` therefore (1) puts three short demonstrations in the target script
 into the chat, (2) applies a llama.cpp logit bias that forbids every vocabulary token written
 in a script foreign to the target (Han/Kana for Korean, Hangul/Han for Thai, …; control/EOS
 tokens excluded), (3) adds a repetition penalty and stops at the first line break or a
 4× repeated token, (4) strips note markers, and (5) retries once with a stricter instruction
 if the output still mixes scripts. With these on, the script mixing disappeared in all tested
 directions.
+
+The demonstrations are a statement, a request and a count, deliberately unrelated to travel
+(`LlmExamples::Diverse`). Up to 0.3.6 there was a single one, "Excuse me, where is the nearest
+station?", and the 1.5B model copied it: "화장실이 어디예요?" became "where is the station that has a
+toilet", and "천천히 말씀해 주세요" came back as the demonstration itself.
 
 Grab them from `Qwen/Qwen2.5-*-Instruct-GGUF` on Hugging Face and add an `llm` entry to the manifest:
 
@@ -37,9 +42,31 @@ Grab them from `Qwen/Qwen2.5-*-Instruct-GGUF` on Hugging Face and add an `llm` e
 
 **How the backends are combined (`translation_backend = auto`)**: a Marian pair is used whenever
 one exists for the direction (direct, or X→en→Y through the English models) because it is 5–10×
-faster and, for X→English, at least as good; the LLM handles everything else (e.g. en→th, ko→vi,
-ja→zh direct). `LlmMode.IF_NEEDED` makes the app download the GGUF only when the chosen languages
-actually need it. Force LLM-only with `backend = llm`.
+faster and, for X→English, at least as good. The remaining directions go to the LLM; with the
+shipped models that means anything into Thai. When a Marian model can reach English from the
+source, the pipeline takes that hop first and hands the LLM English (`llmPivotThroughEnglish`),
+because a small LLM reads English far better than Korean. `LlmMode.IF_NEEDED` makes the app
+download the GGUF only when the chosen languages need it, together with every Marian model their
+routes use. Force LLM-only with `backend = llm`.
+
+Measured into Thai on 30 conversational sentences, plus 10 held-out ones written before any run and
+never used to choose a configuration. The sets and the harness are in `tests/eval`; reproduce with
+`python tests/eval/run_th_eval.py --set tests/eval/th_conversation.json`.
+
+| Korean → Thai | meaning correct, 30 + 10 | chrF, 30 / 10 |
+|---|---|---|
+| Qwen2.5-1.5B from Korean, one demonstration (up to 0.3.6) | 17 / 40 | 33.1 / 35.4 |
+| Qwen2.5-1.5B from Marian's English, three demonstrations (0.3.7) | 26 / 40 | 39.2 / 34.5 |
+| Qwen2.5-3B from Korean, three demonstrations | 31 / 40 | 46.4 / 41.7 |
+
+On the held-out set the English route's chrF did not improve, because of word choice ("lobby"
+rendered as "communication room"), while the sentences it got right still rose from 6 to 7 of 10.
+Most of its remaining errors are made by the Marian Korean→English step. The 3B model is the larger
+gain but doubles the download and the LLM time.
+
+Run through the pipeline's own Auto route rather than as two separate passes, the scores are
+identical and every sentence takes `ko-en → llm`. The extra Marian hop raises the median time per
+sentence on a desktop CPU from 1.7–2.0 s to 2.1–2.3 s; the 3B model takes 4.6–4.8 s.
 
 **Teaching it your domain ("학습")**: `scripts/finetune_lora.py` fine-tunes the same Qwen model
 with LoRA on parallel sentences (Tatoeba for all 7 languages, plus your own JSONL — glossaries,

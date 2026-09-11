@@ -24,6 +24,13 @@ enum class TranslationBackend {
     Marian,  // CTranslate2 OPUS-MT only
     Llm,     // LLM only (any→any in one hop; source may be "auto")
 };
+
+// Demonstrations placed in the LLM prompt ahead of the text to translate.
+enum class LlmExamples {
+    None,     // instruction only
+    Single,   // one "where is the nearest station?" pair (up to 0.3.6); leaks into similar questions
+    Diverse,  // three unrelated sentences: a statement, a request and a count (default)
+};
 inline bool isSupportedLanguage(const std::string& code) {
     for (const auto& l : supportedLanguages())
         if (l == code) return true;
@@ -40,6 +47,10 @@ struct PipelineConfig {
     float llmTemperature = 0.0f;        // 0 = greedy
     int llmGpuLayers = 99;              // Metal / Vulkan offload when compiled in
     std::string llmSystemPrompt;        // override the built-in translation instruction
+    LlmExamples llmExamples = LlmExamples::Diverse;  // demonstrations in the LLM prompt
+    // Auto backend, direction with no Marian route: translate to English with Marian first and give
+    // the LLM English, which it handles far better than Korean or Japanese.
+    bool llmPivotThroughEnglish = true;
     int nThreads = 4;                   // whisper / CTranslate2 intra-op threads
     bool useGpu = true;                 // whisper: Metal (iOS) / Vulkan-OpenCL (Android) when compiled in
     bool enableDenoise = true;          // RNNoise front-end

@@ -90,6 +90,7 @@ void usage() {
         "  sha256     <file>\n"
         "  transcribe --models <dir> --wav <file> [--lang auto] [--threads N]\n"
         "  translate  --models <dir> --text \"...\" --src ko --tgt en [--llm <gguf>] [--backend auto|marian|llm]\n"
+        "             [--llm-examples none|single|diverse] [--no-llm-pivot] [--lines]  --lines: one sentence per stdin line\n"
         "  speech     --models <dir> --wav <file> [--src auto] --tgt en [--stream] [--no-denoise]\n"
         "  listen     --models <dir> [--src auto] --tgt en [--device N] [--seconds N] [--list-devices]\n"
         "             [--record <out.wav>] keeps what the microphone heard, for replay\n"
@@ -334,6 +335,11 @@ bool makePipeline(const Args& a, TranslationPipeline& p, bool needWhisper) {
     const std::string backend = a.get("backend", "auto");
     cfg.backend = backend == "llm" ? TranslationBackend::Llm : backend == "marian" ? TranslationBackend::Marian : TranslationBackend::Auto;
     if (a.has("llm-ctx")) cfg.llmContextSize = std::atoi(a.get("llm-ctx").c_str());
+    if (a.has("llm-examples")) {
+        const std::string e = a.get("llm-examples");
+        cfg.llmExamples = e == "none" ? LlmExamples::None : e == "single" ? LlmExamples::Single : LlmExamples::Diverse;
+    }
+    if (a.has("no-llm-pivot")) cfg.llmPivotThroughEnglish = false;
 
     std::string err;
     if (!p.initialize(cfg, &err)) {
@@ -358,12 +364,28 @@ int cmdTranscribe(const Args& a) {
 }
 
 int cmdTranslate(const Args& a) {
-    if (!a.has("models") || !a.has("text") || !a.has("src") || !a.has("tgt")) { usage(); return 2; }
+    const bool lines = a.has("lines");
+    if (!a.has("models") || (!lines && !a.has("text")) || !a.has("src") || !a.has("tgt")) { usage(); return 2; }
     TranslationPipeline p;
     if (!makePipeline(a, p, false)) return 1;
-    const TranslationResult r = p.translateText(a.get("text"), a.get("src"), a.get("tgt"));
-    std::printf("%s\n", r.toJson().dump(2).c_str());
-    return r.ok ? 0 : 1;
+    if (!lines) {
+        const TranslationResult r = p.translateText(a.get("text"), a.get("src"), a.get("tgt"));
+        std::printf("%s\n", r.toJson().dump(2).c_str());
+        return r.ok ? 0 : 1;
+    }
+    // One sentence per stdin line, one compact JSON result per stdout line. The models load once,
+    // which is what makes comparing configurations over a test set practical.
+    std::string line;
+    int failures = 0;
+    while (std::getline(std::cin, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.empty()) continue;
+        const TranslationResult r = p.translateText(line, a.get("src"), a.get("tgt"));
+        if (!r.ok) ++failures;
+        std::printf("%s\n", r.toJson().dump().c_str());
+        std::fflush(stdout);
+    }
+    return failures == 0 ? 0 : 1;
 }
 
 int cmdSpeech(const Args& a) {

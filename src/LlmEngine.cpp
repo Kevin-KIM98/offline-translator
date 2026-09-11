@@ -99,6 +99,19 @@ std::string LlmEngine::exampleSentence(const std::string& code) {
     return {};
 }
 
+std::vector<std::string> LlmEngine::exampleSet(const std::string& code) {
+    // A statement with a day, a polite request and a count. Varied, so the model picks up the task
+    // rather than one sentence shape, and far from travel questions, so nothing leaks into them.
+    if (code == "ko") return {"회의가 금요일로 미뤄졌어요.", "음악 소리를 조금만 줄여 주시겠어요?", "어제 책을 두 권 샀어요."};
+    if (code == "en") return {"The meeting has been moved to Friday.", "Could you turn the music down a little?", "I bought two books yesterday."};
+    if (code == "es") return {"La reunión se ha aplazado al viernes.", "¿Podría bajar un poco la música?", "Ayer compré dos libros."};
+    if (code == "vi") return {"Cuộc họp đã được dời sang thứ Sáu.", "Bạn có thể vặn nhỏ nhạc một chút được không?", "Hôm qua tôi đã mua hai cuốn sách."};
+    if (code == "th") return {"การประชุมถูกเลื่อนไปเป็นวันศุกร์ครับ", "ช่วยเบาเสียงเพลงลงหน่อยได้ไหมครับ", "เมื่อวานผมซื้อหนังสือสองเล่มครับ"};
+    if (code == "ja") return {"会議は金曜日に延期されました。", "音楽を少し小さくしていただけますか？", "昨日、本を二冊買いました。"};
+    if (code == "zh") return {"会议推迟到星期五了。", "可以把音乐调小一点吗？", "我昨天买了两本书。"};
+    return {};
+}
+
 namespace {
 
 std::uint32_t decodeUtf8(const std::string& s, std::size_t& i) {
@@ -366,18 +379,31 @@ LlmResult LlmEngine::translate(const std::string& text, const std::string& src, 
         //    a one-shot demonstration in the right script, then the user's text.
         std::string system = buildInstruction(src, tgt, impl_->opts.systemPrompt);
         if (strict) system += " IMPORTANT: your previous answer mixed languages. Answer in " + languageName(tgt) + " only.";
-        const std::string exSrc = exampleSentence((src.empty() || src == "auto") ? "en" : src);
-        const std::string exTgt = exampleSentence(tgt);
+        // Demonstrations are complete before any pointer into them is taken below.
+        const std::string exLang = (src.empty() || src == "auto") ? "en" : src;
+        std::vector<std::pair<std::string, std::string>> shots;
+        if (exLang != tgt) {
+            if (impl_->opts.examples == LlmExamples::Single) {
+                std::string a = exampleSentence(exLang), b = exampleSentence(tgt);
+                if (!a.empty() && !b.empty()) shots.emplace_back(std::move(a), std::move(b));
+            } else if (impl_->opts.examples == LlmExamples::Diverse) {
+                const std::vector<std::string> a = exampleSet(exLang), b = exampleSet(tgt);
+                if (!a.empty() && a.size() == b.size())
+                    for (std::size_t k = 0; k < a.size(); ++k) shots.emplace_back(a[k], b[k]);
+            }
+        }
         std::vector<llama_chat_message> msgs;
         msgs.push_back({"system", system.c_str()});
-        if (!exSrc.empty() && !exTgt.empty() && exSrc != exTgt) {
-            msgs.push_back({"user", exSrc.c_str()});
-            msgs.push_back({"assistant", exTgt.c_str()});
+        std::size_t promptChars = system.size() + input.size() + 512;
+        for (const auto& shot : shots) {
+            msgs.push_back({"user", shot.first.c_str()});
+            msgs.push_back({"assistant", shot.second.c_str()});
+            promptChars += shot.first.size() + shot.second.size() + 64;
         }
         msgs.push_back({"user", input.c_str()});
         std::string prompt;
         const char* tmpl = impl_->chatTemplate.empty() ? nullptr : impl_->chatTemplate.c_str();
-        std::vector<char> buf(system.size() + input.size() + exSrc.size() + exTgt.size() + 512);
+        std::vector<char> buf(promptChars);
         int n = llama_chat_apply_template(tmpl, msgs.data(), msgs.size(), true, buf.data(), static_cast<int32_t>(buf.size()));
         if (n > static_cast<int>(buf.size())) {
             buf.resize(static_cast<std::size_t>(n) + 1);
