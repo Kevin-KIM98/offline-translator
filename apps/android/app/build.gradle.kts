@@ -9,7 +9,13 @@ val engineVersion = "0.3.7"
 val useLocalEngine = providers.gradleProperty("useLocalEngine").orNull == "true"
 val engineAar = layout.projectDirectory.file("libs/offline-translator-$engineVersion.aar").asFile
 
-// Fetches the prebuilt AAR on first build so a clone builds with no manual steps.
+// CI passes its run number and a descriptive name, so every APK it builds installs as an update
+// over the one before. Local builds default to 1 / 1.0.0.
+val appVersionCode = providers.gradleProperty("appVersionCode").orNull?.toIntOrNull() ?: 1
+val appVersionName = providers.gradleProperty("appVersionName").orNull ?: "1.0.0"
+
+// Fetches the prebuilt AAR on first build so a clone builds with no manual steps. CI places an AAR
+// built from source here first when the engine itself changed, and this task then leaves it alone.
 val downloadEngineAar by tasks.registering {
     description = "Downloads offline-translator-$engineVersion.aar from the GitHub release."
     outputs.file(engineAar)
@@ -31,12 +37,27 @@ android {
     namespace = "com.offlinetranslator.app"
     compileSdk = 35
 
+    // One signing key for every build, on any machine. Android installs an update only over an app
+    // signed with the same key; the default debug key is generated per machine, so each CI build
+    // used a new one and could only be installed after uninstalling, which also deleted the
+    // downloaded models. The password is Android's public debug default: this key identifies
+    // builds of this project, it does not protect anything, and it is not for publishing to a store.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            storeType = "pkcs12"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.offlinetranslator.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
         // The engine ships arm64-v8a; add x86_64 only when building the engine from source.
         ndk { abiFilters += if (useLocalEngine) listOf("arm64-v8a", "x86_64") else listOf("arm64-v8a") }
     }
@@ -45,12 +66,12 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Unsigned by default; CI signs with a debug key so the APK is installable.
             signingConfig = signingConfigs.getByName("debug")
         }
     }

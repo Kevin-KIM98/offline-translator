@@ -1,37 +1,95 @@
-# Builds the sample interpreter app (apps/android) against the published engine AAR and
-# uploads an installable APK.
+# Builds the Android interpreter app (apps/android) and publishes an installable APK.
 #
-#   * every push touching the app  → APK as a workflow artifact
-#   * manual run with `release_tag` → APK also attached to that GitHub release
+#   * push to any branch touching the app or the engine
+#       -> development build at one fixed address, replaced by every build:
+#          https://github.com/Kevin-KIM98/offline-translator/releases/download/dev-build/offline-interpreter-dev.apk
+#   * manual run with `release_tag`
+#       -> APK attached to that release as offline-interpreter-1.0.0.apk
+#
+# Every APK is signed with apps/android/app/debug.keystore and carries the run number as its
+# versionCode, so each one installs as an update over the last and the app keeps its models.
+# When a push changes the engine, the engine AAR is built from that commit, so an engine edit
+# reaches the phone without cutting a release first.
 name: Android app
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
     paths:
       - "apps/android/**"
+      - "platform/android/**"
+      - "src/**"
+      - "include/**"
+      - "cmake/**"
+      - "CMakeLists.txt"
+      - "scripts/fetch_third_party.*"
       - ".github/workflows/android-app.yml"
-  pull_request:
-    paths:
-      - "apps/android/**"
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag to attach the APK to (e.g. v0.3.2). Leave empty to only build."
+        description: "Release tag to attach the APK to (e.g. v0.3.7). Leave empty for a development build."
         required: false
+      engine_from_source:
+        description: "Development build: build the engine from this commit instead of using the released AAR"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+
+concurrency:
+  # A newer development build supersedes one still running; attaching to a release is never cancelled.
+  group: android-app-${{ inputs.release_tag != '' && inputs.release_tag || 'dev' }}
+  cancel-in-progress: ${{ inputs.release_tag == '' }}
 
 jobs:
   build:
     name: APK
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/android
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag }}
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Decide what to build
+        id: plan
+        run: |
+          if [ -n "$RELEASE_TAG" ]; then
+            echo "kind=release" >> "$GITHUB_OUTPUT"
+            echo "engine_source=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "kind=dev" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "engine_source=${{ inputs.engine_from_source }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The app links the released engine AAR. A change to the engine in this push would be left
+          # out of the APK without a word, so build the engine from source whenever one is present,
+          # and also when the changed files cannot be determined.
+          before="${{ github.event.before }}"
+          if [ -n "$before" ] && [ "$before" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$before^{commit}" 2>/dev/null; then
+            base="$before"
+          else
+            base=$(git merge-base origin/main HEAD 2>/dev/null || true)
+          fi
+          if [ -z "$base" ]; then
+            echo "engine_source=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "$base" HEAD)
+          echo "changed since $base:"
+          echo "$changed"
+          if echo "$changed" | grep -qE '^(src/|include/|cmake/|CMakeLists\.txt|platform/android/|scripts/fetch_third_party)'; then
+            echo "engine_source=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "engine_source=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fetch engine sources
+        if: steps.plan.outputs.engine_source == 'true'
+        run: bash scripts/fetch_third_party.sh --shallow
 
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "17" }
@@ -39,24 +97,60 @@ jobs:
       - uses: android-actions/setup-android@v3
 
       - name: Install SDK packages
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" > /dev/null
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" > /dev/null
+          if [ "${{ steps.plan.outputs.engine_source }}" = "true" ]; then
+            sdkmanager "ndk;27.2.12479018" "cmake;3.22.1" > /dev/null
+          fi
 
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"   # for platform/android, which has no wrapper; apps/android uses its own
 
-      - name: Build debug APK
-        run: ./gradlew --no-daemon assembleDebug
-
-      - name: Build release APK
-        run: ./gradlew --no-daemon assembleRelease
-
-      - name: Name the artifacts
-        id: apk
+      - name: Build the engine AAR from this commit
+        if: steps.plan.outputs.engine_source == 'true'
+        working-directory: platform/android
         run: |
-          version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          # Same command as the Release workflow: an optimised Release build. A debug build of the
+          # native code would make speech recognition and the LLM far too slow to judge on a phone.
+          gradle --no-daemon assembleRelease
+          version=$(grep -oP 'val engineVersion = "\K[^"]+' "$GITHUB_WORKSPACE/apps/android/app/build.gradle.kts")
+          mkdir -p "$GITHUB_WORKSPACE/apps/android/app/libs"
+          cp build/outputs/aar/offline-translator-release.aar \
+            "$GITHUB_WORKSPACE/apps/android/app/libs/offline-translator-$version.aar"
+          ls -l "$GITHUB_WORKSPACE/apps/android/app/libs"
+
+      - name: Build the APK
+        working-directory: apps/android
+        run: |
+          if [ "${{ steps.plan.outputs.kind }}" = "release" ]; then
+            name="1.0.0"
+          else
+            name="1.0.0-dev.${{ github.run_number }}+${GITHUB_SHA::7}"
+          fi
+          echo "APP_VERSION_NAME=$name" >> "$GITHUB_ENV"
+          ./gradlew --no-daemon assembleDebug \
+            -PappVersionCode=${{ github.run_number }} -PappVersionName="$name"
+
+      - name: Build the minified release variant (lint and shrinking check)
+        if: github.ref == 'refs/heads/main' || steps.plan.outputs.kind == 'release'
+        working-directory: apps/android
+        run: |
+          ./gradlew --no-daemon assembleRelease \
+            -PappVersionCode=${{ github.run_number }} -PappVersionName="$APP_VERSION_NAME"
+
+      - name: Name the APKs
+        working-directory: apps/android
+        run: |
           mkdir -p out
-          cp app/build/outputs/apk/debug/app-debug.apk "out/offline-interpreter-$version.apk"
-          cp app/build/outputs/apk/release/app-release.apk "out/offline-interpreter-$version-release.apk"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "${{ steps.plan.outputs.kind }}" = "release" ]; then
+            cp app/build/outputs/apk/debug/app-debug.apk out/offline-interpreter-1.0.0.apk
+          else
+            cp app/build/outputs/apk/debug/app-debug.apk out/offline-interpreter-dev.apk
+          fi
+          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            cp app/build/outputs/apk/release/app-release.apk out/offline-interpreter-minified.apk
+          fi
           ls -l out
 
       - uses: actions/upload-artifact@v4
@@ -65,10 +159,44 @@ jobs:
           path: apps/android/out/*.apk
           if-no-files-found: error
 
-      - name: Attach to release
-        if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+      - name: Publish the development build
+        if: steps.plan.outputs.kind == 'dev'
+        working-directory: apps/android
         env:
           GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
         run: |
-          gh release upload "${{ inputs.release_tag }}" \
-            "out/offline-interpreter-${{ steps.apk.outputs.version }}.apk" --clobber
+          short="${GITHUB_SHA::7}"
+          subject=$(git log -1 --format=%s)
+          if [ "${{ steps.plan.outputs.engine_source }}" = "true" ]; then
+            engine="built from this commit"
+          else
+            engine="released v$(grep -oP 'val engineVersion = "\K[^"]+' app/build.gradle.kts)"
+          fi
+          title="Development build ${{ github.run_number }} - $BRANCH $short"
+          cat > notes.md <<EOF
+          Installable build of branch $BRANCH at commit $short: $subject
+
+          Open this on the phone and install. It updates the app already installed and keeps the downloaded models:
+          https://github.com/Kevin-KIM98/offline-translator/releases/download/dev-build/offline-interpreter-dev.apk
+
+          - version: $APP_VERSION_NAME, versionCode ${{ github.run_number }}
+          - engine: $engine
+          - built: $(date -u +'%Y-%m-%d %H:%M UTC')
+
+          Every build replaces this one. Builds from before the project signing key cannot be updated in place: uninstall that app once first.
+          EOF
+          git tag -f dev-build "$GITHUB_SHA"
+          git push -f origin refs/tags/dev-build
+          if ! gh release view dev-build > /dev/null 2>&1; then
+            gh release create dev-build --prerelease --title "$title" --notes-file notes.md
+          fi
+          gh release upload dev-build out/offline-interpreter-dev.apk --clobber
+          gh release edit dev-build --prerelease --title "$title" --notes-file notes.md
+
+      - name: Attach to the release
+        if: steps.plan.outputs.kind == 'release'
+        working-directory: apps/android
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$RELEASE_TAG" out/offline-interpreter-1.0.0.apk --clobber
