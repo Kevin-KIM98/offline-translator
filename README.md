@@ -32,6 +32,12 @@ for an arm64 Android 8+ device, or build either app from source:
 cd apps/android && ./gradlew assembleDebug          # no NDK needed
 ```
 
+The newest build of any branch is always at
+[offline-interpreter-dev.apk](https://github.com/Kevin-KIM98/offline-translator/releases/download/dev-build/offline-interpreter-dev.apk).
+From development build 14 on, every APK is signed with the same project key and numbered higher
+than the one before, so it installs as an update and keeps the downloaded models. An app installed
+from an earlier build has to be uninstalled once before the first of these.
+
 See [apps/android](apps/android/README.md) and [apps/ios](apps/ios/README.md).
 
 ## Test on a desktop first
