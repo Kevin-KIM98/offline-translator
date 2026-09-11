@@ -9,7 +9,7 @@ import com.offlinetranslator.ModelStatus
  */
 fun modelTitle(context: Context, m: ModelStatus): String = when (m.kind) {
     "stt" -> context.getString(R.string.model_stt)
-    "llm" -> context.getString(R.string.model_llm)
+    "llm" -> m.label.ifBlank { context.getString(R.string.model_llm) }
     "nmt" -> {
         val parts = m.pair.split("-")
         if (parts.size == 2) {

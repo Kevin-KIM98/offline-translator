@@ -62,7 +62,20 @@ never used to choose a configuration. The sets and the harness are in `tests/eva
 On the held-out set the English route's chrF did not improve, because of word choice ("lobby"
 rendered as "communication room"), while the sentences it got right still rose from 6 to 7 of 10.
 Most of its remaining errors are made by the Marian Korean→English step. The 3B model is the larger
-gain but doubles the download and the LLM time.
+gain but doubles the download and the LLM time, so it is offered as a choice rather than the default.
+
+**Offering several LLMs.** The manifest's `llm` object is the default; `llm_options` is an array of
+further entries of the same shape, and every entry may carry a human-facing `label`. Old readers
+ignore both additions. Only one LLM is used at a time: `ModelManager::statusForLanguages(langs,
+deep, llmMode, llmId)` lists the selected one (empty or unknown id: the default), and
+`llmModelPath(llmId)` gives its path. The C ABI adds `tr_mm_status_for_languages_llm_json` and
+`tr_mm_llm_model_path_for`; Kotlin adds `llmId` to `statusForLanguages`, `pipelineConfig` and
+`TranslatorSession.prepare`, plus `ModelRepository.llmOptions()`. The app shows the choice under
+Settings → Translation LLM and downloads the model when the chosen languages need one; the
+shipped manifest offers Qwen2.5 1.5B (default) and Qwen2.5 3B. On the desktop:
+`translator_cli status|translate --llm-id qwen2.5-3b-instruct-q4_k_m`, and
+`scripts/fetch_models.py --llm-id ...`. `prepare_models.py manifest` writes the first GGUF (by
+name) as `llm` and the rest as `llm_options`.
 
 Run through the pipeline's own Auto route rather than as two separate passes, the scores are
 identical and every sentence takes `ko-en → llm`. The extra Marian hop raises the median time per

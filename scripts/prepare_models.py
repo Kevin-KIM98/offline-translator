@@ -24,6 +24,7 @@ you can override any source with --hf-model PAIR=repo (e.g. --hf-model ja-ko=Hel
 import argparse
 import hashlib
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -46,6 +47,15 @@ DEFAULT_HF = {
     "es-en": "Helsinki-NLP/opus-mt-es-en",
     "en-es": "Helsinki-NLP/opus-mt-en-es",
 }
+
+
+def llm_label(stem: str) -> str:
+    """'qwen2.5-3b-instruct-q4_k_m' -> 'Qwen2.5 3B'; anything unrecognised keeps its stem."""
+    m = re.match(r"([a-z]+)([\d.]*)-(\d+(?:\.\d+)?)b", stem, re.I)
+    if not m:
+        return stem
+    family, gen, size = m.groups()
+    return f"{family.capitalize()}{gen} {size}B"
 
 
 def sha256_of(path: Path) -> str:
@@ -157,18 +167,24 @@ def cmd_manifest(a: argparse.Namespace) -> None:
         print(f"stt: {f.name} ({f.stat().st_size / 1e6:.0f} MB)")
 
     llm_dir = root / "llm"
+    # Sorted by name: the first GGUF is the default ("llm"), the rest are offered as "llm_options".
     llm_files = sorted(llm_dir.glob(a.llm_glob)) if llm_dir.exists() else []
-    if llm_files:
-        f = llm_files[0]
-        manifest["llm"] = {
+    llm_entries = []
+    for f in llm_files:
+        llm_entries.append({
             "id": f.stem,
+            "label": llm_label(f.stem),
             "version": a.model_version,
             "filename": f.name,
             "size_bytes": f.stat().st_size,
             "sha256": sha256_of(f),
             "download_url": url("llm", "", f.name),
-        }
-        print(f"llm: {f.name} ({f.stat().st_size / 1e6:.0f} MB)")
+        })
+        print(f"llm: {f.name} ({f.stat().st_size / 1e6:.0f} MB) label={llm_entries[-1]['label']}")
+    if llm_entries:
+        manifest["llm"] = llm_entries[0]
+        if len(llm_entries) > 1:
+            manifest["llm_options"] = llm_entries[1:]
 
     nmt_root = root / "nmt"
     tok = nmt_root / "tokenizer"
@@ -234,8 +250,7 @@ def cmd_manifest(a: argparse.Namespace) -> None:
             f = stt_files[0]
             lines.append(f"up \"{f.as_posix()}\" \"{flat_name('stt', '', f.name)}\"")
             count += 1
-        if llm_files:
-            f = llm_files[0]
+        for f in llm_files:
             lines.append(f"up \"{f.as_posix()}\" \"{flat_name('llm', '', f.name)}\"")
             count += 1
         for entry in nmt:

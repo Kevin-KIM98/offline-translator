@@ -68,6 +68,11 @@ both requested were returned, so `"ko,ja"` came back with speech recognition alo
 includes the manifest's `llm` entry only when some requested direction has no Marian route,
 1 always, 2 never. `tr_mm_llm_model_path(m)` gives the install path.
 
+A manifest may offer several LLMs: `llm` (the default) plus an `llm_options` array, each with a
+`label` that status JSON passes through. `tr_mm_status_for_languages_llm_json(m, langs, deep,
+llm_mode, llm_id)` and `tr_mm_llm_model_path_for(m, llm_id)` select one; `""` or an unknown id
+means the default, and only the selected LLM appears in the list. (0.3.8)
+
 ### Streaming (microphone)
 
 ```

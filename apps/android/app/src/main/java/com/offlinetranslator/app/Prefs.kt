@@ -28,6 +28,11 @@ class Prefs(context: Context) {
             .getOrDefault(TranslationBackend.AUTO)
         set(v) = sp.edit().putString("backend", v.name).apply()
 
+    /** Manifest id of the LLM to use; null means the manifest's default. */
+    var llmId: String?
+        get() = sp.getString("llmId", null)
+        set(v) = sp.edit().putString("llmId", v).apply()
+
     /** True once the user has finished the first-run download at least once. */
     var setupDone: Boolean
         get() = sp.getBoolean("setupDone", false)

@@ -76,6 +76,11 @@
     <string name="backend_auto_desc">Uses the dedicated model for a language pair when one exists, and the LLM otherwise. Fastest.</string>
     <string name="backend_marian_desc">Dedicated translation models only. Directions without one, such as anything into Thai, will not translate.</string>
     <string name="backend_llm_desc">Translates every direction with a single LLM. Slower, but it detects the spoken language itself. Needs 1.1 GB.</string>
+    <string name="settings_llm">Translation LLM</string>
+    <string name="settings_llm_desc">Used for directions without a dedicated model, such as into Thai. The larger model translates noticeably better and about twice as slowly, and needs a phone with 6 GB of memory or more. A model that is not installed is downloaded when the chosen languages need one.</string>
+    <string name="llm_installed">installed</string>
+    <string name="llm_not_installed">not installed</string>
+    <string name="settings_llm_memory_warning">This phone has %1$s of memory. The larger model may fail to load or make the phone slow.</string>
     <string name="settings_installed">Installed models</string>
     <string name="settings_none_installed">No models installed yet.</string>
     <string name="delete">Delete</string>

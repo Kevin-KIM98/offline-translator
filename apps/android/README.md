@@ -63,7 +63,7 @@ Requirements: Android 8.0 (API 26) or newer, arm64 device. Android Studio opens 
 | conversation | one talk button per speaker, held down while speaking; the transcript shows the original quietly and the translation large, with the route and latency, and every line can be replayed |
 | hands-free | keeps the microphone open and routes each utterance by the language whisper detected, so both people can just talk |
 | keyboard | type a sentence instead of speaking it |
-| settings | languages, speak-aloud and speed, translation backend, installed models with sizes and delete, engine build info |
+| settings | languages, speak-aloud and speed, translation backend, which LLM to use (Qwen2.5 1.5B or 3B, downloaded when the languages need one), installed models with sizes and delete, engine build info |
 
 The interface is English by default and Korean on a Korean device; language names in the
 picker always appear in their own script.

@@ -1,5 +1,7 @@
 package com.offlinetranslator.app.ui
 
+import android.app.ActivityManager
+import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +26,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -141,6 +144,55 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
                 }
             }
 
+            if (state.llmOptions.size > 1) {
+                Spacer(Modifier.height(20.dp))
+                SectionLabel(stringResource(R.string.settings_llm))
+                Card {
+                    val selectedId = state.llmId ?: state.llmOptions.first().id
+                    state.llmOptions.forEachIndexed { i, m ->
+                        // The first entry is the manifest's default; storing null for it keeps the
+                        // choice following the manifest if the default ever changes.
+                        val choice = if (i == 0) null else m.id
+                        if (i > 0) Divider()
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { vm.setLlm(choice) }
+                                .padding(start = 16.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(m.label.ifBlank { m.id }, style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    mb(m.totalBytes) + " · " + stringResource(
+                                        if (m.state == ModelState.READY) R.string.llm_installed else R.string.llm_not_installed
+                                    ),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            RadioButton(selected = m.id == selectedId, onClick = { vm.setLlm(choice) })
+                        }
+                    }
+                    Divider()
+                    Text(
+                        stringResource(R.string.settings_llm_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                    val totalMem = remember { totalMemoryBytes(context) }
+                    if (totalMem in 1 until 6_000_000_000L) {
+                        Text(
+                            stringResource(R.string.settings_llm_memory_warning, String.format("%.1f GB", totalMem / 1e9)),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                        )
+                    }
+                }
+            }
+
             Spacer(Modifier.height(20.dp))
             SectionLabel(stringResource(R.string.settings_installed))
             Card {
@@ -226,6 +278,13 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
             onDismiss = { picking = null },
         )
     }
+}
+
+private fun totalMemoryBytes(context: Context): Long {
+    val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return 0L
+    val info = ActivityManager.MemoryInfo()
+    am.getMemoryInfo(info)
+    return info.totalMem
 }
 
 @Composable

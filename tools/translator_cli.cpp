@@ -84,12 +84,12 @@ void usage() {
     std::fputs(
         "translator_cli <command> [options]\n"
         "  status     --models <dir> [--manifest <file>] [--deep]\n"
-        "             [--langs ko,en] [--llm if-needed|always|never]  only what those languages need\n"
+        "             [--langs ko,en] [--llm if-needed|always|never] [--llm-id <id>]  only what those languages need\n"
         "  verify     --file <path> --sha256 <hex> [--size N]\n"
         "  install    --models <dir> --id <model-id> --staged <path> [--no-verify]\n"
         "  sha256     <file>\n"
         "  transcribe --models <dir> --wav <file> [--lang auto] [--threads N]\n"
-        "  translate  --models <dir> --text \"...\" --src ko --tgt en [--llm <gguf>] [--backend auto|marian|llm]\n"
+        "  translate  --models <dir> --text \"...\" --src ko --tgt en [--llm <gguf> | --llm-id <id>] [--backend auto|marian|llm]\n"
         "             [--llm-examples none|single|diverse] [--no-llm-pivot] [--lines]  --lines: one sentence per stdin line\n"
         "  speech     --models <dir> --wav <file> [--src auto] --tgt en [--stream] [--no-denoise]\n"
         "  listen     --models <dir> [--src auto] --tgt en [--device N] [--seconds N] [--list-devices]\n"
@@ -254,7 +254,7 @@ int cmdStatus(const Args& a) {
     j.set("models_root", a.get("models"));
     Json arr = Json::array();
     std::uint64_t pending = 0;
-    for (const auto& st : mm.statusForLanguages(splitCsv(a.get("langs")), deep, llmMode)) {
+    for (const auto& st : mm.statusForLanguages(splitCsv(a.get("langs")), deep, llmMode, a.get("llm-id", ""))) {
         if (st.needsDownload()) pending += st.entry.totalBytes();
         arr.push_back(st.toJson());
     }
@@ -330,7 +330,7 @@ bool makePipeline(const Args& a, TranslationPipeline& p, bool needWhisper) {
     if (a.has("no-default-prompt")) cfg.useDefaultPrompts = false;
     if (a.has("prompt")) cfg.initialPrompt = a.get("prompt");
     if (a.has("llm")) cfg.llmModelPath = a.get("llm");
-    else if (loadManager(a, mm)) cfg.llmModelPath = mm.llmModelPath();
+    else if (loadManager(a, mm)) cfg.llmModelPath = mm.llmModelPath(a.get("llm-id", ""));
     if (!cfg.llmModelPath.empty() && !fs::isFile(cfg.llmModelPath)) cfg.llmModelPath.clear();
     const std::string backend = a.get("backend", "auto");
     cfg.backend = backend == "llm" ? TranslationBackend::Llm : backend == "marian" ? TranslationBackend::Marian : TranslationBackend::Auto;

@@ -105,6 +105,7 @@ Json ModelStatus::toJson() const {
     j.set("id", entry.id);
     j.set("kind", ModelEntry::kindName(entry.kind));
     j.set("pair", entry.pair);
+    j.set("label", entry.label);
     j.set("version", entry.version);
     j.set("state", modelStateName(state));
     j.set("needs_download", needsDownload());
@@ -149,10 +150,28 @@ std::string ModelManager::sttModelPath() const {
 
 std::string ModelManager::llmDir() const { return fs::join(modelsRoot_, "llm"); }
 
-std::string ModelManager::llmModelPath() const {
+std::vector<const ModelEntry*> ModelManager::llmEntries() const {
+    std::vector<const ModelEntry*> out;
     for (const auto& e : entries_)
-        if (e.kind == ModelEntry::Kind::Llm) return e.installPath;
-    return {};
+        if (e.kind == ModelEntry::Kind::Llm) out.push_back(&e);
+    return out;
+}
+
+const ModelEntry* ModelManager::llmEntry(const std::string& llmId) const {
+    const ModelEntry* first = nullptr;
+    for (const auto& e : entries_) {
+        if (e.kind != ModelEntry::Kind::Llm) continue;
+        if (e.id == llmId) return &e;
+        if (!first) first = &e;
+    }
+    // An unknown id (a choice saved before the manifest dropped that model) falls back to the
+    // default rather than leaving the app without an LLM.
+    return first;
+}
+
+std::string ModelManager::llmModelPath(const std::string& llmId) const {
+    const ModelEntry* e = llmEntry(llmId);
+    return e ? e->installPath : std::string();
 }
 
 const ModelEntry* ModelManager::find(const std::string& id) const {
@@ -259,21 +278,28 @@ bool ModelManager::loadManifest(const Json& manifest, std::string* error) {
         entries.push_back(std::move(e));
     }
 
-    // ---- LLM (optional, single GGUF file) ----
-    const Json& llm = manifest["llm"];
-    if (llm.isObject()) {
+    // ---- LLM: "llm" is the default; "llm_options" lists further choices (one GGUF each) ----
+    auto parseLlm = [&](const Json& node) -> bool {
         ModelEntry e;
         e.kind = ModelEntry::Kind::Llm;
-        e.id = llm.getString("id", "llm");
-        e.version = llm.getString("version", "1");
+        e.id = node.getString("id", "llm");
+        e.version = node.getString("version", "1");
+        e.label = node.getString("label");
         DownloadItem d;
-        if (!parseFileItem(llm, resolveUrl("llm"), d, error)) return false;
+        if (!parseFileItem(node, resolveUrl("llm"), d, error)) return false;
         d.isArchive = false;
         e.downloads.push_back(d);
         e.installPath = fs::join(llmDir(), d.filename);
         e.requiredFiles = {d.filename};
         entries.push_back(std::move(e));
-    }
+        return true;
+    };
+    const Json& llm = manifest["llm"];
+    if (llm.isObject() && !parseLlm(llm)) return false;
+    const Json& llmOptions = manifest["llm_options"];
+    if (llmOptions.isArray())
+        for (const auto& node : llmOptions.asArray())
+            if (node.isObject() && !parseLlm(node)) return false;
 
     // ---- Shared tokenizer (optional) ----
     const Json& tok = manifest["tokenizer"];
@@ -489,8 +515,9 @@ Json ModelManager::statusJson(bool deepVerify) const {
 }
 
 std::vector<ModelStatus> ModelManager::statusForLanguages(const std::vector<std::string>& langs, bool deepVerify,
-                                                          LlmMode llmMode) const {
+                                                          LlmMode llmMode, const std::string& llmId) const {
     std::vector<ModelStatus> out;
+    const ModelEntry* selectedLlm = llmEntry(llmId);
     // Which Marian pairs exist in the manifest (for the "is the LLM needed" decision).
     std::vector<std::string> pairs;
     for (const auto& e : entries_)
@@ -526,7 +553,9 @@ std::vector<ModelStatus> ModelManager::statusForLanguages(const std::vector<std:
         if (e.kind == ModelEntry::Kind::Nmt) {
             wanted = std::find(wantedPairs.begin(), wantedPairs.end(), e.pair) != wantedPairs.end();
         } else if (e.kind == ModelEntry::Kind::Llm) {
-            wanted = llmMode == LlmMode::Always || (llmMode == LlmMode::IfNeeded && llmNeeded);
+            // One LLM at a time: the selected one, or the default.
+            const bool selected = selectedLlm != nullptr && &e == selectedLlm;
+            wanted = selected && (llmMode == LlmMode::Always || (llmMode == LlmMode::IfNeeded && llmNeeded));
         }
         if (wanted) out.push_back(statusOf(e, deepVerify));
     }

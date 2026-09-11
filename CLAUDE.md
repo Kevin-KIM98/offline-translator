@@ -77,6 +77,10 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
 - **Noise.** Recognition needs about 20 dB over the background; below +5 dB whisper invents text.
 - **LLM.** Never bias control or end-of-generation tokens in the sampler; generation runs away.
   Small Qwen models drift into Chinese for Thai or Korean targets without the script guard.
+- **Several LLMs.** The manifest's `llm` is the default and `llm_options` adds choices (each with a
+  `label`); old readers ignore the extras, so never turn `llm` into an array. One LLM is selected at
+  a time by id (`llmId` in Kotlin, `--llm-id` in the CLI); Settings → Translation LLM in the app.
+  The 3B model is hosted on `models-v1` as `llm_qwen2.5-3b-instruct-q4_k_m.gguf`.
 - **Thai.** Only the LLM translates into Thai. The default hands it Marian's English and three
   diverse demonstrations: 26 of 40 test sentences correct against 17 before; Qwen2.5-3B reaches 31.
   Judge a change by reading the output with `python tests/eval/run_th_eval.py`; chrF alone misled.

@@ -59,6 +59,8 @@ object NativeBridge {
     /** llmMode: 0 include the LLM only when a requested direction has no Marian route, 1 always, 2 never */
     external fun mmStatusForLanguagesJson(handle: Long, langsCsv: String, deepVerify: Boolean, llmMode: Int): String
     external fun mmLlmModelPath(handle: Long): String
+    external fun mmStatusForLanguagesLlmJson(handle: Long, langsCsv: String, deepVerify: Boolean, llmMode: Int, llmId: String): String
+    external fun mmLlmModelPathFor(handle: Long, llmId: String): String
     external fun mmStagingDir(handle: Long, id: String): String
     external fun mmClearStaging(handle: Long, id: String?): Boolean
     /** 1 ok, 0 mismatch, -1 io error, -2 aborted */

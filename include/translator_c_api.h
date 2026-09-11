@@ -152,6 +152,12 @@ TR_API char* tr_mm_status_json(tr_model_manager* m, int deep_verify);
              1 = always include the LLM, 2 = never. */
 TR_API char* tr_mm_status_for_languages_json(tr_model_manager* m, const char* langs_csv, int deep_verify, int llm_mode);
 TR_API char* tr_mm_llm_model_path(tr_model_manager* m);   /* "" when the manifest has no llm entry */
+/* A manifest may offer several LLMs: "llm" (the default) plus "llm_options"; every status entry
+   of kind "llm" carries a human-facing "label". llm_id picks one; "" or an unknown id means the
+   default. The two functions above are the same with llm_id = "". (0.3.8) */
+TR_API char* tr_mm_status_for_languages_llm_json(tr_model_manager* m, const char* langs_csv, int deep_verify,
+                                                 int llm_mode, const char* llm_id);
+TR_API char* tr_mm_llm_model_path_for(tr_model_manager* m, const char* llm_id);
 
 /* Download staging directory for a model id (created). Caller must tr_string_free(). */
 TR_API char* tr_mm_staging_dir(tr_model_manager* m, const char* id);

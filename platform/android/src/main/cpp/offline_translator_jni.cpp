@@ -257,6 +257,17 @@ JNI_FN(jstring, mmStatusForLanguagesJson)(JNIEnv* env, jobject, jlong h, jstring
 
 JNI_FN(jstring, mmLlmModelPath)(JNIEnv* env, jobject, jlong h) { return takeString(env, tr_mm_llm_model_path(M(h))); }
 
+JNI_FN(jstring, mmStatusForLanguagesLlmJson)(JNIEnv* env, jobject, jlong h, jstring langs, jboolean deep, jint llmMode, jstring llmId) {
+    OptString l(env, langs);
+    OptString i(env, llmId);
+    return takeString(env, tr_mm_status_for_languages_llm_json(M(h), l.c_str(), deep ? 1 : 0, llmMode, i.c_str()));
+}
+
+JNI_FN(jstring, mmLlmModelPathFor)(JNIEnv* env, jobject, jlong h, jstring llmId) {
+    OptString i(env, llmId);
+    return takeString(env, tr_mm_llm_model_path_for(M(h), i.c_str()));
+}
+
 JNI_FN(jstring, mmStagingDir)(JNIEnv* env, jobject, jlong h, jstring id) {
     OptString i(env, id);
     return takeString(env, tr_mm_staging_dir(M(h), i.c_str()));

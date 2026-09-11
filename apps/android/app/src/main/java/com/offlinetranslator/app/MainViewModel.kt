@@ -72,6 +72,9 @@ data class UiState(
     val backend: TranslationBackend = TranslationBackend.AUTO,
     val message: String? = null,
     val installed: List<ModelStatus> = emptyList(),
+    /** Chosen LLM id, null for the manifest's default; every LLM the manifest offers. */
+    val llmId: String? = null,
+    val llmOptions: List<ModelStatus> = emptyList(),
 ) {
     val langs: List<String> get() = listOf(langA, langB)
 }
@@ -86,6 +89,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             speak = prefs.speak,
             speechRate = prefs.speechRate,
             backend = prefs.backend,
+            llmId = prefs.llmId,
         )
     )
     val state: StateFlow<UiState> = _state.asStateFlow()
@@ -113,11 +117,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     val repository = repo ?: ModelRepository(getApplication<Application>()).also { repo = it }
                     repository.refreshManifest()
                     if (!repository.hasManifest()) error(str(R.string.err_no_manifest))
-                    repository.statusForLanguages(_state.value.langs, llmMode = llmMode())
+                    repository.statusForLanguages(_state.value.langs, llmMode = llmMode(), llmId = _state.value.llmId)
                 }
             }
             r.onFailure { e -> _state.update { it.copy(phase = Phase.Fatal(e.message ?: str(R.string.err_init))) } }
             r.onSuccess { status ->
+                refreshInstalled()
                 val pending = status.filter { it.needsDownload }
                 if (pending.isEmpty()) openSession() else _state.update { it.copy(phase = Phase.Setup(pending)) }
             }
@@ -174,7 +179,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         downloadJob?.cancel()
         viewModelScope.launch {
             val pending = withContext(Dispatchers.IO) {
-                runCatching { repo?.statusForLanguages(_state.value.langs, llmMode = llmMode())?.filter { it.needsDownload } }
+                runCatching { repo?.statusForLanguages(_state.value.langs, llmMode = llmMode(), llmId = _state.value.llmId)?.filter { it.needsDownload } }
                     .getOrNull()
             } ?: emptyList()
             _state.update {
@@ -193,7 +198,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val built = runCatching {
                 withContext(Dispatchers.Default) {
                     val repository = repo ?: error("model repository closed")
-                    val config = repository.pipelineConfig(backend = _state.value.backend)
+                    val config = repository.pipelineConfig(backend = _state.value.backend, llmId = _state.value.llmId)
                     // The app drives TTS itself so a line can be replayed and muted mid-sentence.
                     TranslatorSession(getApplication<Application>(), config, speakResults = false)
                 }
@@ -398,6 +403,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         boot()
     }
 
+    /** Switches the LLM. One that is not installed yet goes through the normal download screen. */
+    fun setLlm(id: String?) {
+        if (id == _state.value.llmId) return
+        prefs.llmId = id
+        pauseMic()
+        _state.update { it.copy(llmId = id) }
+        boot()
+    }
+
     fun clearConversation() {
         stopSpeaking()
         _state.update { it.copy(turns = emptyList()) }
@@ -410,7 +424,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun refreshInstalled() {
         viewModelScope.launch {
             val list = withContext(Dispatchers.IO) { runCatching { repo?.status() }.getOrNull() } ?: return@launch
-            _state.update { it.copy(installed = list) }
+            _state.update { it.copy(installed = list, llmOptions = list.filter { m -> m.kind == "llm" }) }
         }
     }
 

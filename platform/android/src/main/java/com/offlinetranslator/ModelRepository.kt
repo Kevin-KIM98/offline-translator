@@ -33,6 +33,8 @@ data class ModelStatus(
     val id: String,
     val kind: String,
     val pair: String,
+    /** Human-facing name from the manifest, e.g. "Qwen2.5 3B" (LLM entries). */
+    val label: String,
     val version: String,
     val state: ModelState,
     val detail: String,
@@ -49,6 +51,7 @@ data class ModelStatus(
                 id = o.getString("id"),
                 kind = o.optString("kind"),
                 pair = o.optString("pair"),
+                label = o.optString("label"),
                 version = o.optString("version"),
                 state = ModelState.parse(o.optString("state")),
                 detail = o.optString("detail"),
@@ -109,8 +112,18 @@ class ModelRepository(
     /** Path the manifest's LLM installs to (may not exist yet); empty when the manifest has no LLM. */
     val llmModelPath: String get() = NativeBridge.mmLlmModelPath(h())
 
-    fun pipelineConfig(nThreads: Int? = null, backend: TranslationBackend = TranslationBackend.AUTO): PipelineConfig {
-        val llm = llmModelPath.takeIf { it.isNotEmpty() && File(it).isFile }
+    /** Install path of the LLM `llmId` names; of the manifest's default when null or unknown. */
+    fun llmModelPath(llmId: String?): String = NativeBridge.mmLlmModelPathFor(h(), llmId ?: "")
+
+    /** Every LLM the manifest offers, default first. `label` names it, `state` says whether it is installed. */
+    fun llmOptions(): List<ModelStatus> = status().filter { it.kind == "llm" }
+
+    fun pipelineConfig(
+        nThreads: Int? = null,
+        backend: TranslationBackend = TranslationBackend.AUTO,
+        llmId: String? = null,
+    ): PipelineConfig {
+        val llm = llmModelPath(llmId).takeIf { it.isNotEmpty() && File(it).isFile }
         return PipelineConfig(
             whisperModelPath = sttModelPath.ifEmpty { null },
             nmtRootDir = nmtRootDir,
@@ -143,8 +156,14 @@ class ModelRepository(
     /** deepVerify re-hashes installed files — call from Dispatchers.IO. */
     fun status(deepVerify: Boolean = false): List<ModelStatus> = parseStatus(NativeBridge.mmStatusJson(h(), deepVerify))
 
-    fun statusForLanguages(langs: Collection<String>, deepVerify: Boolean = false, llmMode: LlmMode = LlmMode.IF_NEEDED): List<ModelStatus> =
-        parseStatus(NativeBridge.mmStatusForLanguagesJson(h(), langs.joinToString(","), deepVerify, llmMode.native))
+    /** Models the given languages need. `llmId` picks which LLM counts; null means the manifest's default. */
+    fun statusForLanguages(
+        langs: Collection<String>,
+        deepVerify: Boolean = false,
+        llmMode: LlmMode = LlmMode.IF_NEEDED,
+        llmId: String? = null,
+    ): List<ModelStatus> =
+        parseStatus(NativeBridge.mmStatusForLanguagesLlmJson(h(), langs.joinToString(","), deepVerify, llmMode.native, llmId ?: ""))
 
     private fun parseStatus(json: String): List<ModelStatus> {
         val arr = JSONObject(json).optJSONArray("models") ?: return emptyList()

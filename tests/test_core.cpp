@@ -561,12 +561,24 @@ void testModelManager() {
         llm.set("sha256", Sha256::hashString("llm"));
         llm.set("download_url", "llm/llm-route-test.gguf");
         m.set("llm", llm);
+        Json big = Json::object();
+        big.set("id", "llm-big-test");
+        big.set("label", "Big");
+        big.set("version", "1");
+        big.set("filename", "llm-big-test.gguf");
+        big.set("size_bytes", 20);
+        big.set("sha256", Sha256::hashString("big"));
+        big.set("download_url", "llm/llm-big-test.gguf");
+        Json options = Json::array();
+        options.push_back(big);
+        m.set("llm_options", options);
 
         ModelManager routes(fs::join(root, "routes"));
         CHECK(routes.loadManifestJson(m.dump(), &err));
-        auto ids = [&](const std::vector<std::string>& langs) {
+        auto ids = [&](const std::vector<std::string>& langs, const std::string& llmId = "") {
             std::vector<std::string> out;
-            for (const auto& st : routes.statusForLanguages(langs)) out.push_back(st.entry.id);
+            for (const auto& st : routes.statusForLanguages(langs, false, ModelManager::LlmMode::IfNeeded, llmId))
+                out.push_back(st.entry.id);
             return out;
         };
         auto has = [](const std::vector<std::string>& v, const std::string& id) {
@@ -591,6 +603,19 @@ void testModelManager() {
         const auto koEn = ids({"ko", "en"});
         CHECK_EQ(koEn.size(), std::size_t(3));   // speech + ko-en + en-ko
         CHECK(!has(koEn, "llm-route-test"));
+
+        // Several LLMs: "llm" is the default, "llm_options" add choices, one is used at a time.
+        CHECK_EQ(routes.llmEntries().size(), std::size_t(2));
+        CHECK_EQ(routes.llmModelPath(), fs::join(routes.llmDir(), "llm-route-test.gguf"));
+        CHECK_EQ(routes.llmModelPath("llm-big-test"), fs::join(routes.llmDir(), "llm-big-test.gguf"));
+        CHECK_EQ(routes.llmModelPath("no-such-llm"), routes.llmModelPath());   // unknown id: the default
+        CHECK(!has(koTh, "llm-big-test"));
+        const auto koThBig = ids({"ko", "th"}, "llm-big-test");
+        CHECK(has(koThBig, "llm-big-test"));
+        CHECK(!has(koThBig, "llm-route-test"));
+        CHECK(has(koThBig, "nmt-ko-en"));
+        CHECK_EQ(routes.statusOf(*routes.find("llm-big-test")).toJson().getString("label"), "Big");
+        CHECK_EQ(routes.statusOf(*routes.find("llm-route-test")).toJson().getString("label"), "");
     }
 
     // Cache + reload.

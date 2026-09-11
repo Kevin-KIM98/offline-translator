@@ -367,6 +367,11 @@ TR_API char* tr_mm_status_json(tr_model_manager* m, int deep_verify) {
 }
 
 TR_API char* tr_mm_status_for_languages_json(tr_model_manager* m, const char* langs_csv, int deep_verify, int llm_mode) {
+    return tr_mm_status_for_languages_llm_json(m, langs_csv, deep_verify, llm_mode, "");
+}
+
+TR_API char* tr_mm_status_for_languages_llm_json(tr_model_manager* m, const char* langs_csv, int deep_verify,
+                                                 int llm_mode, const char* llm_id) {
     if (!m) return dupString("{\"models\":[]}");
     std::lock_guard<std::mutex> lock(m->mutex);
     Json j = Json::object();
@@ -375,7 +380,7 @@ TR_API char* tr_mm_status_for_languages_json(tr_model_manager* m, const char* la
     Json arr = Json::array();
     std::uint64_t pendingBytes = 0;
     const auto mode = llm_mode == 1 ? ModelManager::LlmMode::Always : llm_mode == 2 ? ModelManager::LlmMode::Never : ModelManager::LlmMode::IfNeeded;
-    for (const auto& s : m->impl.statusForLanguages(splitCsv(safe(langs_csv)), deep_verify != 0, mode)) {
+    for (const auto& s : m->impl.statusForLanguages(splitCsv(safe(langs_csv)), deep_verify != 0, mode, safe(llm_id))) {
         if (s.needsDownload()) pendingBytes += s.entry.totalBytes();
         arr.push_back(s.toJson());
     }
@@ -430,9 +435,13 @@ TR_API char* tr_mm_stt_model_path(tr_model_manager* m) {
 }
 
 TR_API char* tr_mm_llm_model_path(tr_model_manager* m) {
+    return tr_mm_llm_model_path_for(m, "");
+}
+
+TR_API char* tr_mm_llm_model_path_for(tr_model_manager* m, const char* llm_id) {
     if (!m) return nullptr;
     std::lock_guard<std::mutex> lock(m->mutex);
-    return dupString(m->impl.llmModelPath());
+    return dupString(m->impl.llmModelPath(safe(llm_id)));
 }
 
 TR_API char* tr_mm_nmt_root_dir(tr_model_manager* m) {
