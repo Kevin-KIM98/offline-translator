@@ -120,7 +120,7 @@ models its route uses.
 | `["ko","ja"]` | ≈ 0.66 GB | four dedicated models, both directions through English |
 | `["ko","th"]` | ≈ 1.7 GB | Thai→Korean through English; Korean→Thai by the LLM, which is handed Marian's English |
 
-Up to 0.3.7 a choice like `["ko","ja"]` selected no English models and so downloaded speech
+Up to 0.3.6 a choice like `["ko","ja"]` selected no English models and so downloaded speech
 recognition alone; nothing could translate. Pass `backend = LLM` (Kotlin
 `TranslationBackend.LLM`, Swift `.LLM`) to translate everything with the LLM — slower, but a single
 model for all 42 directions with automatic source-language detection.
