@@ -1,0 +1,98 @@
+{
+  "description": "Speech recognition check: ten conversational sentences per language in the interpreter's domain (directions, hotel, transport, food, emergencies, time). Numbers are written as words, the way a person says them; whisper may return digits, and the scorer maps both sides to digits before comparing. Audio is synthesised from these texts, so each text is its own reference.",
+  "languages": {
+    "ko": [
+      "화장실이 어디예요?",
+      "내일 오후 세 시에 호텔 로비에서 만나요.",
+      "이 근처에 약국이 있나요?",
+      "공항까지 택시로 얼마나 걸려요?",
+      "저는 땅콩 알레르기가 있어서 조심해야 해요.",
+      "표 두 장 주세요.",
+      "조금만 천천히 말씀해 주시겠어요?",
+      "여권을 잃어버려서 경찰서에 가야 해요.",
+      "이 버스가 시내로 가는지 알려 주세요.",
+      "오늘 저녁에 비가 온다고 해서 우산을 챙겼어요."
+    ],
+    "en": [
+      "Where is the restroom?",
+      "Let's meet in the hotel lobby at three tomorrow afternoon.",
+      "Is there a pharmacy near here?",
+      "How long does it take to get to the airport by taxi?",
+      "I'm allergic to peanuts, so I have to be careful.",
+      "Two tickets, please.",
+      "Could you speak a little more slowly?",
+      "I lost my passport and need to go to the police station.",
+      "Please tell me whether this bus goes downtown.",
+      "They said it would rain this evening, so I brought an umbrella."
+    ],
+    "es": [
+      "¿Dónde está el baño?",
+      "Nos vemos mañana a las tres de la tarde en el vestíbulo del hotel.",
+      "¿Hay una farmacia cerca de aquí?",
+      "¿Cuánto se tarda en llegar al aeropuerto en taxi?",
+      "Soy alérgico a los cacahuetes, así que tengo que tener cuidado.",
+      "Dos entradas, por favor.",
+      "¿Podría hablar un poco más despacio?",
+      "Perdí mi pasaporte y tengo que ir a la comisaría.",
+      "Dígame si este autobús va al centro.",
+      "Dijeron que llovería esta tarde, así que traje un paraguas."
+    ],
+    "vi": [
+      "Nhà vệ sinh ở đâu?",
+      "Ngày mai ba giờ chiều gặp nhau ở sảnh khách sạn nhé.",
+      "Gần đây có hiệu thuốc không?",
+      "Đi taxi đến sân bay mất bao lâu?",
+      "Tôi bị dị ứng đậu phộng nên phải cẩn thận.",
+      "Cho tôi hai vé.",
+      "Bạn có thể nói chậm hơn một chút được không?",
+      "Tôi bị mất hộ chiếu nên phải đến đồn cảnh sát.",
+      "Xin cho tôi biết xe buýt này có đi vào trung tâm không.",
+      "Nghe nói tối nay trời mưa nên tôi đã mang theo ô."
+    ],
+    "th": [
+      "ห้องน้ำอยู่ที่ไหนครับ",
+      "พรุ่งนี้บ่ายสามโมงเจอกันที่ล็อบบี้โรงแรมนะครับ",
+      "แถวนี้มีร้านขายยาไหมครับ",
+      "นั่งแท็กซี่ไปสนามบินใช้เวลานานเท่าไหร่ครับ",
+      "ผมแพ้ถั่วลิสง เลยต้องระวังครับ",
+      "ขอตั๋วสองใบครับ",
+      "ช่วยพูดช้าลงหน่อยได้ไหมครับ",
+      "ผมทำพาสปอร์ตหาย เลยต้องไปสถานีตำรวจครับ",
+      "ช่วยบอกหน่อยครับว่ารถเมล์คันนี้เข้าเมืองไหม",
+      "เขาบอกว่าเย็นนี้ฝนจะตก ผมเลยเอาร่มมาด้วยครับ"
+    ],
+    "ja": [
+      "トイレはどこですか。",
+      "明日の午後三時にホテルのロビーで会いましょう。",
+      "この近くに薬局はありますか。",
+      "空港までタクシーでどのくらいかかりますか。",
+      "ピーナッツのアレルギーがあるので気をつけないといけません。",
+      "チケットを二枚ください。",
+      "もう少しゆっくり話していただけますか。",
+      "パスポートをなくしたので警察署に行かなければなりません。",
+      "このバスが市内に行くかどうか教えてください。",
+      "今夜は雨が降ると言っていたので傘を持ってきました。"
+    ],
+    "zh": [
+      "洗手间在哪里？",
+      "明天下午三点在酒店大堂见。",
+      "这附近有药店吗？",
+      "坐出租车到机场要多长时间？",
+      "我对花生过敏，所以必须小心。",
+      "请给我两张票。",
+      "您能说慢一点吗？",
+      "我的护照丢了，需要去警察局。",
+      "请告诉我这辆公交车去不去市中心。",
+      "听说今晚会下雨，所以我带了伞。"
+    ]
+  },
+  "voices": {
+    "ko": ["ko-KR-SunHiNeural", "ko-KR-InJoonNeural"],
+    "en": ["en-US-JennyNeural", "en-US-GuyNeural"],
+    "es": ["es-ES-ElviraNeural", "es-ES-AlvaroNeural"],
+    "vi": ["vi-VN-HoaiMyNeural", "vi-VN-NamMinhNeural"],
+    "th": ["th-TH-PremwadeeNeural", "th-TH-NiwatNeural"],
+    "ja": ["ja-JP-NanamiNeural", "ja-JP-KeitaNeural"],
+    "zh": ["zh-CN-XiaoxiaoNeural", "zh-CN-YunxiNeural"]
+  }
+}

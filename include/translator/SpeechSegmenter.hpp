@@ -1,6 +1,6 @@
-// Turns a continuous stream of denoised 30 ms frames + VAD probabilities into discrete
-// utterances suitable for whisper. Implements start/stop hysteresis, pre-roll, minimum
-// and maximum utterance lengths.
+// Turns a continuous stream of 30 ms frames + VAD probabilities into discrete utterances
+// suitable for whisper. Implements start/stop hysteresis, pre-roll, minimum and maximum
+// utterance lengths, and a loudness gate against room noise.
 #pragma once
 
 #include <cstddef>
@@ -32,9 +32,12 @@ class SpeechSegmenter {
 public:
     explicit SpeechSegmenter(const SegmenterConfig& cfg = {});
 
-    // Push one 480-sample frame with its VAD probability.
+    // Push one 480-sample frame with its VAD probability. `frame480` is what the utterance is
+    // built from; the loudness gate measures `levelFrame480` when given (the pipeline passes the
+    // denoised frame there and the microphone frame as the audio, so the thresholds keep the
+    // meaning they were measured with), else the audio frame itself.
     // Returns true if a complete utterance became available.
-    bool pushFrame(const float* frame480, float vadProb);
+    bool pushFrame(const float* frame480, float vadProb, const float* levelFrame480 = nullptr);
 
     bool hasUtterance() const { return !ready_.empty(); }
     std::vector<float> popUtterance();

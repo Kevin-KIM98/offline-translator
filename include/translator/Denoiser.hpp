@@ -24,6 +24,11 @@ public:
     // in/out may alias. Returns VAD probability in [0, 1].
     float process(const float* in480, float* out480);
 
+    // Voice activity from frame energy over a tracked floor, without touching the audio. Used
+    // by process() when RNNoise is absent, and by the pipeline when the denoiser is switched
+    // off, so utterances still close on pauses instead of waiting for a flush.
+    float energyVad(const float* in480);
+
     void reset();
 
 private:

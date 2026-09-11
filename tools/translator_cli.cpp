@@ -91,7 +91,8 @@ void usage() {
         "  transcribe --models <dir> --wav <file> [--lang auto] [--threads N]\n"
         "  translate  --models <dir> --text \"...\" --src ko --tgt en [--llm <gguf> | --llm-id <id>] [--backend auto|marian|llm]\n"
         "             [--llm-examples none|single|diverse] [--no-llm-pivot] [--lines]  --lines: one sentence per stdin line\n"
-        "  speech     --models <dir> --wav <file> [--src auto] --tgt en [--stream] [--no-denoise]\n"
+        "  speech     --models <dir> --wav <file> [--src auto] --tgt en [--stream] [--no-denoise] [--no-llm]\n"
+        "             [--stt-denoised]  whisper hears RNNoise's output instead of the microphone audio\n"
         "  listen     --models <dir> [--src auto] --tgt en [--device N] [--seconds N] [--list-devices]\n"
         "             [--record <out.wav>] keeps what the microphone heard, for replay\n"
         "             live microphone; speak, pause, and each utterance is translated\n",
@@ -322,6 +323,7 @@ bool makePipeline(const Args& a, TranslationPipeline& p, bool needWhisper) {
     cfg.nThreads = std::atoi(a.get("threads", "4").c_str());
     cfg.useGpu = !a.has("cpu");
     cfg.enableDenoise = !a.has("no-denoise");
+    cfg.sttOnDenoisedAudio = a.has("stt-denoised");   // pre-0.3.9 behaviour, for comparison
     if (a.has("beam")) cfg.beamSize = std::atoi(a.get("beam").c_str());
     if (a.has("stt-beam")) cfg.sttBeamSize = std::atoi(a.get("stt-beam").c_str());
     if (a.has("no-speech")) cfg.noSpeechThreshold = static_cast<float>(std::atof(a.get("no-speech").c_str()));
@@ -332,6 +334,7 @@ bool makePipeline(const Args& a, TranslationPipeline& p, bool needWhisper) {
     if (a.has("llm")) cfg.llmModelPath = a.get("llm");
     else if (loadManager(a, mm)) cfg.llmModelPath = mm.llmModelPath(a.get("llm-id", ""));
     if (!cfg.llmModelPath.empty() && !fs::isFile(cfg.llmModelPath)) cfg.llmModelPath.clear();
+    if (a.has("no-llm")) cfg.llmModelPath.clear();   // skip the 1 GB load when only Marian is needed
     const std::string backend = a.get("backend", "auto");
     cfg.backend = backend == "llm" ? TranslationBackend::Llm : backend == "marian" ? TranslationBackend::Marian : TranslationBackend::Auto;
     if (a.has("llm-ctx")) cfg.llmContextSize = std::atoi(a.get("llm-ctx").c_str());

@@ -85,9 +85,9 @@ void SpeechSegmenter::emitCurrent() {
     silenceRun_ = 0;
 }
 
-bool SpeechSegmenter::pushFrame(const float* frame480, float vadProb) {
+bool SpeechSegmenter::pushFrame(const float* frame480, float vadProb, const float* levelFrame480) {
     const std::size_t before = ready_.size();
-    const float rms = frameRms(frame480);
+    const float rms = frameRms(levelFrame480 ? levelFrame480 : frame480);
 
     if (!inSpeech_) {
         // Track the room while nobody is talking. Falls quickly so a quieter room is picked up

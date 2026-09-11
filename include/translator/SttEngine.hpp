@@ -31,6 +31,11 @@ public:
         bool adaptiveAudioContext = true;
     };
 
+    // Language of the audio by whisper's detector, run on the same reduced encoder window the
+    // transcription uses. Empty when it fails. Lets the pipeline choose the per-language prompt
+    // before transcribing "auto" input; whisper's own auto mode decodes without one.
+    std::string detectLanguage(const float* pcm, std::size_t n, bool adaptiveAudioContext = true);
+
     // lang: ISO-639-1 or "auto". Audio shorter than ~1 s is zero-padded (whisper minimum).
     SttResult transcribe(const float* pcm, std::size_t n, const std::string& lang, const DecodeOptions& opts);
     SttResult transcribe(const float* pcm, std::size_t n, const std::string& lang) {

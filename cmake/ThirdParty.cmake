@@ -148,6 +148,27 @@ if(TRANSLATOR_WITH_WHISPER)
             set(WHISPER_COREML           ${TRANSLATOR_COREML} CACHE BOOL "" FORCE)
             set(WHISPER_COREML_ALLOW_FALLBACK ON              CACHE BOOL "" FORCE)
         endif()
+        # whisper_full() applied `audio_ctx` only after automatic language detection, so with
+        # `language = "auto"` the detection ran a full 30 s encoder pass before the reduced one
+        # the transcription uses (about 4x the latency of a fixed language). The patch moves the
+        # assignment in front of the detection. Applied at configure time; a no-op once applied.
+        set(_wh_patch ${CMAKE_CURRENT_LIST_DIR}/patches/whisper.cpp-audio-ctx-before-lang-detect.patch)
+        find_package(Git QUIET)
+        if(GIT_EXECUTABLE)
+            execute_process(COMMAND ${GIT_EXECUTABLE} -C ${_wh} apply --check --reverse ${_wh_patch}
+                            RESULT_VARIABLE _wh_patched OUTPUT_QUIET ERROR_QUIET)
+            if(NOT _wh_patched EQUAL 0)
+                execute_process(COMMAND ${GIT_EXECUTABLE} -C ${_wh} apply ${_wh_patch}
+                                RESULT_VARIABLE _wh_patch_rc)
+                if(_wh_patch_rc EQUAL 0)
+                    message(STATUS "whisper.cpp: applied ${_wh_patch}")
+                else()
+                    message(WARNING "whisper.cpp: could not apply ${_wh_patch}; automatic language detection will be slow")
+                endif()
+            endif()
+        else()
+            message(WARNING "git not found: whisper.cpp patch not applied; automatic language detection will be slow")
+        endif()
         add_subdirectory(${_wh} ${CMAKE_BINARY_DIR}/third_party/whisper.cpp EXCLUDE_FROM_ALL)
         _translator_set_property_recursive(${_wh} POSITION_INDEPENDENT_CODE ON)
         set(TRANSLATOR_HAS_WHISPER 1)

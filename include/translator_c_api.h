@@ -73,6 +73,8 @@ typedef struct tr_pipeline_config {
     float llm_temperature;            /* default 0 (greedy) */
     int llm_gpu_layers;               /* default 99 */
     const char* llm_system_prompt;    /* optional override of the translation instruction */
+    /* 0.3.9+ */
+    int stt_on_denoised_audio;        /* give whisper RNNoise's output instead of the microphone audio (default 0) */
 } tr_pipeline_config;
 
 typedef struct tr_segmenter_config {

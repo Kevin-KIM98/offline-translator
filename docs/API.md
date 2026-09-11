@@ -31,6 +31,7 @@ tr_pipeline* p = tr_pipeline_create(&cfg);        // NULL → tr_last_global_err
 | `use_default_prompts` | 1 | punctuated per-language prompt → whisper emits punctuation, so NMT sees real sentences |
 | `use_context_prompt` | 1 | previous transcript (≤ 200 chars) appended to the prompt for consistent vocabulary |
 | `stt_adaptive_audio_ctx` | 1 | shrink whisper's 30 s encoder window to the utterance length (~3× faster on CPU) |
+| `stt_on_denoised_audio` | 0 | 0.3.9+: give whisper RNNoise's output instead of the microphone audio. RNNoise always supplies the voice activity and the level for the loudness gate; whisper is trained on noisy speech and the denoiser's artifacts cost words on clean speech |
 | `no_speech_threshold` | 0.85 | drop whisper segments it flags as non-speech |
 | `clean_transcripts` | 1 | remove `[music]`-style markers, runaway repetitions and stock hallucinations ("시청해주셔서 감사합니다") |
 | `beam_size` | 4 | NMT beam |

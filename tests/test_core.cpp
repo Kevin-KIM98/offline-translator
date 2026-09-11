@@ -223,6 +223,33 @@ void testSegmenter() {
         gate.flush();
         CHECK(!gate.hasUtterance());
     }
+
+    // The gate can judge loudness on a different frame from the one it stores: the pipeline
+    // hands it the microphone audio for whisper and RNNoise's output for the level, so the
+    // thresholds measured on denoised frames keep their meaning.
+    {
+        SpeechSegmenter gate(cfg);
+        std::vector<float> hush(kFrameSize, 0.001f), quiet(kFrameSize, 0.002f), loud(kFrameSize, 0.2f);
+        for (int i = 0; i < 40; ++i) gate.pushFrame(hush.data(), 0.05f, hush.data());
+        for (int i = 0; i < 40; ++i) gate.pushFrame(loud.data(), 0.95f, quiet.data());   // stored loud, judged quiet
+        for (int i = 0; i < 30; ++i) gate.pushFrame(hush.data(), 0.05f, hush.data());
+        CHECK(!gate.hasUtterance());
+        CHECK_EQ(gate.droppedQuietCount(), std::size_t(1));
+        for (int i = 0; i < 40; ++i) gate.pushFrame(quiet.data(), 0.95f, loud.data());   // stored quiet, judged loud
+        for (int i = 0; i < 30; ++i) gate.pushFrame(hush.data(), 0.05f, hush.data());
+        CHECK(gate.hasUtterance());
+        std::vector<float> u = gate.popUtterance();
+        CHECK(std::fabs(u[std::size_t(5) * kFrameSize] - 0.002f) < 1e-6f);   // the stored audio is the raw frame
+    }
+
+    // Without a VAD (denoiser off) every frame counts as voiced; the utterance closes on flush.
+    {
+        SpeechSegmenter seg2(cfg);
+        std::vector<float> loud(kFrameSize, 0.2f);
+        for (int i = 0; i < 50; ++i) seg2.pushFrame(loud.data(), 1.0f);
+        CHECK(seg2.flush());
+        CHECK(seg2.hasUtterance());
+    }
 }
 
 void testTextUtil() {
@@ -715,6 +742,28 @@ void testPipelineStub() {
     CHECK(utt.size() >= std::size_t(kSampleRate));           // ≥ 1 s of speech captured
     CHECK(utt.size() <= std::size_t(kSampleRate) * 5 / 2);   // but not the whole stream
     CHECK(!p.hasPendingUtterance());
+
+    // Denoiser off: the energy gate stands in as the VAD, so the pause still closes the
+    // utterance. (A constant "voiced" once made the whole stream one utterance whose median
+    // frame was silence, and the loudness gate dropped it: `speech --stream --no-denoise`
+    // produced nothing.)
+    {
+        PipelineConfig raw = cfg;
+        raw.enableDenoise = false;
+        TranslationPipeline q;
+        CHECK(q.initialize(raw, &err));
+        bool closed = false;
+        for (std::size_t i = 0; i < audio.size(); i += 320) {
+            const std::size_t n = std::min<std::size_t>(320, audio.size() - i);
+            closed |= q.feedAudio(audio.data() + i, n);
+        }
+        CHECK(closed);
+        CHECK_EQ(q.pendingUtteranceCount(), std::size_t(1));
+        const std::vector<float> rawUtt = q.popPendingUtterance();
+        CHECK(rawUtt.size() >= std::size_t(kSampleRate));
+        CHECK(rawUtt.size() <= std::size_t(kSampleRate) * 5 / 2);
+        CHECK(!q.flushAudio());
+    }
 
     // Without whisper compiled in, processing reports a clear error rather than crashing.
     TranslationResult sp = p.processSpeechToTranslation(utt.data(), utt.size(), "auto", "en");

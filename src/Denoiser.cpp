@@ -79,6 +79,11 @@ float Denoiser::process(const float* in480, float* out480) {
 #endif
 
     // Fallback: pass-through + adaptive energy gate.
+    if (in480 != out480) std::memcpy(out480, in480, sizeof(float) * kFrameSize);
+    return energyVad(in480);
+}
+
+float Denoiser::energyVad(const float* in480) {
     double energy = 0.0;
     for (int i = 0; i < kFrameSize; ++i) energy += double(in480[i]) * double(in480[i]);
     energy /= kFrameSize;
@@ -104,8 +109,6 @@ float Denoiser::process(const float* in480, float* out480) {
         vad = std::max(0.0f, std::min(1.0f, (snr - 2.0f) / 6.0f)); // 2x → 0, 8x → 1
     }
     impl_->smoothedVad = 0.7f * impl_->smoothedVad + 0.3f * vad;
-
-    if (in480 != out480) std::memcpy(out480, in480, sizeof(float) * kFrameSize);
     return impl_->smoothedVad;
 }
 

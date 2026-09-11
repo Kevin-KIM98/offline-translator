@@ -74,7 +74,23 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   still transcribed.
 - **Push-to-talk.** A flush that queues nothing must call `onNoSpeech`, or the app's progress
   indicator never clears.
-- **Noise.** Recognition needs about 20 dB over the background; below +5 dB whisper invents text.
+- **Noise.** Whisper must hear the microphone audio, not RNNoise's output (`sttOnDenoisedAudio`
+  is off since 0.3.9): the denoiser cost words on clean speech and most of the old "20 dB over the
+  background" requirement. RNNoise still supplies the voice activity and the level for the
+  loudness gate. Measured with `tests/eval/stt_noise.py` (pink noise into synthesised clips):
+  correct down to +5 dB SNR, partial at 0 dB, invented text from about −5 dB. Re-run it after any
+  front-end change; clean speech must not lose words and noisy speech must not get worse.
+- **Speech recognition per language (0.3.9, synthetic clips).** App-path CER: ko 0.0, en 0.0,
+  es 0.1, vi 3.9, th 14.5, ja 2.1, zh 2.7 %; language id 140/140. Beam 5, the per-language prompt
+  (zh drifts into traditional characters without it), the adaptive window and microphone audio
+  to whisper each earned their place in `tests/eval/run_stt_eval.py`; `auto` detects the language
+  first so the prompt applies (`SttEngine::detectLanguage`, `Impl::resolveLang`). Thai is whisper
+  small's weak language; only a bigger whisper model helps. Re-run the eval after touching
+  SttEngine, the prompts in TextUtil, the segmenter or the denoiser (clips: `stt_synthesize.py`).
+- **Automatic language detection.** Hands-free mode passes `auto`. Upstream whisper.cpp applies
+  `audio_ctx` after language detection, so auto cost 4× a fixed language; `cmake/patches/` moves
+  the assignment and `cmake/ThirdParty.cmake` applies it at configure time (auto now ≈ +0.8 s, one
+  extra encoder pass). Keep the patch when bumping whisper.cpp; upstream master still has the order.
 - **LLM.** Never bias control or end-of-generation tokens in the sampler; generation runs away.
   Small Qwen models drift into Chinese for Thai or Korean targets without the script guard.
 - **Several LLMs.** The manifest's `llm` is the default and `llm_options` adds choices (each with a

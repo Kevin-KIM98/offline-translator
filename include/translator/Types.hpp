@@ -53,7 +53,10 @@ struct PipelineConfig {
     bool llmPivotThroughEnglish = true;
     int nThreads = 4;                   // whisper / CTranslate2 intra-op threads
     bool useGpu = true;                 // whisper: Metal (iOS) / Vulkan-OpenCL (Android) when compiled in
-    bool enableDenoise = true;          // RNNoise front-end
+    bool enableDenoise = true;          // RNNoise front-end: voice activity and the level the loudness gate uses
+    // Give whisper RNNoise's output instead of the microphone audio. Off by default: whisper is
+    // trained on noisy speech, and on clean speech the denoiser's artifacts cost words.
+    bool sttOnDenoisedAudio = false;
     int beamSize = 4;                   // NMT beam (1 = greedy, fastest)
     int maxDecodingLength = 256;        // NMT hard stop
     int noRepeatNgramSize = 3;          // NMT: block repeated n-grams (0 = off)

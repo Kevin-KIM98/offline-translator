@@ -153,6 +153,7 @@ TR_API void tr_pipeline_config_init(tr_pipeline_config* cfg) {
     cfg->llm_temperature = 0.0f;
     cfg->llm_gpu_layers = 99;
     cfg->llm_system_prompt = nullptr;
+    cfg->stt_on_denoised_audio = 0;
 }
 
 TR_API void tr_segmenter_config_init(tr_segmenter_config* cfg) {
@@ -189,6 +190,7 @@ TR_API tr_pipeline* tr_pipeline_create(const tr_pipeline_config* cfg) {
     c.repetitionPenalty = cfg->repetition_penalty > 0.0f ? cfg->repetition_penalty : 1.0f;
     c.noSpeechThreshold = cfg->no_speech_threshold;
     c.sttAdaptiveAudioContext = cfg->stt_adaptive_audio_ctx != 0;
+    c.sttOnDenoisedAudio = cfg->stt_on_denoised_audio != 0;
     c.llmModelPath = safe(cfg->llm_model_path);
     c.backend = cfg->translation_backend == 2 ? TranslationBackend::Llm : cfg->translation_backend == 1 ? TranslationBackend::Marian : TranslationBackend::Auto;
     c.llmContextSize = cfg->llm_context_size > 0 ? cfg->llm_context_size : 1024;

@@ -98,12 +98,22 @@ struct TranslationPipeline::Impl {
         o.noSpeechThreshold = cfg.noSpeechThreshold;
         o.adaptiveAudioContext = cfg.sttAdaptiveAudioContext;
         const bool wantDefault = cfg.initialPrompt.empty() && cfg.useDefaultPrompts;
-        // With "auto" we only know the language after the first utterance; reuse it.
+        // "auto" reaches here only when detection failed; fall back to the previous language.
         const std::string promptLang = (lang.empty() || lang == "auto") ? previousLang : lang;
         o.initialPrompt = text::buildSttPrompt(wantDefault ? std::string() : cfg.initialPrompt,
                                                wantDefault ? promptLang : std::string(),
                                                cfg.useContextPrompt ? previousTranscript : std::string());
         return o;
+    }
+
+    // "auto": detect the language first so the per-language prompt applies. Whisper's own auto
+    // mode decodes without one, which on the test set cost Chinese 1.2% → 7.8% CER (it drifted
+    // into traditional characters). The detection pass encodes the same reduced window whisper
+    // would have encoded for its own detection, so the extra cost is one mel computation.
+    std::string resolveLang(const float* pcm, std::size_t n, const std::string& lang) {
+        if (!lang.empty() && lang != "auto") return lang;
+        const std::string detected = stt.detectLanguage(pcm, n, cfg.sttAdaptiveAudioContext);
+        return detected.empty() ? lang : detected;
     }
 
     void rememberTranscript(const std::string& t, const std::string& lang) {
@@ -247,6 +257,17 @@ bool TranslationPipeline::feedAudio(const float* pcm, std::size_t n) {
     bool ready = false;
     std::size_t i = 0;
 
+    // RNNoise supplies the voice probability and the level the loudness gate compares; whisper
+    // hears the microphone audio itself unless sttOnDenoisedAudio asks for the denoised frames.
+    // With the denoiser off an energy gate stands in as the VAD: a constant "voiced" would put
+    // every pause into the utterance and the loudness gate's median would drop it.
+    auto push = [&](const float* frame) {
+        if (!impl_->cfg.enableDenoise) return impl_->segmenter.pushFrame(frame, impl_->denoiser.energyVad(frame));
+        const float vad = impl_->denoiser.process(frame, impl_->frameOut);
+        return impl_->cfg.sttOnDenoisedAudio ? impl_->segmenter.pushFrame(impl_->frameOut, vad)
+                                             : impl_->segmenter.pushFrame(frame, vad, impl_->frameOut);
+    };
+
     // Complete a partially buffered frame first.
     if (!impl_->frameBuf.empty()) {
         const std::size_t need = kFrameSize - impl_->frameBuf.size();
@@ -254,17 +275,11 @@ bool TranslationPipeline::feedAudio(const float* pcm, std::size_t n) {
         impl_->frameBuf.insert(impl_->frameBuf.end(), pcm, pcm + take);
         i = take;
         if (impl_->frameBuf.size() < static_cast<std::size_t>(kFrameSize)) return false;
-        const float vad = impl_->cfg.enableDenoise ? impl_->denoiser.process(impl_->frameBuf.data(), impl_->frameOut)
-                                                   : (std::memcpy(impl_->frameOut, impl_->frameBuf.data(), sizeof(impl_->frameOut)), 1.0f);
-        ready |= impl_->segmenter.pushFrame(impl_->frameOut, vad);
+        ready |= push(impl_->frameBuf.data());
         impl_->frameBuf.clear();
     }
 
-    for (; i + kFrameSize <= n; i += kFrameSize) {
-        const float vad = impl_->cfg.enableDenoise ? impl_->denoiser.process(pcm + i, impl_->frameOut)
-                                                   : (std::memcpy(impl_->frameOut, pcm + i, sizeof(impl_->frameOut)), 1.0f);
-        ready |= impl_->segmenter.pushFrame(impl_->frameOut, vad);
-    }
+    for (; i + kFrameSize <= n; i += kFrameSize) ready |= push(pcm + i);
     if (i < n) impl_->frameBuf.assign(pcm + i, pcm + n);
     return ready;
 }
@@ -327,11 +342,15 @@ SttResult TranslationPipeline::transcribe(const float* pcm, std::size_t n, const
         r.error = "pipeline not initialized";
         return r;
     }
-    SttResult r = impl_->stt.transcribe(pcm, n, sourceLang, impl_->decodeOptions(sourceLang));
+    const auto t0 = std::chrono::steady_clock::now();
+    const std::string lang = impl_->resolveLang(pcm, n, sourceLang);
+    const double detectMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    SttResult r = impl_->stt.transcribe(pcm, n, lang, impl_->decodeOptions(lang));
     if (!r.ok) {
         impl_->setError(r.error);
         return r;
     }
+    r.elapsedMs += detectMs;   // "auto" pays for the detection pass; report it as STT time
     if (impl_->cfg.cleanTranscripts) r.text = text::cleanTranscript(r.text, r.detectedLang);
     impl_->rememberTranscript(r.text, r.detectedLang);
     return r;
@@ -379,9 +398,11 @@ TranslationResult TranslationPipeline::processSpeechToTranslation(const float* p
         return r;
     }
 
-    // 1. STT
-    const SttResult stt = impl_->stt.transcribe(pcm, n, sourceLang, impl_->decodeOptions(sourceLang));
-    r.sttMs = stt.elapsedMs;
+    // 1. STT ("auto" pays for a detection pass first; it counts as STT time)
+    const std::string lang = impl_->resolveLang(pcm, n, sourceLang);
+    const double detectMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    const SttResult stt = impl_->stt.transcribe(pcm, n, lang, impl_->decodeOptions(lang));
+    r.sttMs = stt.elapsedMs + detectMs;
     if (!stt.ok) {
         r.error = stt.error;
         impl_->setError(r.error);

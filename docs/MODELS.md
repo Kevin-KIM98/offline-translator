@@ -108,6 +108,13 @@ python scripts/prepare_models.py whisper --model small --quant q5_1 --out dist/m
 python scripts/prepare_models.py whisper --model small --quant q5_1 --coreml   # + iOS CoreML encoder
 ```
 
+Measured with `small-q5_1` through the app's streaming path on 140 synthesised clips (10 travel
+sentences × 7 languages × 2 voices; `tests/eval/run_stt_eval.py`): character error rate ko 0.0%,
+en 0.0%, es 0.1%, ja 2.1%, zh 2.7%, vi 3.9%, th 14.5%; language identification 140/140. Thai is
+the weak language of `small` (tone marks, vowel spellings); `medium` is the next step for Thai-heavy
+use, at 539 MB and about three times the time per utterance. Synthetic voices are cleaner than a
+phone microphone, so treat these as upper bounds.
+
 **iOS CoreML**: whisper.cpp looks for `<model-name>-encoder.mlmodelc` next to the ggml file.
 Ship the unzipped `ggml-small-encoder.mlmodelc` directory in `models/stt/` (add it to the
 manifest as an NMT-style `files` entry or bundle it in the app). The first launch compiles it
