@@ -25,7 +25,7 @@ releases — no server of your own is needed.
 `apps/` holds a finished two-way interpreter for both platforms — first-run model download,
 push-to-talk per speaker, a replayable transcript, hands-free mode, keyboard input and model
 management. Grab
-[offline-interpreter-1.0.0.apk](https://github.com/Kevin-KIM98/offline-translator/releases/download/v0.3.5/offline-interpreter-1.0.0.apk)
+[offline-interpreter-1.0.0.apk](https://github.com/Kevin-KIM98/offline-translator/releases/download/v0.3.6/offline-interpreter-1.0.0.apk)
 for an arm64 Android 8+ device, or build either app from source:
 
 ```
@@ -77,7 +77,7 @@ device.
 2. `app/build.gradle.kts`:
 
 ```kotlin
-implementation(files("libs/offline-translator-0.3.5.aar"))
+implementation(files("libs/offline-translator-0.3.6.aar"))
 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 ```
 
@@ -156,6 +156,31 @@ LLM samples (Qwen2.5-1.5B, desktop CPU, 1.3–3.7 s each): ko→vi "Xin chào. H
 ko→th "สวัสดีครับ/ค่ะ วันพรุ่งนี้การประชุมจะเริ่มเวลา 3 โมง", auto→en (Spanish in) "Hello. Where is the nearest metro station?".
 Into Korean the Marian pivot (th→en→ko: "안녕하세요, 내일 3시에 미팅 시작해요 가장 가까운 지하철역은 어디인가요?") beats the 1.5B LLM,
 which is why `auto` prefers Marian.
+
+### How much background noise it tolerates
+
+Measured by mixing pink noise, which is close to the spectrum of a crowd or a PA system, into a
+Korean sample at a known signal-to-noise ratio and reading what came out:
+
+| SNR | result |
+|---|---|
+| +20 dB | correct, wording occasionally varies |
+| +15 dB | words break up, one sentence lost, translation misleading |
+| +10 dB | meaning gone ("지하철역" heard as "대학설력") |
+| +5 dB | **invents text**: returns the recognition prompt instead of what was said |
+| 0 dB | invents text only |
+
+So the practical requirement is roughly **20 dB of headroom over the background**. A quiet room or
+an office is comfortable; a busy restaurant or a street is marginal; a bar or a club, where the
+music alone is 90 dB and a speaker at arm's length arrives 15–25 dB below it, is out of reach.
+
+The failure below +10 dB is the dangerous kind: whisper does not return nothing, it returns a
+confident sentence that was never said. Nothing downstream can tell the difference.
+
+What actually helps, in order of effect: a close-talking microphone (a headset boom 3 cm from the
+mouth buys 20–25 dB over a phone at arm's length), a directional or beamforming capture mode,
+and a denoiser built for non-stationary noise — RNNoise is tuned for steady noise like fans and
+hum and does little against music or overlapping voices.
 
 Models are hosted on the [`models-v1` release](https://github.com/Kevin-KIM98/offline-translator/releases/tag/models-v1)
 and described by [assets/manifest.json](assets/manifest.json) (per-file SHA-256): whisper `small-q5_1`,
