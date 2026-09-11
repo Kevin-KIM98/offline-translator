@@ -36,6 +36,10 @@ __pycache__/
 # Desktop test model directories
 pc-models/
 pc-test/
+pc-3b/
 
 # Translation evaluation outputs
 tests/eval/out/
+
+# Desktop test model directories
+pc-3b/
