@@ -25,7 +25,7 @@ releases — no server of your own is needed.
 `apps/` holds a finished two-way interpreter for both platforms — first-run model download,
 push-to-talk per speaker, a replayable transcript, hands-free mode, keyboard input and model
 management. Grab
-[offline-interpreter-1.0.0.apk](https://github.com/Kevin-KIM98/offline-translator/releases/download/v0.3.6/offline-interpreter-1.0.0.apk)
+[offline-interpreter-1.0.0.apk](https://github.com/Kevin-KIM98/offline-translator/releases/download/v0.3.7/offline-interpreter-1.0.0.apk)
 for an arm64 Android 8+ device, or build either app from source:
 
 ```
@@ -77,7 +77,7 @@ device.
 2. `app/build.gradle.kts`:
 
 ```kotlin
-implementation(files("libs/offline-translator-0.3.6.aar"))
+implementation(files("libs/offline-translator-0.3.7.aar"))
 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 ```
 
@@ -120,7 +120,7 @@ models its route uses.
 | `["ko","ja"]` | ≈ 0.66 GB | four dedicated models, both directions through English |
 | `["ko","th"]` | ≈ 1.7 GB | Thai→Korean through English; Korean→Thai by the LLM, which is handed Marian's English |
 
-Up to 0.3.6 a choice like `["ko","ja"]` selected no English models and so downloaded speech
+Up to 0.3.7 a choice like `["ko","ja"]` selected no English models and so downloaded speech
 recognition alone; nothing could translate. Pass `backend = LLM` (Kotlin
 `TranslationBackend.LLM`, Swift `.LLM`) to translate everything with the LLM — slower, but a single
 model for all 42 directions with automatic source-language detection.
