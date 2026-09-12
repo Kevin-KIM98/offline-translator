@@ -34,12 +34,16 @@ clone ctranslate2   https://github.com/OpenNMT/CTranslate2     "$CT2_REF" recurs
 clone sentencepiece https://github.com/google/sentencepiece    "$SPM_REF"
 clone llama.cpp     https://github.com/ggml-org/llama.cpp      "$LLAMA_REF"
 
+# media.xiph.org (RNNoise weights) drops connections now and then; a CI run should not fail
+# on one timeout. Retries cover connection and transfer errors alike.
+CURL_RETRY="--retry 5 --retry-delay 15 --retry-all-errors --connect-timeout 30 --max-time 600"
+
 # miniaudio is a single public-domain header; the desktop CLI uses it for `listen`.
 if [[ ! -f "$TP/miniaudio/miniaudio.h" ]]; then
     echo ">> downloading miniaudio $MINIAUDIO_REF"
     mkdir -p "$TP/miniaudio"
     url="https://raw.githubusercontent.com/mackron/miniaudio/$MINIAUDIO_REF/miniaudio.h"
-    if command -v curl >/dev/null; then curl -sSL -o "$TP/miniaudio/miniaudio.h" "$url"
+    if command -v curl >/dev/null; then curl -sSL $CURL_RETRY -o "$TP/miniaudio/miniaudio.h" "$url"
     else wget -q -O "$TP/miniaudio/miniaudio.h" "$url"; fi
 fi
 
@@ -49,7 +53,7 @@ if [[ -f "$TP/rnnoise/model_version" && ! -f "$TP/rnnoise/src/rnnoise_data.c" ]]
     (
         cd "$TP/rnnoise"
         model="rnnoise_data-$(cat model_version).tar.gz"
-        if command -v curl >/dev/null; then curl -sSL -o "$model" "https://media.xiph.org/rnnoise/models/$model"
+        if command -v curl >/dev/null; then curl -sSL $CURL_RETRY -o "$model" "https://media.xiph.org/rnnoise/models/$model"
         else wget -q -O "$model" "https://media.xiph.org/rnnoise/models/$model"; fi
         tar xzf "$model"
     )
