@@ -144,6 +144,44 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
                 }
             }
 
+            if (state.sttOptions.size > 1) {
+                Spacer(Modifier.height(20.dp))
+                SectionLabel(stringResource(R.string.settings_stt))
+                Card {
+                    val selectedId = state.sttId ?: state.sttOptions.first().id
+                    state.sttOptions.forEachIndexed { i, m ->
+                        val choice = if (i == 0) null else m.id   // null follows the manifest's default
+                        if (i > 0) Divider()
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { vm.setStt(choice) }
+                                .padding(start = 16.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(m.label.ifBlank { m.id }, style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    mb(m.totalBytes) + " · " + stringResource(
+                                        if (m.state == ModelState.READY) R.string.llm_installed else R.string.llm_not_installed
+                                    ),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            RadioButton(selected = m.id == selectedId, onClick = { vm.setStt(choice) })
+                        }
+                    }
+                    Divider()
+                    Text(
+                        stringResource(R.string.settings_stt_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
+            }
+
             if (state.llmOptions.size > 1) {
                 Spacer(Modifier.height(20.dp))
                 SectionLabel(stringResource(R.string.settings_llm))

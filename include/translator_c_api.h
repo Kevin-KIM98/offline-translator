@@ -160,6 +160,12 @@ TR_API char* tr_mm_llm_model_path(tr_model_manager* m);   /* "" when the manifes
 TR_API char* tr_mm_status_for_languages_llm_json(tr_model_manager* m, const char* langs_csv, int deep_verify,
                                                  int llm_mode, const char* llm_id);
 TR_API char* tr_mm_llm_model_path_for(tr_model_manager* m, const char* llm_id);
+/* Several speech models likewise: "stt" (the default) plus "stt_options", each with a "label".
+   stt_id picks one; "" or an unknown id means the default. Only the selected speech model is
+   listed by the status call, as for the LLM. (0.3.10) */
+TR_API char* tr_mm_status_for_languages_json2(tr_model_manager* m, const char* langs_csv, int deep_verify,
+                                              int llm_mode, const char* llm_id, const char* stt_id);
+TR_API char* tr_mm_stt_model_path_for(tr_model_manager* m, const char* stt_id);
 
 /* Download staging directory for a model id (created). Caller must tr_string_free(). */
 TR_API char* tr_mm_staging_dir(tr_model_manager* m, const char* id);

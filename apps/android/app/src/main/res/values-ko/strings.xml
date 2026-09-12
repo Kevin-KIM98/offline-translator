@@ -23,6 +23,7 @@
 
     <!-- Model names -->
     <string name="model_stt">음성 인식</string>
+    <string name="model_stt_named">음성 인식 · %1$s</string>
     <string name="model_llm">다국어 통역 LLM</string>
     <string name="model_nmt_pair">%1$s → %2$s 번역</string>
     <string name="model_nmt_generic">번역 모델 %1$s</string>
@@ -79,6 +80,8 @@
     <string name="settings_llm_desc">태국어처럼 전용 모델이 없는 방향에 씁니다. 큰 모델은 번역이 눈에 띄게 좋아지지만 두 배쯤 느리고, 메모리 6 GB 이상인 폰이 필요합니다. 설치되지 않은 모델을 고르면, 선택한 언어에 LLM이 필요할 때 내려받습니다.</string>
     <string name="llm_installed">설치됨</string>
     <string name="llm_not_installed">미설치</string>
+    <string name="settings_stt">음성 인식 모델</string>
+    <string name="settings_stt_desc">Whisper small(190 MB)은 한국어·영어·스페인어·일본어·중국어를 잘 알아듣습니다. Whisper medium은 태국어와 베트남어를 눈에 띄게 더 잘 알아듣지만 문장당 세 배쯤 느리고, 메모리 4 GB 이상인 폰이 필요합니다. 설치되지 않은 모델을 고르면 내려받습니다.</string>
     <string name="settings_llm_memory_warning">이 폰의 메모리는 %1$s입니다. 큰 모델은 열리지 않거나 폰이 느려질 수 있습니다.</string>
     <string name="settings_installed">설치된 모델</string>
     <string name="settings_none_installed">아직 설치된 모델이 없습니다.</string>

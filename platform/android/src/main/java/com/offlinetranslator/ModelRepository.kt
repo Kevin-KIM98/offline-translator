@@ -118,14 +118,21 @@ class ModelRepository(
     /** Every LLM the manifest offers, default first. `label` names it, `state` says whether it is installed. */
     fun llmOptions(): List<ModelStatus> = status().filter { it.kind == "llm" }
 
+    /** Install path of the speech model `sttId` names; of the manifest's default when null or unknown. */
+    fun sttModelPath(sttId: String?): String = NativeBridge.mmSttModelPathFor(h(), sttId ?: "")
+
+    /** Every speech (whisper) model the manifest offers, default first. */
+    fun sttOptions(): List<ModelStatus> = status().filter { it.kind == "stt" }
+
     fun pipelineConfig(
         nThreads: Int? = null,
         backend: TranslationBackend = TranslationBackend.AUTO,
         llmId: String? = null,
+        sttId: String? = null,
     ): PipelineConfig {
         val llm = llmModelPath(llmId).takeIf { it.isNotEmpty() && File(it).isFile }
         return PipelineConfig(
-            whisperModelPath = sttModelPath.ifEmpty { null },
+            whisperModelPath = sttModelPath(sttId).ifEmpty { null },
             nmtRootDir = nmtRootDir,
             llmModelPath = llm,
             backend = backend,
@@ -156,14 +163,18 @@ class ModelRepository(
     /** deepVerify re-hashes installed files — call from Dispatchers.IO. */
     fun status(deepVerify: Boolean = false): List<ModelStatus> = parseStatus(NativeBridge.mmStatusJson(h(), deepVerify))
 
-    /** Models the given languages need. `llmId` picks which LLM counts; null means the manifest's default. */
+    /**
+     * Models the given languages need. `llmId` picks which LLM counts and `sttId` which speech
+     * model; null means the manifest's default.
+     */
     fun statusForLanguages(
         langs: Collection<String>,
         deepVerify: Boolean = false,
         llmMode: LlmMode = LlmMode.IF_NEEDED,
         llmId: String? = null,
+        sttId: String? = null,
     ): List<ModelStatus> =
-        parseStatus(NativeBridge.mmStatusForLanguagesLlmJson(h(), langs.joinToString(","), deepVerify, llmMode.native, llmId ?: ""))
+        parseStatus(NativeBridge.mmStatusForLanguagesJson2(h(), langs.joinToString(","), deepVerify, llmMode.native, llmId ?: "", sttId ?: ""))
 
     private fun parseStatus(json: String): List<ModelStatus> {
         val arr = JSONObject(json).optJSONArray("models") ?: return emptyList()

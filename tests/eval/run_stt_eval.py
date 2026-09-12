@@ -76,12 +76,15 @@ def wer(ref: str, hyp: str, lang: str) -> float:
     return edit_distance(r, h) / max(1, len(r))
 
 
+WHISPER = []   # extra CLI arguments, e.g. ["--whisper", path] to test another whisper model
+
+
 def run(cli, models, config, wav, lang):
     """Returns (text, detected_lang, stt_ms)."""
     if config in ("app", "app_denoised"):
         tgt = "ko" if lang == "en" else "en"
         # --no-llm: every pair here has a Marian model, and loading the LLM costs ~50 s per clip.
-        cmd = [cli, "speech", "--models", str(models), "--wav", str(wav), "--src", lang, "--tgt", tgt, "--stream", "--no-llm"]
+        cmd = [cli, "speech", "--models", str(models), "--wav", str(wav), "--src", lang, "--tgt", tgt, "--stream", "--no-llm"] + WHISPER
         if config == "app_denoised":
             cmd.append("--stt-denoised")
         out = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8").stdout
@@ -97,7 +100,7 @@ def run(cli, models, config, wav, lang):
                 ms += d.get("timings", {}).get("stt_ms", 0.0)
         return " ".join(texts), det, ms
     cmd = [cli, "transcribe", "--models", str(models), "--wav", str(wav),
-           "--lang", "auto" if config == "auto" else lang]
+           "--lang", "auto" if config == "auto" else lang] + WHISPER
     if config == "noprompt":
         cmd.append("--no-default-prompt")
     elif config == "fullctx":
@@ -120,7 +123,10 @@ def main() -> int:
     ap.add_argument("--models", default=str(ROOT / "models" / "release"))
     ap.add_argument("--configs", default="app,app_denoised,oneshot,noprompt,fullctx,greedy,auto")
     ap.add_argument("--langs")
+    ap.add_argument("--whisper", help="ggml whisper model file to test instead of the manifest's (e.g. medium)")
     args = ap.parse_args()
+    if args.whisper:
+        WHISPER[:] = ["--whisper", args.whisper]
 
     spec = json.load(open(args.set, encoding="utf-8"))
     audio = pathlib.Path(args.audio)

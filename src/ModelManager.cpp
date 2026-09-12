@@ -142,10 +142,26 @@ std::string ModelManager::stagingRoot() const { return fs::join(modelsRoot_, "st
 std::string ModelManager::installedRecordPath() const { return fs::join(modelsRoot_, "installed.json"); }
 std::string ModelManager::cachedManifestPath() const { return fs::join(modelsRoot_, "manifest.json"); }
 
-std::string ModelManager::sttModelPath() const {
+std::vector<const ModelEntry*> ModelManager::sttEntries() const {
+    std::vector<const ModelEntry*> out;
     for (const auto& e : entries_)
-        if (e.kind == ModelEntry::Kind::Stt) return e.installPath;
-    return {};
+        if (e.kind == ModelEntry::Kind::Stt) out.push_back(&e);
+    return out;
+}
+
+const ModelEntry* ModelManager::sttEntry(const std::string& sttId) const {
+    const ModelEntry* first = nullptr;
+    for (const auto& e : entries_) {
+        if (e.kind != ModelEntry::Kind::Stt) continue;
+        if (e.id == sttId) return &e;
+        if (!first) first = &e;
+    }
+    return first;   // unknown id: the default, as for the LLM
+}
+
+std::string ModelManager::sttModelPath(const std::string& sttId) const {
+    const ModelEntry* e = sttEntry(sttId);
+    return e ? e->installPath : std::string();
 }
 
 std::string ModelManager::llmDir() const { return fs::join(modelsRoot_, "llm"); }
@@ -262,21 +278,28 @@ bool ModelManager::loadManifest(const Json& manifest, std::string* error) {
     baseUrl_ = manifest.getString("base_url");
     const std::string manifestVersion = manifest.getString("manifest_version", "0");
 
-    // ---- STT ----
-    const Json& stt = manifest["stt"];
-    if (stt.isObject()) {
+    // ---- STT: "stt" is the default; "stt_options" lists further whisper models (one file each) ----
+    auto parseStt = [&](const Json& node) -> bool {
         ModelEntry e;
         e.kind = ModelEntry::Kind::Stt;
-        e.id = stt.getString("id", "whisper");
-        e.version = stt.getString("version", "1");
+        e.id = node.getString("id", "whisper");
+        e.version = node.getString("version", "1");
+        e.label = node.getString("label");
         DownloadItem d;
-        if (!parseFileItem(stt, resolveUrl("stt"), d, error)) return false;
+        if (!parseFileItem(node, resolveUrl("stt"), d, error)) return false;
         d.isArchive = false;
         e.downloads.push_back(d);
         e.installPath = fs::join(sttDir(), d.filename);
         e.requiredFiles = {d.filename};
         entries.push_back(std::move(e));
-    }
+        return true;
+    };
+    const Json& stt = manifest["stt"];
+    if (stt.isObject() && !parseStt(stt)) return false;
+    const Json& sttOptions = manifest["stt_options"];
+    if (sttOptions.isArray())
+        for (const auto& node : sttOptions.asArray())
+            if (node.isObject() && !parseStt(node)) return false;
 
     // ---- LLM: "llm" is the default; "llm_options" lists further choices (one GGUF each) ----
     auto parseLlm = [&](const Json& node) -> bool {
@@ -515,9 +538,11 @@ Json ModelManager::statusJson(bool deepVerify) const {
 }
 
 std::vector<ModelStatus> ModelManager::statusForLanguages(const std::vector<std::string>& langs, bool deepVerify,
-                                                          LlmMode llmMode, const std::string& llmId) const {
+                                                          LlmMode llmMode, const std::string& llmId,
+                                                          const std::string& sttId) const {
     std::vector<ModelStatus> out;
     const ModelEntry* selectedLlm = llmEntry(llmId);
+    const ModelEntry* selectedStt = sttEntry(sttId);
     // Which Marian pairs exist in the manifest (for the "is the LLM needed" decision).
     std::vector<std::string> pairs;
     for (const auto& e : entries_)
@@ -550,7 +575,10 @@ std::vector<ModelStatus> ModelManager::statusForLanguages(const std::vector<std:
 
     for (const auto& e : entries_) {
         bool wanted = true;
-        if (e.kind == ModelEntry::Kind::Nmt) {
+        if (e.kind == ModelEntry::Kind::Stt) {
+            // One speech model at a time: the selected one, or the default.
+            wanted = selectedStt != nullptr && &e == selectedStt;
+        } else if (e.kind == ModelEntry::Kind::Nmt) {
             wanted = std::find(wantedPairs.begin(), wantedPairs.end(), e.pair) != wantedPairs.end();
         } else if (e.kind == ModelEntry::Kind::Llm) {
             // One LLM at a time: the selected one, or the default.

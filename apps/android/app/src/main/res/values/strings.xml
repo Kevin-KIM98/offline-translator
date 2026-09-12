@@ -24,6 +24,7 @@
 
     <!-- Model names -->
     <string name="model_stt">Speech recognition</string>
+    <string name="model_stt_named">Speech recognition · %1$s</string>
     <string name="model_llm">Multilingual LLM</string>
     <string name="model_nmt_pair">%1$s to %2$s translation</string>
     <string name="model_nmt_generic">Translation model %1$s</string>
@@ -80,6 +81,8 @@
     <string name="settings_llm_desc">Used for directions without a dedicated model, such as into Thai. The larger model translates noticeably better and about twice as slowly, and needs a phone with 6 GB of memory or more. A model that is not installed is downloaded when the chosen languages need one.</string>
     <string name="llm_installed">installed</string>
     <string name="llm_not_installed">not installed</string>
+    <string name="settings_stt">Speech recognition model</string>
+    <string name="settings_stt_desc">Whisper small (190 MB) recognises Korean, English, Spanish, Japanese and Chinese well. Whisper medium hears Thai and Vietnamese noticeably better, is about three times slower per sentence and needs a phone with 4 GB of memory or more. A model that is not installed is downloaded when you choose it.</string>
     <string name="settings_llm_memory_warning">This phone has %1$s of memory. The larger model may fail to load or make the phone slow.</string>
     <string name="settings_installed">Installed models</string>
     <string name="settings_none_installed">No models installed yet.</string>

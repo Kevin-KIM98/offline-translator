@@ -49,6 +49,16 @@ DEFAULT_HF = {
 }
 
 
+def stt_label(stem: str) -> str:
+    """'whisper-medium-q5_0' -> 'Whisper medium'."""
+    parts = stem.split("-")
+    if parts and parts[0] == "whisper":
+        parts = parts[1:]
+    if parts and parts[-1].startswith("q") and parts[-1][1:2].isdigit():
+        parts = parts[:-1]
+    return "Whisper " + "-".join(parts) if parts else stem
+
+
 def llm_label(stem: str) -> str:
     """'qwen2.5-3b-instruct-q4_k_m' -> 'Qwen2.5 3B'; anything unrecognised keeps its stem."""
     m = re.match(r"([a-z]+)([\d.]*)-(\d+(?:\.\d+)?)b", stem, re.I)
@@ -153,18 +163,26 @@ def cmd_manifest(a: argparse.Namespace) -> None:
         return f"{kind}/{group}/{filename}" if group else f"{kind}/{filename}"
 
     stt_dir = root / "stt"
+    # The file --stt-default names is "stt" (what every install starts with); any other match of
+    # --stt-glob is offered as an "stt_options" choice, larger models for better accuracy.
     stt_files = sorted(stt_dir.glob(a.stt_glob)) if stt_dir.exists() else []
-    if stt_files:
-        f = stt_files[0]
-        manifest["stt"] = {
+    stt_files.sort(key=lambda f: (f.name != a.stt_default, f.name))
+    stt_entries = []
+    for f in stt_files:
+        stt_entries.append({
             "id": f.stem,
+            "label": stt_label(f.stem),
             "version": a.model_version,
             "filename": f.name,
             "size_bytes": f.stat().st_size,
             "sha256": sha256_of(f),
             "download_url": url("stt", "", f.name),
-        }
-        print(f"stt: {f.name} ({f.stat().st_size / 1e6:.0f} MB)")
+        })
+        print(f"stt: {f.name} ({f.stat().st_size / 1e6:.0f} MB) label={stt_entries[-1]['label']}")
+    if stt_entries:
+        manifest["stt"] = stt_entries[0]
+        if len(stt_entries) > 1:
+            manifest["stt_options"] = stt_entries[1:]
 
     llm_dir = root / "llm"
     # Sorted by name: the first GGUF is the default ("llm"), the rest are offered as "llm_options".
@@ -289,7 +307,8 @@ def main() -> None:
     m.add_argument("--base-url", required=True)
     m.add_argument("--version", default="1.1.0", help="manifest_version")
     m.add_argument("--model-version", default="1", help="per-model version string")
-    m.add_argument("--stt-glob", default="*.bin", help="which STT file to reference (e.g. 'whisper-small-*.bin')")
+    m.add_argument("--stt-glob", default="*.bin", help="which STT files to reference (e.g. 'whisper-*.bin')")
+    m.add_argument("--stt-default", default="whisper-small-q5_1.bin", help="the STT file every install starts with; the others become stt_options")
     m.add_argument("--llm-glob", default="*.gguf", help="which GGUF under <root>/llm to reference")
     m.add_argument("--flat", action="store_true", help="flat asset names (stt_x.bin, nmt_ko-en_model.bin) for GitHub releases")
     m.add_argument("--out", default=None, help="manifest output path (default <root>/manifest.json)")

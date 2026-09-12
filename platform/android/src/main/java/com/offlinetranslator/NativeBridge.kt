@@ -61,6 +61,8 @@ object NativeBridge {
     external fun mmLlmModelPath(handle: Long): String
     external fun mmStatusForLanguagesLlmJson(handle: Long, langsCsv: String, deepVerify: Boolean, llmMode: Int, llmId: String): String
     external fun mmLlmModelPathFor(handle: Long, llmId: String): String
+    external fun mmStatusForLanguagesJson2(handle: Long, langsCsv: String, deepVerify: Boolean, llmMode: Int, llmId: String, sttId: String): String
+    external fun mmSttModelPathFor(handle: Long, sttId: String): String
     external fun mmStagingDir(handle: Long, id: String): String
     external fun mmClearStaging(handle: Long, id: String?): Boolean
     /** 1 ok, 0 mismatch, -1 io error, -2 aborted */

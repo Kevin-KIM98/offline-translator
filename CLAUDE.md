@@ -97,6 +97,12 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   `label`); old readers ignore the extras, so never turn `llm` into an array. One LLM is selected at
   a time by id (`llmId` in Kotlin, `--llm-id` in the CLI); Settings → Translation LLM in the app.
   The 3B model is hosted on `models-v1` as `llm_qwen2.5-3b-instruct-q4_k_m.gguf`.
+- **Several speech models (0.3.10).** The manifest's `stt` is the default (whisper small) and
+  `stt_options` adds whisper medium (`stt_whisper-medium-q5_0.bin` on `models-v1`, label "Whisper
+  medium"); same rules as `llm_options`, never turn `stt` into an array. Selected by id (`sttId` in
+  Kotlin, `--stt-id` in the CLI, `tr_mm_status_for_languages_json2` / `tr_mm_stt_model_path_for`);
+  Settings → Speech recognition model. Medium measured th 9.1% CER against small's 14.5%, vi 0.8%
+  vs 3.9%, ~3× the time. `large-v3-turbo` repeats sentences with the adaptive window: not an option.
 - **Thai.** Only the LLM translates into Thai. The default hands it Marian's English and three
   diverse demonstrations: 26 of 40 test sentences correct against 17 before; Qwen2.5-3B reaches 31.
   Judge a change by reading the output with `python tests/eval/run_th_eval.py`; chrF alone misled.

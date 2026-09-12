@@ -111,9 +111,22 @@ python scripts/prepare_models.py whisper --model small --quant q5_1 --coreml   #
 Measured with `small-q5_1` through the app's streaming path on 140 synthesised clips (10 travel
 sentences × 7 languages × 2 voices; `tests/eval/run_stt_eval.py`): character error rate ko 0.0%,
 en 0.0%, es 0.1%, ja 2.1%, zh 2.7%, vi 3.9%, th 14.5%; language identification 140/140. Thai is
-the weak language of `small` (tone marks, vowel spellings); `medium` is the next step for Thai-heavy
-use, at 539 MB and about three times the time per utterance. Synthetic voices are cleaner than a
-phone microphone, so treat these as upper bounds.
+the weak language of `small` (tone marks, vowel spellings). `medium-q5_0` (539 MB, offered in the
+app since 0.3.10) measured on the same clips, one-shot: th 9.1%, vi 0.8%, ja 0.2%, zh 0.0%, ko/en/es
+0.0%, at 3.4–4.4 s per utterance against 1.2–1.5 s for `small`. Thai's remaining errors are vowel
+and tone spellings of single words. `large-v3-turbo-q5_0` repeated sentences with the adaptive
+encoder window and was not adopted. Synthetic voices are cleaner than a phone microphone, so treat
+these as upper bounds.
+
+**Offering several speech models.** As for the LLM: the manifest's `stt` object is the default and
+`stt_options` lists further whisper files of the same shape, each with a `label`. One is used at a
+time: `ModelManager::statusForLanguages(langs, deep, llmMode, llmId, sttId)` lists the selected
+one and `sttModelPath(sttId)` gives its path; the C ABI adds `tr_mm_status_for_languages_json2`
+and `tr_mm_stt_model_path_for`; Kotlin adds `sttId` to `statusForLanguages`, `pipelineConfig` and
+`TranslatorSession.prepare`, plus `ModelRepository.sttOptions()`. The app shows the choice under
+Settings → Speech recognition model. Desktop: `translator_cli status|transcribe|speech --stt-id
+whisper-medium-q5_0`, `scripts/fetch_models.py --stt-id ...`; `prepare_models.py manifest` writes
+the file named by `--stt-default` as `stt` and the other matches of `--stt-glob` as `stt_options`.
 
 **iOS CoreML**: whisper.cpp looks for `<model-name>-encoder.mlmodelc` next to the ggml file.
 Ship the unzipped `ggml-small-encoder.mlmodelc` directory in `models/stt/` (add it to the
@@ -149,6 +162,7 @@ converter did not (the normal case for transformers-converted Marian models).
 | pair | model | size | notes |
 |---|---|---|---|
 | STT | whisper `small-q5_1` | 190 MB | all seven languages |
+| STT option | whisper `medium-q5_0` | 539 MB | `stt_options`: chosen in Settings; better Thai and Vietnamese, ~3× the time |
 | ko-en, ja-en, zh-en, es-en | OPUS-MT base INT8 | ≈ 80 MB each | pre-converted (Hugging Face `jiangzhuo9357/*-ct2`) |
 | en-zh, en-es | OPUS-MT base INT8 | ≈ 80 MB each | same source |
 | en-ja | `opus-tatoeba-en-ja` INT8 | 78 MB | `opus-mt-en-jap` is trained on Bible text and unusable for modern Japanese |

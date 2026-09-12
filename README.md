@@ -141,7 +141,7 @@ Point `manifestUrl` at your own copy of `assets/manifest.json` (regenerate it wi
 | stage | engine | notes |
 |---|---|---|
 | noise suppression + VAD | RNNoise | 30 ms frames: voice activity and the level for the loudness gate; utterance segmentation with pre-roll / hangover. Whisper hears the microphone audio, not RNNoise's output (0.3.9) |
-| speech recognition | whisper.cpp `small-q5_1` (190 MB) | beam 5, punctuated per-language prompts, conversation context, hallucination filter, adaptive encoder window (also for automatic language detection, 0.3.9) |
+| speech recognition | whisper.cpp `small-q5_1` (190 MB); `medium-q5_0` (539 MB) selectable in Settings (0.3.10) | beam 5, punctuated per-language prompts, conversation context, hallucination filter, adaptive encoder window (also for automatic language detection, 0.3.9) |
 | translation (Marian) | CTranslate2 OPUS-MT INT8 (≈ 80 MB / pair, 11 pairs) | beam 4, repetition control, sentence batching, English-pivot routing, per-language post-processing |
 | translation (LLM) | llama.cpp + Qwen2.5-1.5B-Instruct Q4_K_M (1.1 GB) | directions no dedicated model covers, starting from Marian's English where a pair reaches it; three demonstrations, script guard, greedy decoding, output cleanup; any→any with source auto-detect when used on its own; `scripts/finetune_lora.py` adapts it to your domain |
 | speech output | AVSpeechSynthesizer / android.speech.tts | offline OS voices |
@@ -326,3 +326,12 @@ AAR on Ubuntu, the XCFramework on macOS, rewrites `Package.swift` with the new c
   no gain, 3.3× slower — adaptive kept. Thai is whisper `small`'s weak language (tone marks and
   vowel spellings: ล็อบบี้ → รอบบี); a larger whisper model is the lever, at about four times
   the size. Synthetic voices are cleaner than a phone microphone, so these are upper bounds.
+* **Whisper medium selectable (0.3.10).** Settings → Speech recognition model offers `medium-q5_0`
+  (539 MB) next to the default `small`; the app downloads it when chosen, and the manifest carries it
+  as `stt_options` the way `llm_options` carries the 3B LLM. On the same 140 clips, one-shot, desktop
+  CPU: th 14.5% → 9.1% CER (exact transcripts 2 → 5 of 20), vi 3.9% → 0.8%, ja 2.1% → 0.2%,
+  zh 2.7% → 0.0%, ko/en/es unchanged at 0; 3.4–4.4 s per utterance against 1.2–1.5 s. Thai's
+  remaining errors are vowel and tone spellings of single words (ตั๋ว → ตัว), not lost sentences.
+  `large-v3-turbo` was tried and dropped: with the adaptive encoder window it repeated sentences
+  from the first Korean clips on. `translator_cli ... --stt-id whisper-medium-q5_0` and
+  `scripts/fetch_models.py --stt-id ...` select it on the desktop.

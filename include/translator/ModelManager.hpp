@@ -45,7 +45,7 @@ struct ModelEntry {
     Kind kind = Kind::Nmt;
     std::string version;        // free-form; change triggers "update_available"
     std::string pair;           // "ko-en" (nmt only)
-    std::string label;          // human-facing name, e.g. "Qwen2.5 3B" (llm entries)
+    std::string label;          // human-facing name, e.g. "Qwen2.5 3B" (llm and stt entries)
     std::string installPath;    // file (stt) or directory (nmt / tokenizer)
     std::vector<DownloadItem> downloads;
     std::vector<std::string> requiredFiles; // relative to installPath (dirs) — for stt: {basename}
@@ -112,10 +112,12 @@ public:
     // both languages are requested, and the LLM per `llmMode` (IfNeeded = some requested
     // direction has neither a direct pair nor an English pivot).
     enum class LlmMode { IfNeeded, Always, Never };
-    // llmId selects which LLM counts (empty or unknown: the default); only that one is listed.
+    // llmId / sttId select which LLM and which speech model count (empty or unknown: the
+    // default); only those are listed.
     std::vector<ModelStatus> statusForLanguages(const std::vector<std::string>& langs, bool deepVerify = false,
                                                 LlmMode llmMode = LlmMode::IfNeeded,
-                                                const std::string& llmId = "") const;
+                                                const std::string& llmId = "",
+                                                const std::string& sttId = "") const;
 
     // ---- Download staging / verification / install ------------------------------
     std::string stagingDir(const std::string& id) const; // created on demand
@@ -135,7 +137,11 @@ public:
     bool remove(const std::string& id, std::string* error = nullptr);
 
     // Path helpers for wiring into PipelineConfig.
-    std::string sttModelPath() const;
+    // STT entries in manifest order: the "stt" object first (the default), then "stt_options".
+    std::vector<const ModelEntry*> sttEntries() const;
+    // The entry `sttId` names; the default when the id is empty or unknown; nullptr with no STT.
+    const ModelEntry* sttEntry(const std::string& sttId = "") const;
+    std::string sttModelPath(const std::string& sttId = "") const;
     // LLM entries in manifest order: the "llm" object first (the default), then "llm_options".
     std::vector<const ModelEntry*> llmEntries() const;
     // The entry `llmId` names; the default when the id is empty or unknown; nullptr with no LLM.

@@ -599,12 +599,23 @@ void testModelManager() {
         Json options = Json::array();
         options.push_back(big);
         m.set("llm_options", options);
+        Json bigStt = Json::object();
+        bigStt.set("id", "whisper-big-test");
+        bigStt.set("label", "Whisper big");
+        bigStt.set("version", "1");
+        bigStt.set("filename", "whisper-big-test.bin");
+        bigStt.set("size_bytes", 20);
+        bigStt.set("sha256", Sha256::hashString("bigstt"));
+        bigStt.set("download_url", "stt/whisper-big-test.bin");
+        Json sttOptions = Json::array();
+        sttOptions.push_back(bigStt);
+        m.set("stt_options", sttOptions);
 
         ModelManager routes(fs::join(root, "routes"));
         CHECK(routes.loadManifestJson(m.dump(), &err));
-        auto ids = [&](const std::vector<std::string>& langs, const std::string& llmId = "") {
+        auto ids = [&](const std::vector<std::string>& langs, const std::string& llmId = "", const std::string& sttId = "") {
             std::vector<std::string> out;
-            for (const auto& st : routes.statusForLanguages(langs, false, ModelManager::LlmMode::IfNeeded, llmId))
+            for (const auto& st : routes.statusForLanguages(langs, false, ModelManager::LlmMode::IfNeeded, llmId, sttId))
                 out.push_back(st.entry.id);
             return out;
         };
@@ -643,6 +654,19 @@ void testModelManager() {
         CHECK(has(koThBig, "nmt-ko-en"));
         CHECK_EQ(routes.statusOf(*routes.find("llm-big-test")).toJson().getString("label"), "Big");
         CHECK_EQ(routes.statusOf(*routes.find("llm-route-test")).toJson().getString("label"), "");
+
+        // Several speech models: "stt" is the default, "stt_options" add choices, one at a time.
+        CHECK_EQ(routes.sttEntries().size(), std::size_t(2));
+        CHECK_EQ(routes.sttModelPath(), fs::join(routes.sttDir(), "whisper-route-test.bin"));
+        CHECK_EQ(routes.sttModelPath("whisper-big-test"), fs::join(routes.sttDir(), "whisper-big-test.bin"));
+        CHECK_EQ(routes.sttModelPath("no-such-stt"), routes.sttModelPath());   // unknown id: the default
+        CHECK(has(koEn, "whisper-route-test"));
+        CHECK(!has(koEn, "whisper-big-test"));
+        const auto koEnBig = ids({"ko", "en"}, "", "whisper-big-test");
+        CHECK(has(koEnBig, "whisper-big-test"));
+        CHECK(!has(koEnBig, "whisper-route-test"));
+        CHECK_EQ(koEnBig.size(), std::size_t(3));
+        CHECK_EQ(routes.statusOf(*routes.find("whisper-big-test")).toJson().getString("label"), "Whisper big");
     }
 
     // Cache + reload.

@@ -74,6 +74,11 @@ A manifest may offer several LLMs: `llm` (the default) plus an `llm_options` arr
 llm_mode, llm_id)` and `tr_mm_llm_model_path_for(m, llm_id)` select one; `""` or an unknown id
 means the default, and only the selected LLM appears in the list. (0.3.8)
 
+Several speech models work the same way: `stt` (the default, whisper small) plus an `stt_options`
+array with a `label` each. `tr_mm_status_for_languages_json2(m, langs, deep, llm_mode, llm_id,
+stt_id)` and `tr_mm_stt_model_path_for(m, stt_id)` select one; only the selected speech model
+appears in the list, and `""` or an unknown id means the default. (0.3.10)
+
 ### Streaming (microphone)
 
 ```

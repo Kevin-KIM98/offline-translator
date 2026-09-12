@@ -104,6 +104,7 @@ def main() -> int:
     ap.add_argument("--langs", help="comma-separated languages, e.g. ko,en. Omit for every model in the manifest.")
     ap.add_argument("--llm", choices=["if-needed", "always", "never"], default="if-needed")
     ap.add_argument("--llm-id", help="which LLM from the manifest (see llm_options); default: the manifest's llm")
+    ap.add_argument("--stt-id", help="which whisper model from the manifest (see stt_options); default: the manifest's stt")
     ap.add_argument("--manifest", default=DEFAULT_MANIFEST, help="manifest URL or local path")
     ap.add_argument("--cli", help="path to translator_cli")
     ap.add_argument("--dry-run", action="store_true", help="list what would be downloaded and stop")
@@ -124,6 +125,8 @@ def main() -> int:
         cmd += ["--langs", args.langs, "--llm", args.llm]
         if args.llm_id:
             cmd += ["--llm-id", args.llm_id]
+        if args.stt_id:
+            cmd += ["--stt-id", args.stt_id]
     result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
     if result.returncode != 0:
         sys.stderr.write(result.stderr)

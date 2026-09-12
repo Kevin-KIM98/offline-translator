@@ -33,6 +33,11 @@ class Prefs(context: Context) {
         get() = sp.getString("llmId", null)
         set(v) = sp.edit().putString("llmId", v).apply()
 
+    /** Manifest id of the speech (whisper) model to use; null means the manifest's default. */
+    var sttId: String?
+        get() = sp.getString("sttId", null)
+        set(v) = sp.edit().putString("sttId", v).apply()
+
     /** True once the user has finished the first-run download at least once. */
     var setupDone: Boolean
         get() = sp.getBoolean("setupDone", false)

@@ -8,7 +8,7 @@ import com.offlinetranslator.ModelStatus
  * download progress, so a model is called the same thing everywhere.
  */
 fun modelTitle(context: Context, m: ModelStatus): String = when (m.kind) {
-    "stt" -> context.getString(R.string.model_stt)
+    "stt" -> if (m.label.isBlank()) context.getString(R.string.model_stt) else context.getString(R.string.model_stt_named, m.label)
     "llm" -> m.label.ifBlank { context.getString(R.string.model_llm) }
     "nmt" -> {
         val parts = m.pair.split("-")
