@@ -5,7 +5,7 @@ plugins {
 }
 
 // Version of the engine release this app links against.
-val engineVersion = "0.3.9"
+val engineVersion = "0.3.10"
 val useLocalEngine = providers.gradleProperty("useLocalEngine").orNull == "true"
 val engineAar = layout.projectDirectory.file("libs/offline-translator-$engineVersion.aar").asFile
 
