@@ -47,14 +47,30 @@ if [[ ! -f "$TP/miniaudio/miniaudio.h" ]]; then
     else wget -q -O "$TP/miniaudio/miniaudio.h" "$url"; fi
 fi
 
-# RNNoise ≥ 0.2 ships its weights separately.
+# RNNoise ≥ 0.2 ships its weights separately. media.xiph.org goes down for hours at a time, so a
+# copy sits on this repository's "third-party" release; either source must match the recorded hash.
+RNNOISE_DATA_SHA256="4ac81c5c0884ec4bd5907026aaae16209b7b76cd9d7f71af582094a2f98f4b43"   # rnnoise_data-0b50c45.tar.gz
 if [[ -f "$TP/rnnoise/model_version" && ! -f "$TP/rnnoise/src/rnnoise_data.c" ]]; then
     echo ">> downloading RNNoise model weights"
     (
         cd "$TP/rnnoise"
         model="rnnoise_data-$(cat model_version).tar.gz"
-        if command -v curl >/dev/null; then curl -sSL $CURL_RETRY -o "$model" "https://media.xiph.org/rnnoise/models/$model"
-        else wget -q -O "$model" "https://media.xiph.org/rnnoise/models/$model"; fi
+        fetch() {   # url
+            if command -v curl >/dev/null; then curl -sSL $CURL_RETRY -o "$model" "$1"
+            else wget -q -O "$model" "$1"; fi
+        }
+        digest() {
+            if command -v sha256sum >/dev/null; then sha256sum "$model" | cut -c1-64
+            else shasum -a 256 "$model" | cut -c1-64; fi
+        }
+        ok=0
+        for url in "https://github.com/Kevin-KIM98/offline-translator/releases/download/third-party/$model" \
+                   "https://media.xiph.org/rnnoise/models/$model"; do
+            rm -f "$model"
+            if fetch "$url" && [[ "$(digest)" == "$RNNOISE_DATA_SHA256" ]]; then ok=1; break; fi
+            echo "   $url: download failed or hash mismatch, trying the next source"
+        done
+        [[ $ok == 1 ]] || { echo "RNNoise weights: no source delivered $model"; exit 1; }
         tar xzf "$model"
     )
 fi

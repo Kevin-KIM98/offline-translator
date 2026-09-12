@@ -38,10 +38,23 @@ if ((Test-Path $dl) -and -not (Test-Path $rnData)) {
     $line = Get-Content $dl | Where-Object { $_ -match "^model=" } | Select-Object -First 1
     if ($line) {
         $model = ($line -split "=", 2)[1].Trim()
-        $url = "https://media.xiph.org/rnnoise/models/$model"
         Write-Host ">> downloading RNNoise model $model"
         $tgz = Join-Path $TP "rnnoise\$model"
-        Invoke-WebRequest -Uri $url -OutFile $tgz
+        # media.xiph.org goes down for hours at a time; a copy sits on this repository's
+        # "third-party" release. Either source must match the hash recorded in fetch_third_party.sh.
+        $expected = "4ac81c5c0884ec4bd5907026aaae16209b7b76cd9d7f71af582094a2f98f4b43"   # rnnoise_data-0b50c45.tar.gz
+        $ok = $false
+        foreach ($url in @("https://github.com/Kevin-KIM98/offline-translator/releases/download/third-party/$model",
+                           "https://media.xiph.org/rnnoise/models/$model")) {
+            try {
+                Invoke-WebRequest -Uri $url -OutFile $tgz -TimeoutSec 120
+                if ((Get-FileHash $tgz -Algorithm SHA256).Hash.ToLower() -eq $expected) { $ok = $true; break }
+                Write-Warning "$url : hash mismatch, trying the next source"
+            } catch {
+                Write-Warning "$url : $($_.Exception.Message)"
+            }
+        }
+        if (-not $ok) { throw "RNNoise weights: no source delivered $model" }
         & tar -xzf $tgz -C (Join-Path $TP "rnnoise")
         Remove-Item $tgz -Force
     } else {
