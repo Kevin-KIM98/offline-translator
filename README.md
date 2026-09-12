@@ -25,7 +25,7 @@ releases — no server of your own is needed.
 `apps/` holds a finished two-way interpreter for both platforms — first-run model download,
 push-to-talk per speaker, a replayable transcript, hands-free mode, keyboard input and model
 management. Grab
-[offline-interpreter-1.0.0.apk](https://github.com/Kevin-KIM98/offline-translator/releases/download/v0.3.9/offline-interpreter-1.0.0.apk)
+[offline-interpreter-1.0.0.apk](https://github.com/Kevin-KIM98/offline-translator/releases/download/v0.3.10/offline-interpreter-1.0.0.apk)
 for an arm64 Android 8+ device, or build either app from source:
 
 ```
@@ -83,7 +83,7 @@ device.
 2. `app/build.gradle.kts`:
 
 ```kotlin
-implementation(files("libs/offline-translator-0.3.9.aar"))
+implementation(files("libs/offline-translator-0.3.10.aar"))
 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 ```
 
