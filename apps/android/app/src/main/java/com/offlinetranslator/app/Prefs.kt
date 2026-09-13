@@ -1,11 +1,20 @@
 package com.offlinetranslator.app
 
+import android.app.ActivityManager
 import android.content.Context
 import com.offlinetranslator.TranslationBackend
 
 /** Everything the app remembers between launches. Small enough for SharedPreferences. */
 class Prefs(context: Context) {
     private val sp = context.getSharedPreferences("interpreter", Context.MODE_PRIVATE)
+
+    // Model defaults follow the phone. With 8 GB of memory or more the accurate models are the
+    // default (whisper medium: th 14.5% -> 9.1% CER, vi 3.9% -> 0.8%; Qwen2.5 3B: 26 -> 31 of 40
+    // Korean->Thai sentences right), at two to three times the time per sentence. Smaller phones
+    // start with the fast models. Either way the user can change them in Settings.
+    private val roomy: Boolean = totalMemoryBytes(context) >= 7_500_000_000L
+    val defaultSttId: String = if (roomy) "whisper-medium-q5_0" else "whisper-small-q5_1"
+    val defaultLlmId: String = if (roomy) "qwen2.5-3b-instruct-q4_k_m" else "qwen2.5-1.5b-instruct-q4_k_m"
 
     var langA: String
         get() = sp.getString("langA", "ko")!!
@@ -28,9 +37,9 @@ class Prefs(context: Context) {
             .getOrDefault(TranslationBackend.AUTO)
         set(v) = sp.edit().putString("backend", v.name).apply()
 
-    /** Manifest id of the LLM to use; null means the manifest's default. */
+    /** Manifest id of the LLM to use; unset means the phone's default (see [defaultLlmId]). */
     var llmId: String?
-        get() = sp.getString("llmId", null)
+        get() = sp.getString("llmId", null) ?: defaultLlmId
         set(v) = sp.edit().putString("llmId", v).apply()
 
     /** Whisper on the GPU (Vulkan), experimental; off by default. */
@@ -46,9 +55,9 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("gpuTrialPending", false)
         set(v) = sp.edit().putBoolean("gpuTrialPending", v).apply()
 
-    /** Manifest id of the speech (whisper) model to use; null means the manifest's default. */
+    /** Manifest id of the speech (whisper) model to use; unset means the phone's default (see [defaultSttId]). */
     var sttId: String?
-        get() = sp.getString("sttId", null)
+        get() = sp.getString("sttId", null) ?: defaultSttId
         set(v) = sp.edit().putString("sttId", v).apply()
 
     /** True once the user has finished the first-run download at least once. */
@@ -60,4 +69,12 @@ class Prefs(context: Context) {
     var wifiOnly: Boolean
         get() = sp.getBoolean("wifiOnly", true)
         set(v) = sp.edit().putBoolean("wifiOnly", v).apply()
+}
+
+/** Physical memory of the phone, 0 when unknown. */
+fun totalMemoryBytes(context: Context): Long {
+    val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return 0L
+    val info = ActivityManager.MemoryInfo()
+    am.getMemoryInfo(info)
+    return info.totalMem
 }

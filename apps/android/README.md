@@ -61,6 +61,7 @@ Requirements: Android 9 (API 28) or newer, arm64 device (the Vulkan backend link
 |---|---|
 | first run | lists exactly the models the chosen language pair needs, with sizes, then downloads them with progress, resume after interruption and a free-space check |
 | conversation | one talk button per speaker, held down while speaking; the transcript shows the original quietly and the translation large, with the route and latency, and every line can be replayed |
+| model defaults | phones with 8 GB of memory or more start with Whisper medium and Qwen2.5 3B (the accurate pair, 2–3× the time per sentence); smaller phones with Whisper small and Qwen2.5 1.5B; both are changed under Settings |
 | download everything | Settings → Installed models → "Download everything": both speech models, every translation pair and both LLMs in one download (about 5 GB), so no later language or model choice needs the network |
 | performance | "Speech recognition on the GPU (experimental)": whisper's encoder through Vulkan, off by default, switches itself off after a crash; unmeasured on devices |
 | conversation mode | keeps the microphone open; the engine detects the language of each utterance and translates it into the other party's language, so both people just talk in turn. The microphone is muted while a translation is read aloud, so the phone does not transcribe its own voice; long speech is cut at pauses and translated in pieces |

@@ -50,6 +50,7 @@ import com.offlinetranslator.app.MainViewModel
 import com.offlinetranslator.app.R
 import com.offlinetranslator.app.Side
 import com.offlinetranslator.app.UiState
+import com.offlinetranslator.app.totalMemoryBytes
 import com.offlinetranslator.app.mb
 import com.offlinetranslator.app.modelTitle
 import com.offlinetranslator.app.ui.theme.LocalSpeakerColors
@@ -170,7 +171,7 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
                 Card {
                     val selectedId = state.sttId ?: state.sttOptions.first().id
                     state.sttOptions.forEachIndexed { i, m ->
-                        val choice = if (i == 0) null else m.id   // null follows the manifest's default
+                        val choice = m.id
                         if (i > 0) Divider()
                         Row(
                             Modifier
@@ -208,9 +209,7 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
                 Card {
                     val selectedId = state.llmId ?: state.llmOptions.first().id
                     state.llmOptions.forEachIndexed { i, m ->
-                        // The first entry is the manifest's default; storing null for it keeps the
-                        // choice following the manifest if the default ever changes.
-                        val choice = if (i == 0) null else m.id
+                        val choice = m.id
                         if (i > 0) Divider()
                         Row(
                             Modifier
@@ -354,12 +353,6 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
     }
 }
 
-private fun totalMemoryBytes(context: Context): Long {
-    val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return 0L
-    val info = ActivityManager.MemoryInfo()
-    am.getMemoryInfo(info)
-    return info.totalMem
-}
 
 @Composable
 private fun BackendChip(

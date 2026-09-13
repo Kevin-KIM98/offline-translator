@@ -104,6 +104,11 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   `label`); old readers ignore the extras, so never turn `llm` into an array. One LLM is selected at
   a time by id (`llmId` in Kotlin, `--llm-id` in the CLI); Settings → Translation LLM in the app.
   The 3B model is hosted on `models-v1` as `llm_qwen2.5-3b-instruct-q4_k_m.gguf`.
+- **App model defaults (0.3.16).** `Prefs.defaultSttId/defaultLlmId`: phones with ≥ 7.5 GB of
+  memory default to whisper medium + Qwen2.5 3B (the user's Galaxy S25 has 12 GB), smaller ones
+  to small + 1.5B; the settings radios store explicit ids now (null used to mean "manifest
+  default", which the app default no longer equals). The manifest's own `stt`/`llm` defaults are
+  unchanged for library consumers.
 - **Several speech models (0.3.10).** The manifest's `stt` is the default (whisper small) and
   `stt_options` adds whisper medium (`stt_whisper-medium-q5_0.bin` on `models-v1`, label "Whisper
   medium"); same rules as `llm_options`, never turn `stt` into an array. Selected by id (`sttId` in
