@@ -91,6 +91,10 @@
     <string name="settings_none_installed">아직 설치된 모델이 없습니다.</string>
     <string name="delete">삭제</string>
     <string name="settings_total">합계 %1$s</string>
+    <string name="settings_download_all">모든 모델 내려받기 (남은 용량 %1$s)</string>
+    <string name="settings_download_all_desc">음성 인식 모델 2개, 번역 모델 전부, LLM 2개를 한 번에 받습니다. 그 뒤로는 어떤 언어나 모델을 골라도 추가로 내려받지 않습니다. Wi-Fi를 권하며, 중단해도 이어받습니다.</string>
+    <string name="setup_everything_subtitle">앱이 쓸 수 있는 모든 모델을 한 번에 내려받습니다: 음성 인식 모델 2개, 번역 모델 전부, LLM 2개. 그 뒤로는 어떤 언어·모델을 골라도 인터넷 없이 동작합니다.</string>
+    <string name="all_models_installed">모든 모델이 이미 설치되어 있습니다.</string>
     <string name="settings_about">정보</string>
     <string name="info_engine_version">엔진 버전</string>
     <string name="info_manifest">모델 목록</string>

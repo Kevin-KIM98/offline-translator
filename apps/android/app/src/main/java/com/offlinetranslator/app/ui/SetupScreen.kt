@@ -65,7 +65,8 @@ fun SetupScreen(
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            stringResource(R.string.setup_subtitle, Lang.of(state.langA).name, Lang.of(state.langB).name),
+            if (phase.everything) stringResource(R.string.setup_everything_subtitle)
+            else stringResource(R.string.setup_subtitle, Lang.of(state.langA).name, Lang.of(state.langB).name),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

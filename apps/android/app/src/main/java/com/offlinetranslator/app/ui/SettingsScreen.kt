@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Button
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -290,6 +291,22 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(16.dp),
+                        )
+                    }
+                }
+                // Everything the manifest offers, in one go: both speech models, every pair, both LLMs.
+                val missing = state.installed.filter { it.needsDownload }
+                if (missing.isNotEmpty()) {
+                    Divider()
+                    Column(Modifier.padding(16.dp)) {
+                        Button(onClick = { vm.downloadEverything(); onBack() }, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.settings_download_all, mb(missing.sumOf { it.totalBytes })))
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            stringResource(R.string.settings_download_all_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }

@@ -27,8 +27,11 @@ sealed interface Phase {
     /** Reading the manifest and checking what is installed. */
     data object Checking : Phase
 
-    /** Models are missing; [pending] is what the chosen languages still need. */
-    data class Setup(val pending: List<ModelStatus>, val error: String? = null) : Phase
+    /**
+     * Models are missing; [pending] is what the chosen languages still need — or, with
+     * [everything], every model the manifest offers, so no later choice needs a download.
+     */
+    data class Setup(val pending: List<ModelStatus>, val error: String? = null, val everything: Boolean = false) : Phase
 
     data class Downloading(
         val label: String,
@@ -196,9 +199,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 runCatching { repo?.statusForLanguages(_state.value.langs, llmMode = llmMode(), llmId = _state.value.llmId, sttId = _state.value.sttId)?.filter { it.needsDownload } }
                     .getOrNull()
             } ?: emptyList()
-            _state.update {
-                it.copy(phase = Phase.Setup(pending, str(R.string.err_download_stopped)))
+            // Stopping a "download everything" run leaves the chosen languages either complete
+            // (back to the conversation) or short of something (the usual setup screen).
+            if (pending.isEmpty()) openSession()
+            else _state.update { it.copy(phase = Phase.Setup(pending, str(R.string.err_download_stopped))) }
+        }
+    }
+
+    /**
+     * Every model the manifest offers — both speech models, every translation pair, both LLMs —
+     * in one download, so changing languages or models later never waits for the network. The
+     * setup screen lists them with the total size and asks before starting.
+     */
+    fun downloadEverything() {
+        viewModelScope.launch {
+            val pending = withContext(Dispatchers.IO) { runCatching { repo?.status() }.getOrNull() }
+                ?.filter { it.needsDownload } ?: emptyList()
+            if (pending.isEmpty()) {
+                showMessage(str(R.string.all_models_installed))
+                return@launch
             }
+            pauseMic()
+            _state.update { it.copy(phase = Phase.Setup(pending, everything = true), handsFree = false, listening = null) }
         }
     }
 
