@@ -346,7 +346,7 @@ void testLlmEngine() {
     CHECK_EQ(LlmEngine::buildInstruction("ko", "en", "custom"), "custom");
     CHECK(!LlmEngine::exampleSentence("th").empty());
     // Diverse demonstrations pair up by index, so every language needs the same count.
-    for (const char* code : {"ko", "en", "es", "vi", "th", "ja", "zh"})
+    for (const char* code : {"ko", "en", "es", "vi", "th", "ja", "zh", "id"})
         CHECK_EQ(LlmEngine::exampleSet(code).size(), std::size_t(3));
     CHECK(LlmEngine::exampleSet("xx").empty());
     CHECK(LlmEngine::exampleSentence("xx").empty());
@@ -367,15 +367,28 @@ void testLlmEngine() {
     CHECK(!r.error.empty());
 
     // Languages
-    CHECK_EQ(supportedLanguages().size(), std::size_t(7));
+    CHECK_EQ(supportedLanguages().size(), std::size_t(8));
     CHECK(isSupportedLanguage("vi"));
     CHECK(isSupportedLanguage("th"));
+    CHECK(isSupportedLanguage("id"));
+    CHECK(!text::defaultPromptFor("id").empty());
+    CHECK(text::isHallucination("Terima kasih telah menonton!", "id"));
+    CHECK_EQ(LlmEngine::languageName("id"), "Indonesian");
+    CHECK(LlmEngine::foreignScriptRatio("Selamat pagi 会议明天开始", "id") > 0.3);
     CHECK(!text::defaultPromptFor("vi").empty());
     CHECK(!text::defaultPromptFor("th").empty());
     CHECK(text::isHallucination("ขอบคุณที่รับชม", "th"));
     CHECK(text::isHallucination("Cảm ơn các bạn đã theo dõi!", "vi"));
     CHECK_EQ(text::postProcessTranslation("สวัสดี  ครับ", "th"), "สวัสดี ครับ");
     CHECK_EQ(text::postProcessTranslation("xin chào . tôi là", "vi"), "Xin chào. Tôi là");
+    // The en-ko model sometimes appends its English input; a trailing run of Latin words goes.
+    CHECK_EQ(text::postProcessTranslation("택시로 공항까지 얼마나 걸립니까? How long is the ride to the airport in a cab?", "ko"),
+             "택시로 공항까지 얼마나 걸립니까?");
+    CHECK_EQ(text::postProcessTranslation("택시로 공항까지 얼마나 걸립니까? How long’s the ride to the airport?", "ko"),
+             "택시로 공항까지 얼마나 걸립니까?");   // curly apostrophe inside the copy
+    CHECK_EQ(text::postProcessTranslation("회의는 오후 3 PM에 시작합니다.", "ko"), "회의는 오후 3 PM에 시작합니다.");   // short Latin tail stays
+    CHECK_EQ(text::postProcessTranslation("OK 알겠습니다.", "ko"), "OK 알겠습니다.");                                  // Latin in front stays
+    CHECK_EQ(text::postProcessTranslation("How long is the ride to the airport?", "en"), "How long is the ride to the airport?");
 }
 
 void testSentenceSplit() {

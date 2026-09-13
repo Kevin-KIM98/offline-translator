@@ -76,7 +76,7 @@ Nothing leaves the device. The only network use is the one-time model download.
 MainActivity.kt      permission, keep-awake, lifecycle → pauses the mic when backgrounded
 MainViewModel.kt     the whole state machine: models → session → conversation
 Prefs.kt             what is remembered between launches
-Languages.kt         the seven languages and the two conversation sides
+Languages.kt         the eight languages and the two conversation sides
 ui/InterpreterApp.kt phase routing (checking / setup / downloading / ready / failed)
 ui/SetupScreen.kt    first-run download
 ui/ConversationScreen.kt  main screen

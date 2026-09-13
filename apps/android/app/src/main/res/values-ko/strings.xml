@@ -27,7 +27,7 @@
     <string name="model_llm">다국어 통역 LLM</string>
     <string name="model_nmt_pair">%1$s → %2$s 번역</string>
     <string name="model_nmt_generic">번역 모델 %1$s</string>
-    <string name="model_stt_sub">whisper · 7개 언어 공용</string>
+    <string name="model_stt_sub">whisper · 8개 언어 공용</string>
     <string name="model_llm_sub">Qwen2.5 · 모든 언어 조합</string>
     <string name="model_nmt_sub">OPUS-MT</string>
 

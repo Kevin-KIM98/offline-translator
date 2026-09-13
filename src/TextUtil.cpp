@@ -85,6 +85,8 @@ const std::vector<std::string>& hallucinations(const std::string& lang) {
                 "gracias", "hasta la próxima"}},
         {"vi", {"cảm ơn các bạn đã theo dõi", "cảm ơn đã xem", "hãy đăng ký kênh", "hẹn gặp lại", "phụ đề bởi", "cảm ơn"}},
         {"th", {"ขอบคุณที่รับชม", "ขอบคุณครับ", "ขอบคุณค่ะ", "กดติดตาม", "แล้วพบกันใหม่", "คำบรรยายโดย"}},
+        {"id", {"terima kasih telah menonton", "terima kasih sudah menonton", "jangan lupa subscribe",
+                "sampai jumpa di video berikutnya", "subtitle oleh", "terima kasih"}},
     };
     static const std::vector<std::string> empty;
     const auto it = table.find(lang);
@@ -137,6 +139,7 @@ std::string defaultPromptFor(const std::string& lang) {
     if (lang == "es") return "Hola. La reunión de hoy empieza a las tres de la tarde. Sí, entendido. Gracias.";
     if (lang == "vi") return "Xin chào. Cuộc họp hôm nay bắt đầu lúc 3 giờ chiều. Vâng, tôi hiểu rồi. Cảm ơn.";
     if (lang == "th") return "สวัสดีครับ การประชุมวันนี้เริ่มตอนบ่ายสามโมง ครับ เข้าใจแล้ว ขอบคุณครับ";
+    if (lang == "id") return "Halo. Rapat hari ini dimulai pukul 3 sore. Ya, saya mengerti. Terima kasih.";
     return {};
 }
 
@@ -263,8 +266,49 @@ std::string cleanTranscript(const std::string& input, const std::string& lang) {
 // Translation post-processing
 // ---------------------------------------------------------------------------
 
+namespace {
+// The en-ko Marian model now and then appends its English input to the Korean ("... 걸립니까? How
+// long is the ride to the airport in a cab?"). Behind text in a non-Latin target script, a run of
+// four or more Latin-alphabet words at the very end is that copy, never the translation.
+std::string dropAppendedSource(const std::string& s, const std::string& lang) {
+    if (lang != "ko" && lang != "ja" && lang != "zh" && lang != "th") return s;
+    const auto chars = utf8Chars(s);
+    auto latinWord = [](const std::string& ch) {
+        if (ch.size() == 1) return true;                       // ASCII letters, digits, punctuation
+        return ch == "’" || ch == "‘";  // curly apostrophes
+    };
+    // Walk words from the end while they are made of Latin/ASCII characters only.
+    std::size_t i = chars.size();
+    while (i > 0 && chars[i - 1] == " ") --i;
+    std::size_t cut = i;
+    int words = 0;
+    while (i > 0) {
+        std::size_t j = i;
+        bool letters = false, ok = true;
+        while (j > 0 && chars[j - 1] != " ") {
+            --j;
+            if (!latinWord(chars[j])) { ok = false; break; }
+            const char c = chars[j][0];
+            if (chars[j].size() == 1 && ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))) letters = true;
+        }
+        if (!ok || !letters) break;
+        cut = j;
+        ++words;
+        i = j;
+        while (i > 0 && chars[i - 1] == " ") --i;
+    }
+    if (words < 4 || cut == 0) return s;
+    bool nativeBefore = false;
+    for (std::size_t k = 0; k < cut && !nativeBefore; ++k) nativeBefore = chars[k].size() > 1 && !latinWord(chars[k]);
+    if (!nativeBefore) return s;
+    std::string head;
+    for (std::size_t k = 0; k < cut; ++k) head += chars[k];
+    return trim(head);
+}
+} // namespace
+
 std::string postProcessTranslation(const std::string& input, const std::string& lang) {
-    std::string s = collapseSpaces(input);
+    std::string s = dropAppendedSource(collapseSpaces(input), lang);
     if (s.empty()) return s;
     const auto chars = utf8Chars(s);
     std::string out;

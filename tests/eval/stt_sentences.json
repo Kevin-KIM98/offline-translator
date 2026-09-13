@@ -84,15 +84,52 @@
       "我的护照丢了，需要去警察局。",
       "请告诉我这辆公交车去不去市中心。",
       "听说今晚会下雨，所以我带了伞。"
+    ],
+    "id": [
+      "Di mana toiletnya?",
+      "Mari bertemu di lobi hotel besok jam tiga sore.",
+      "Apakah ada apotek di dekat sini?",
+      "Berapa lama perjalanan ke bandara dengan taksi?",
+      "Saya alergi kacang, jadi saya harus hati-hati.",
+      "Tolong dua tiket.",
+      "Bisakah Anda berbicara sedikit lebih pelan?",
+      "Saya kehilangan paspor dan harus pergi ke kantor polisi.",
+      "Tolong beri tahu saya apakah bus ini pergi ke pusat kota.",
+      "Katanya malam ini akan hujan, jadi saya membawa payung."
     ]
   },
   "voices": {
-    "ko": ["ko-KR-SunHiNeural", "ko-KR-InJoonNeural"],
-    "en": ["en-US-JennyNeural", "en-US-GuyNeural"],
-    "es": ["es-ES-ElviraNeural", "es-ES-AlvaroNeural"],
-    "vi": ["vi-VN-HoaiMyNeural", "vi-VN-NamMinhNeural"],
-    "th": ["th-TH-PremwadeeNeural", "th-TH-NiwatNeural"],
-    "ja": ["ja-JP-NanamiNeural", "ja-JP-KeitaNeural"],
-    "zh": ["zh-CN-XiaoxiaoNeural", "zh-CN-YunxiNeural"]
+    "ko": [
+      "ko-KR-SunHiNeural",
+      "ko-KR-InJoonNeural"
+    ],
+    "en": [
+      "en-US-JennyNeural",
+      "en-US-GuyNeural"
+    ],
+    "es": [
+      "es-ES-ElviraNeural",
+      "es-ES-AlvaroNeural"
+    ],
+    "vi": [
+      "vi-VN-HoaiMyNeural",
+      "vi-VN-NamMinhNeural"
+    ],
+    "th": [
+      "th-TH-PremwadeeNeural",
+      "th-TH-NiwatNeural"
+    ],
+    "ja": [
+      "ja-JP-NanamiNeural",
+      "ja-JP-KeitaNeural"
+    ],
+    "zh": [
+      "zh-CN-XiaoxiaoNeural",
+      "zh-CN-YunxiNeural"
+    ],
+    "id": [
+      "id-ID-GadisNeural",
+      "id-ID-ArdiNeural"
+    ]
   }
 }

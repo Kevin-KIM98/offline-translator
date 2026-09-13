@@ -183,6 +183,6 @@ class OfflineTranslator(config: PipelineConfig) : Closeable {
     companion object {
         val version: String get() = NativeBridge.version()
         val buildCapabilities: JSONObject get() = JSONObject(NativeBridge.buildCapabilities())
-        val supportedLanguages: List<String> = listOf("ko", "en", "es", "vi", "th", "ja", "zh")
+        val supportedLanguages: List<String> = listOf("ko", "en", "es", "vi", "th", "ja", "zh", "id")
     }
 }

@@ -1,10 +1,10 @@
 # Model preparation
 
-## 0. LLM backend (any→any, 7 languages)
+## 0. LLM backend (any→any, 8 languages)
 
 Since 0.3 the engine can translate with a small instruction-tuned LLM through llama.cpp instead
 of (or in addition to) the per-pair Marian models. One GGUF file covers every direction among
-Korean, English, Spanish, Vietnamese, Thai, Japanese and Chinese, and the source language may be
+Korean, English, Spanish, Vietnamese, Thai, Japanese, Chinese and Indonesian, and the source language may be
 left to the model (`"auto"`).
 
 | model | file | size | CPU latency (desktop, 4 threads, 2–3 sentences) | notes |
@@ -82,7 +82,7 @@ identical and every sentence takes `ko-en → llm`. The extra Marian hop raises 
 sentence on a desktop CPU from 1.7–2.0 s to 2.1–2.3 s; the 3B model takes 4.6–4.8 s.
 
 **Teaching it your domain ("학습")**: `scripts/finetune_lora.py` fine-tunes the same Qwen model
-with LoRA on parallel sentences (Tatoeba for all 7 languages, plus your own JSONL — glossaries,
+with LoRA on parallel sentences (Tatoeba for all 8 languages, plus your own JSONL — glossaries,
 corrected app outputs), merges the adapter and exports a quantized GGUF that drops into the
 manifest. The training prompt is byte-identical to what `LlmEngine` sends at runtime. It needs a
 GPU machine (≈ 12 GB VRAM for 1.5B); nothing is trained on the phone.
@@ -161,7 +161,7 @@ converter did not (the normal case for transformers-converted Marian models).
 
 | pair | model | size | notes |
 |---|---|---|---|
-| STT | whisper `small-q5_1` | 190 MB | all seven languages |
+| STT | whisper `small-q5_1` | 190 MB | all eight languages |
 | STT option | whisper `medium-q5_0` | 539 MB | `stt_options`: chosen in Settings; better Thai and Vietnamese, ~3× the time |
 | ko-en, ja-en, zh-en, es-en | OPUS-MT base INT8 | ≈ 80 MB each | pre-converted (Hugging Face `jiangzhuo9357/*-ct2`) |
 | en-zh, en-es | OPUS-MT base INT8 | ≈ 80 MB each | same source |
@@ -169,6 +169,7 @@ converter did not (the normal case for transformers-converted Marian models).
 | en-ko | `opus-mt-tc-big-en-ko` INT8, converted from the original Marian weights | ≈ 215 MB | see below |
 | vi-en, en-vi | OPUS-MT base INT8 (`dekthedev/*-ct2-int8`) | 73 MB each | |
 | th-en | OPUS-MT base INT8 (converted from `Helsinki-NLP/opus-mt-th-en`) | 82 MB | no Marian en→th exists → the LLM handles it |
+| id-en, en-id | OPUS-MT base INT8 (converted from `Helsinki-NLP/opus-mt-id-en` / `-en-id`) | 77 MB each | 0.3.12; every direction reaches Indonesian through English |
 | LLM | Qwen2.5-1.5B-Instruct Q4_K_M | 1.12 GB | any direction without a Marian route; downloaded only when needed |
 
 Every other direction pivots through English automatically when both halves exist (ko↔ja, ko↔zh, vi→ko, th→ko, …); directions that cannot be pivoted (anything → Thai, and any pair the LLM-only backend is asked for) go to the LLM.

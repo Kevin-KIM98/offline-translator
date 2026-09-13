@@ -96,6 +96,7 @@ std::string LlmEngine::exampleSentence(const std::string& code) {
     if (code == "th") return "ขอโทษครับ สถานีที่ใกล้ที่สุดอยู่ที่ไหนครับ";
     if (code == "ja") return "すみません、一番近い駅はどこですか？";
     if (code == "zh") return "请问，最近的车站在哪里？";
+    if (code == "id") return "Permisi, di mana stasiun terdekat?";
     return {};
 }
 
@@ -109,6 +110,7 @@ std::vector<std::string> LlmEngine::exampleSet(const std::string& code) {
     if (code == "th") return {"การประชุมถูกเลื่อนไปเป็นวันศุกร์ครับ", "ช่วยเบาเสียงเพลงลงหน่อยได้ไหมครับ", "เมื่อวานผมซื้อหนังสือสองเล่มครับ"};
     if (code == "ja") return {"会議は金曜日に延期されました。", "音楽を少し小さくしていただけますか？", "昨日、本を二冊買いました。"};
     if (code == "zh") return {"会议推迟到星期五了。", "可以把音乐调小一点吗？", "我昨天买了两本书。"};
+    if (code == "id") return {"Rapatnya dipindahkan ke hari Jumat.", "Bisakah Anda mengecilkan musiknya sedikit?", "Kemarin saya membeli dua buku."};
     return {};
 }
 
@@ -146,7 +148,7 @@ bool scriptAllowed(Script s, const std::string& lang) {
     if (lang == "ja") return s == Script::Kana || s == Script::Han;
     if (lang == "zh") return s == Script::Han;
     if (lang == "th") return s == Script::Thai;
-    if (lang == "en" || lang == "es" || lang == "vi") return s == Script::Latin;
+    if (lang == "en" || lang == "es" || lang == "vi" || lang == "id") return s == Script::Latin;
     return true;
 }
 
@@ -226,7 +228,7 @@ struct LlmEngine::Impl {
         if (it != samplers.end()) return it->second;
 
         std::vector<llama_logit_bias> biases;
-        const bool known = tgt == "ko" || tgt == "ja" || tgt == "zh" || tgt == "th" || tgt == "en" || tgt == "es" || tgt == "vi";
+        const bool known = tgt == "ko" || tgt == "ja" || tgt == "zh" || tgt == "th" || tgt == "en" || tgt == "es" || tgt == "vi" || tgt == "id";
         if (known) {
             for (std::size_t id = 0; id < tokenScripts.size(); ++id) {
                 const auto& scripts = tokenScripts[id];

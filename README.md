@@ -1,7 +1,7 @@
-# Offline 7-language speech translator
+# Offline 8-language speech translator
 
 On-device, no-network speech translation for **Android and iOS** — Korean · English · Spanish ·
-Vietnamese · Thai · Japanese · Chinese, in every direction:
+Vietnamese · Thai · Japanese · Chinese · Indonesian, in every direction:
 
 ```
 mic 16 kHz ─► RNNoise ─► VAD segmenter ─► whisper.cpp ─► translation ─────────────────► OS TTS
@@ -130,7 +130,7 @@ models its route uses.
 Up to 0.3.6 a choice like `["ko","ja"]` selected no English models and so downloaded speech
 recognition alone; nothing could translate. Pass `backend = LLM` (Kotlin
 `TranslationBackend.LLM`, Swift `.LLM`) to translate everything with the LLM — slower, but a single
-model for all 42 directions with automatic source-language detection.
+model for all 56 directions with automatic source-language detection.
 
 ### Self-hosting models
 
@@ -143,7 +143,7 @@ Point `manifestUrl` at your own copy of `assets/manifest.json` (regenerate it wi
 |---|---|---|
 | noise suppression + VAD | RNNoise | 30 ms frames: voice activity and the level for the loudness gate; utterance segmentation with pre-roll / hangover; a speaker who never pauses is cut at the longest short pause before 15 s (0.3.11). Whisper hears the microphone audio, not RNNoise's output (0.3.9) |
 | speech recognition | whisper.cpp `small-q5_1` (190 MB); `medium-q5_0` (539 MB) selectable in Settings (0.3.10) | beam 5, punctuated per-language prompts, conversation context, hallucination filter, adaptive encoder window (also for automatic language detection, 0.3.9) |
-| translation (Marian) | CTranslate2 OPUS-MT INT8 (≈ 80 MB / pair, 11 pairs) | beam 4, repetition control, sentence batching, English-pivot routing, per-language post-processing |
+| translation (Marian) | CTranslate2 OPUS-MT INT8 (≈ 80 MB / pair, 13 pairs) | beam 4, repetition control, sentence batching, English-pivot routing, per-language post-processing |
 | translation (LLM) | llama.cpp + Qwen2.5-1.5B-Instruct Q4_K_M (1.1 GB) | directions no dedicated model covers, starting from Marian's English where a pair reaches it; three demonstrations, script guard, greedy decoding, output cleanup; any→any with source auto-detect when used on its own; `scripts/finetune_lora.py` adapts it to your domain |
 | speech output | AVSpeechSynthesizer / android.speech.tts | offline OS voices |
 
@@ -221,7 +221,7 @@ hum and does little against music or overlapping voices.
 
 Models are hosted on the [`models-v1` release](https://github.com/Kevin-KIM98/offline-translator/releases/tag/models-v1)
 and described by [assets/manifest.json](assets/manifest.json) (per-file SHA-256): whisper `small-q5_1`,
-11 Marian pairs (ko/ja/zh/es/vi/th ↔ en, en→ko tc-big) and the Qwen2.5-1.5B GGUF.
+13 Marian pairs (ko/ja/zh/es/vi/th/id ↔ en, en→ko tc-big) and the Qwen2.5-1.5B GGUF.
 
 ## Repository layout
 
@@ -348,3 +348,12 @@ AAR on Ubuntu, the XCFramework on macOS, rewrites `Package.swift` with the new c
   the second half of the piece, ko 3.3% → 1.4% CER with every cut at a clause boundary, en 0.0%.
   Each piece is translated as soon as it closes, so a long speech arrives in parts, a few seconds
   behind the speaker. The 140-clip per-language numbers did not move.
+* **Indonesian (0.3.12).** Eighth language: OPUS-MT `id-en` / `en-id` (77 MB each, converted to
+  CTranslate2 INT8), so every direction reaches Indonesian through English with Marian and only
+  Indonesian → Thai needs the LLM. Whisper `small` on 20 synthesised clips through the app path:
+  3.5% character error rate, 12 of 20 exact, language identified 20/20 (19/20 with `auto`: the
+  three-word "Tolong dua tiket." came back as Thai). Its errors are content words ("kacang" heard
+  as "kaki", "kehilangan paspor" as "kecil. Dapur"); whisper `medium` is the lever, as for Thai.
+  While checking the pivot, the en→ko model turned out to append its English input to the Korean
+  now and then ("택시로 공항까지 얼마나 걸립니까? How long is the ride…"); the post-processing now
+  drops a trailing run of Latin words behind Korean, Japanese, Chinese or Thai text.

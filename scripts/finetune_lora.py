@@ -33,11 +33,11 @@ import sys
 from pathlib import Path
 
 LANG_NAMES = {
-    "ko": "Korean", "en": "English", "es": "Spanish", "vi": "Vietnamese", "th": "Thai",
+    "ko": "Korean", "en": "English", "es": "Spanish", "vi": "Vietnamese", "th": "Thai", "id": "Indonesian",
     "ja": "Japanese", "zh": "Chinese (Simplified)",
 }
 # Tatoeba uses ISO-639-3 codes.
-TATOEBA = {"ko": "kor", "en": "eng", "es": "spa", "vi": "vie", "th": "tha", "ja": "jpn", "zh": "cmn"}
+TATOEBA = {"ko": "kor", "en": "eng", "es": "spa", "vi": "vie", "th": "tha", "ja": "jpn", "zh": "cmn", "id": "ind"}
 
 
 def instruction(src: str, tgt: str) -> str:
@@ -156,7 +156,7 @@ def main() -> None:
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     d = sub.add_parser("data", help="build a Tatoeba-based JSONL training set")
-    d.add_argument("--languages", nargs="+", default=["ko", "en", "es", "vi", "th", "ja", "zh"])
+    d.add_argument("--languages", nargs="+", default=["ko", "en", "es", "vi", "th", "ja", "zh", "id"])
     d.add_argument("--max-per-pair", type=int, default=20000)
     d.add_argument("--out", default="data/train.jsonl")
     d.set_defaults(fn=cmd_data)

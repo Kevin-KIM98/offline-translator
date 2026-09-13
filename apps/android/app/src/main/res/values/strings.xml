@@ -28,7 +28,7 @@
     <string name="model_llm">Multilingual LLM</string>
     <string name="model_nmt_pair">%1$s to %2$s translation</string>
     <string name="model_nmt_generic">Translation model %1$s</string>
-    <string name="model_stt_sub">whisper · shared by all seven languages</string>
+    <string name="model_stt_sub">whisper · shared by all eight languages</string>
     <string name="model_llm_sub">Qwen2.5 · every language pair</string>
     <string name="model_nmt_sub">OPUS-MT</string>
 

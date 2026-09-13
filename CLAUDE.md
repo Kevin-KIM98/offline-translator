@@ -1,6 +1,6 @@
 # offline-translator
 
-On-device, offline speech interpreter: a C++ engine (RNNoise, whisper.cpp, CTranslate2/Marian,
+On-device, offline speech interpreter (ko en es vi th ja zh id): a C++ engine (RNNoise, whisper.cpp, CTranslate2/Marian,
 llama.cpp) with a C ABI, and an Android app in `apps/android` that uses it. The user runs the app on
 **Android only**; `apps/ios` and the iOS workflows exist but are not in use, so do not spend effort
 there unless asked.
@@ -113,6 +113,13 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
 - **Thai.** Only the LLM translates into Thai. The default hands it Marian's English and three
   diverse demonstrations: 26 of 40 test sentences correct against 17 before; Qwen2.5-3B reaches 31.
   Judge a change by reading the output with `python tests/eval/run_th_eval.py`; chrF alone misled.
+- **Indonesian (0.3.12).** `id` is the eighth language: OPUS-MT `id-en`/`en-id` on `models-v1`
+  (manifest 1.5.0), routes through English, LLM only for id → th. Whisper small on the 20-clip set:
+  3.5% CER app path, language id 20/20 (auto 19/20; a three-word clip went to Thai). Adding a
+  language touches: `supportedLanguages()` in Types.hpp, `defaultPromptFor`/`hallucinations` in
+  TextUtil, `exampleSentence`/`exampleSet`/`scriptAllowed`/the `known` list in LlmEngine,
+  `OfflineTranslator.supportedLanguages`, `OfflineTTSManager.localeFor`, the app's `Lang.ALL`,
+  `stt_sentences.json` + `NUMBER_WORDS`/`SPACED` in run_stt_eval.py, `finetune_lora.py` tables.
 - **Model selection.** A language choice must download every pair its routes use, including the
   English hops. Before 0.3.7 `ko,ja` got speech recognition only and could not translate.
 

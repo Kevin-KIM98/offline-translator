@@ -1,5 +1,5 @@
 {
-  "manifest_version": "1.4.0",
+  "manifest_version": "1.5.0",
   "base_url": "https://github.com/Kevin-KIM98/offline-translator/releases/download/models-v1/",
   "stt": {
     "id": "whisper-small-q5_1",
@@ -76,6 +76,43 @@
           "size_bytes": 825924,
           "sha256": "e236ee6d866b635c0142114f8647f39831f9d92534aa2aad75c942f6a78ad0e3",
           "download_url": "nmt_en-es_target.spm"
+        }
+      ]
+    },
+    {
+      "pair": "en-id",
+      "dir_name": "en-id",
+      "version": "1",
+      "files": [
+        {
+          "filename": "config.json",
+          "size_bytes": 233,
+          "sha256": "72901fbd8abd89fb5cf4a388f26fc681f5c4c58a1e1a88b30b879f107270e7ee",
+          "download_url": "nmt_en-id_config.json"
+        },
+        {
+          "filename": "model.bin",
+          "size_bytes": 74261035,
+          "sha256": "2b9dc8ce6b00b40a9f1b08457fe0c8abe83b116eb88be5049d26242a41624a1b",
+          "download_url": "nmt_en-id_model.bin"
+        },
+        {
+          "filename": "shared_vocabulary.json",
+          "size_bytes": 1049307,
+          "sha256": "3dfd710f00b1ffcf67c3301c53cd6104d7ad96aa0b2dbb923db58bac71751ca4",
+          "download_url": "nmt_en-id_shared_vocabulary.json"
+        },
+        {
+          "filename": "source.spm",
+          "size_bytes": 795925,
+          "sha256": "e88300911c2c573ec5526777a1e84bae698d20925b82dcef9c7248bb0e537ed0",
+          "download_url": "nmt_en-id_source.spm"
+        },
+        {
+          "filename": "target.spm",
+          "size_bytes": 800687,
+          "sha256": "2a8fefe71c7f26cb0c6aa1b9f0cc0f8d18006b20fe41c547af7f25b9c8333465",
+          "download_url": "nmt_en-id_target.spm"
         }
       ]
     },
@@ -267,6 +304,43 @@
           "size_bytes": 801636,
           "sha256": "4dd547c24816a335e7b0b2e63376a8f1b3cbfc671eda5ab808dd44fdadaa8791",
           "download_url": "nmt_es-en_target.spm"
+        }
+      ]
+    },
+    {
+      "pair": "id-en",
+      "dir_name": "id-en",
+      "version": "1",
+      "files": [
+        {
+          "filename": "config.json",
+          "size_bytes": 233,
+          "sha256": "72901fbd8abd89fb5cf4a388f26fc681f5c4c58a1e1a88b30b879f107270e7ee",
+          "download_url": "nmt_id-en_config.json"
+        },
+        {
+          "filename": "model.bin",
+          "size_bytes": 74261035,
+          "sha256": "0ccbb875f6544b2b17d76646902cf0e84915a0ecd7b3de0e115f63de19205c44",
+          "download_url": "nmt_id-en_model.bin"
+        },
+        {
+          "filename": "shared_vocabulary.json",
+          "size_bytes": 1049307,
+          "sha256": "3dfd710f00b1ffcf67c3301c53cd6104d7ad96aa0b2dbb923db58bac71751ca4",
+          "download_url": "nmt_id-en_shared_vocabulary.json"
+        },
+        {
+          "filename": "source.spm",
+          "size_bytes": 800687,
+          "sha256": "2a8fefe71c7f26cb0c6aa1b9f0cc0f8d18006b20fe41c547af7f25b9c8333465",
+          "download_url": "nmt_id-en_source.spm"
+        },
+        {
+          "filename": "target.spm",
+          "size_bytes": 795925,
+          "sha256": "e88300911c2c573ec5526777a1e84bae698d20925b82dcef9c7248bb0e537ed0",
+          "download_url": "nmt_id-en_target.spm"
         }
       ]
     },

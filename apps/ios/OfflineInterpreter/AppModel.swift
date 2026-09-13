@@ -3,7 +3,7 @@ import Foundation
 import OfflineTranslator
 import SwiftUI
 
-/// One of the seven languages the engine supports, as shown in the UI.
+/// One of the eight languages the engine supports, as shown in the UI.
 struct Lang: Identifiable, Hashable {
     let code: String
     /// Endonym — what speakers of the language call it.
@@ -18,6 +18,7 @@ struct Lang: Identifiable, Hashable {
         Lang(code: "ja", name: "日本語"),
         Lang(code: "zh", name: "中文"),
         Lang(code: "vi", name: "Tiếng Việt"),
+        Lang(code: "id", name: "Bahasa Indonesia"),
         Lang(code: "th", name: "ไทย"),
     ]
 
