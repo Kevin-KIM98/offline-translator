@@ -123,6 +123,25 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
             }
 
             Spacer(Modifier.height(20.dp))
+            SectionLabel(stringResource(R.string.settings_performance))
+            Card {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.settings_gpu), style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            stringResource(R.string.settings_gpu_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = state.useGpu, onCheckedChange = vm::setUseGpu)
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
             SectionLabel(stringResource(R.string.settings_backend))
             Card {
                 Column(Modifier.padding(16.dp)) {

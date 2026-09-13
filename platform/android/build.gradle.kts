@@ -23,10 +23,15 @@ android {
                 arguments += listOf(
                     "-DANDROID_STL=c++_shared",
                     "-DANDROID_ARM_NEON=ON",
-                    "-DTRANSLATOR_VULKAN=OFF",   // set ON for Adreno/Mali GPU offload (needs Vulkan NDK headers)
+                    // ggml's Vulkan backend is compiled in; whether it is used is decided at runtime by
+                    // PipelineConfig.useGpu (off unless the app's "GPU acceleration" switch is on). The
+                    // shader compiler comes from the NDK (shader-tools/<host>/glslc): put it on PATH or
+                    // point GLSLC at it, as the workflows do.
+                    "-DTRANSLATOR_VULKAN=ON",
                     "-DTRANSLATOR_STRICT_DEPS=ON",
                     "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
                 )
+                System.getenv("GLSLC")?.let { arguments += "-DVulkan_GLSLC_EXECUTABLE=$it" }
                 cppFlags += "-O3"
                 // Only build our library (skips sentencepiece/cpuinfo command-line tools).
                 targets += "offline_translator"

@@ -40,6 +40,9 @@ jobs:
       - name: Build AAR
         working-directory: platform/android
         run: |
+          # The Vulkan backend's shaders are compiled with the NDK's glslc.
+          export GLSLC="${ANDROID_SDK_ROOT:-$ANDROID_HOME}/ndk/27.2.12479018/shader-tools/linux-x86_64/glslc"
+          "$GLSLC" --version | head -1
           gradle --no-daemon assembleRelease
           ls -la build/outputs/aar
           cp build/outputs/aar/offline-translator-release.aar "$GITHUB_WORKSPACE/offline-translator-${VERSION}.aar"

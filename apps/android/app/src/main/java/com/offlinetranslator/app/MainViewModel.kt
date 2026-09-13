@@ -78,6 +78,8 @@ data class UiState(
     /** Chosen speech model id, null for the manifest's default; every whisper model the manifest offers. */
     val sttId: String? = null,
     val sttOptions: List<ModelStatus> = emptyList(),
+    /** Whisper on the GPU (experimental). */
+    val useGpu: Boolean = false,
 ) {
     val langs: List<String> get() = listOf(langA, langB)
 }
@@ -94,6 +96,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             backend = prefs.backend,
             llmId = prefs.llmId,
             sttId = prefs.sttId,
+            useGpu = prefs.useGpu,
         )
     )
     val state: StateFlow<UiState> = _state.asStateFlow()
@@ -114,6 +117,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     // ---------------------------------------------------------------- startup
 
     fun boot() {
+        // A launch that never got past opening the engine with the GPU on: the driver took the
+        // process down. Back to the CPU, and say so, rather than dying again.
+        if (prefs.gpuTrialPending && prefs.useGpu) {
+            prefs.useGpu = false
+            prefs.gpuTrialPending = false
+            _state.update { it.copy(useGpu = false, message = str(R.string.gpu_disabled_after_crash)) }
+        }
         viewModelScope.launch {
             _state.update { it.copy(phase = Phase.Checking) }
             val r = runCatching {
@@ -202,9 +212,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val built = runCatching {
                 withContext(Dispatchers.Default) {
                     val repository = repo ?: error("model repository closed")
-                    val config = repository.pipelineConfig(backend = _state.value.backend, llmId = _state.value.llmId, sttId = _state.value.sttId)
+                    val useGpu = _state.value.useGpu
+                    val config = repository.pipelineConfig(
+                        backend = _state.value.backend, llmId = _state.value.llmId, sttId = _state.value.sttId, useGpu = useGpu,
+                    )
+                    if (useGpu) prefs.gpuTrialPending = true
                     // The app drives TTS itself so a line can be replayed and muted mid-sentence.
-                    TranslatorSession(getApplication<Application>(), config, speakResults = false)
+                    TranslatorSession(getApplication<Application>(), config, speakResults = false).also {
+                        if (useGpu) prefs.gpuTrialPending = false
+                    }
                 }
             }
             built.onFailure { e -> _state.update { it.copy(phase = Phase.Fatal(e.message ?: str(R.string.err_engine_open))) } }
@@ -394,6 +410,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         prefs.backend = backend
         pauseMic()
         _state.update { it.copy(backend = backend) }
+        boot()
+    }
+
+    /** Whisper on the GPU: reopens the engine with the new setting. */
+    fun setUseGpu(on: Boolean) {
+        if (on == _state.value.useGpu) return
+        prefs.useGpu = on
+        pauseMic()
+        _state.update { it.copy(useGpu = on) }
         boot()
     }
 

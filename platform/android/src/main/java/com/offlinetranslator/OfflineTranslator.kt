@@ -25,7 +25,13 @@ data class PipelineConfig(
     val backend: TranslationBackend = TranslationBackend.AUTO,
     val llmContextSize: Int = 1024,
     val nThreads: Int = Runtime.getRuntime().availableProcessors().coerceIn(2, 6),
-    val useGpu: Boolean = true,
+    /**
+     * Run whisper's encoder on the GPU through Vulkan (0.3.14+, experimental). Off by default: it
+     * has not been measured on devices, some drivers fail inside the native code, and the first
+     * start compiles shaders for a few seconds. The engine falls back to the CPU when no usable
+     * Vulkan device is found.
+     */
+    val useGpu: Boolean = false,
     val enableDenoise: Boolean = true,
     val beamSize: Int = 4,
     val maxDecodingLength: Int = 256,

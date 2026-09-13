@@ -113,6 +113,13 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
 - **Thai.** Only the LLM translates into Thai. The default hands it Marian's English and three
   diverse demonstrations: 26 of 40 test sentences correct against 17 before; Qwen2.5-3B reaches 31.
   Judge a change by reading the output with `python tests/eval/run_th_eval.py`; chrF alone misled.
+- **GPU (0.3.14, experimental, unmeasured).** The Android AAR compiles ggml's Vulkan backend
+  (`TRANSLATOR_VULKAN=ON`; glslc from the NDK's shader-tools via `GLSLC` in the workflows).
+  Whether whisper uses it is `PipelineConfig.useGpu`, off by default in the Kotlin library and
+  behind Settings → Performance → "Speech recognition on the GPU" in the app, with a crash-loop
+  guard (`gpuTrialPending`: still set at the next launch → switch off + message). The LLM stays on
+  the CPU on Android (JNI sets `llm_gpu_layers = 0`). Nothing about GPU speed or stability has
+  been measured on a device; do not claim otherwise.
 - **Speed (0.3.13).** `LlmEngine` reuses the KV cache of the shared prompt prefix
   (`cachedPrompt`, `llama_kv_self_seq_rm` from the first differing token): ko→th 2.1 → 1.1 s per
   sentence on the desktop; outputs differ slightly (batch-size rounding), Thai chrF 39.2 → 39.5.

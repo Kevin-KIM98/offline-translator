@@ -129,6 +129,7 @@ class ModelRepository(
         backend: TranslationBackend = TranslationBackend.AUTO,
         llmId: String? = null,
         sttId: String? = null,
+        useGpu: Boolean = false,
     ): PipelineConfig {
         val llm = llmModelPath(llmId).takeIf { it.isNotEmpty() && File(it).isFile }
         return PipelineConfig(
@@ -136,6 +137,7 @@ class ModelRepository(
             nmtRootDir = nmtRootDir,
             llmModelPath = llm,
             backend = backend,
+            useGpu = useGpu,
             nThreads = nThreads ?: Runtime.getRuntime().availableProcessors().coerceIn(2, 6),
         )
     }

@@ -69,6 +69,10 @@
     <string name="settings_speak_sub">기기에 설치된 음성으로 재생합니다</string>
     <string name="settings_rate">말하기 속도</string>
     <string name="settings_rate_value">%1$.1f×</string>
+    <string name="settings_performance">성능</string>
+    <string name="settings_gpu">음성 인식 GPU 가속 (실험적)</string>
+    <string name="settings_gpu_desc">whisper 인코더를 Vulkan으로 그래픽 칩에서 돌립니다. 폰에 따라 빨라질 수도, 느려지거나 불안정할 수도 있으며, 켠 뒤 첫 시작은 셰이더를 준비하느라 몇 초 걸립니다. 켠 상태로 앱이 비정상 종료되면 자동으로 다시 꺼집니다.</string>
+    <string name="gpu_disabled_after_crash">GPU 음성 인식을 켠 상태로 앱이 정상 시작되지 않아 다시 껐습니다.</string>
     <string name="settings_backend">번역 엔진</string>
     <string name="backend_auto">자동</string>
     <string name="backend_marian">전용 모델</string>

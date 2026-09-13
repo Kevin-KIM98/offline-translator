@@ -122,6 +122,9 @@ JNI_FN(jlong, pipelineCreate)(JNIEnv* env, jobject, jstring whisperPath, jstring
     cfg.nmt_root_dir = nr.c_str();
     cfg.n_threads = nThreads;
     cfg.use_gpu = useGpu ? 1 : 0;
+    // useGpu governs whisper's encoder. The LLM stays on the CPU: on a phone's shared-memory GPU
+    // llama.cpp's Vulkan path has not been measured here, and a 1 GB offload is a memory risk.
+    cfg.llm_gpu_layers = 0;
     cfg.enable_denoise = denoise ? 1 : 0;
     cfg.beam_size = beam;
     cfg.max_decoding_length = maxLen;

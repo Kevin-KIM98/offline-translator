@@ -70,6 +70,10 @@
     <string name="settings_speak_sub">Uses the voices installed on this device</string>
     <string name="settings_rate">Speaking rate</string>
     <string name="settings_rate_value">%1$.1f×</string>
+    <string name="settings_performance">Performance</string>
+    <string name="settings_gpu">Speech recognition on the GPU (experimental)</string>
+    <string name="settings_gpu_desc">Runs whisper\'s encoder on the graphics chip through Vulkan. Faster on some phones, slower or unstable on others, and the first start after switching takes a few seconds to compile shaders. If the app crashes with it on, it switches itself back off.</string>
+    <string name="gpu_disabled_after_crash">The app did not start properly with GPU speech recognition on, so it has been switched off again.</string>
     <string name="settings_backend">Translation engine</string>
     <string name="backend_auto">Automatic</string>
     <string name="backend_marian">Dedicated</string>

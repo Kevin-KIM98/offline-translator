@@ -61,6 +61,7 @@ Requirements: Android 8.0 (API 26) or newer, arm64 device. Android Studio opens 
 |---|---|
 | first run | lists exactly the models the chosen language pair needs, with sizes, then downloads them with progress, resume after interruption and a free-space check |
 | conversation | one talk button per speaker, held down while speaking; the transcript shows the original quietly and the translation large, with the route and latency, and every line can be replayed |
+| performance | "Speech recognition on the GPU (experimental)": whisper's encoder through Vulkan, off by default, switches itself off after a crash; unmeasured on devices |
 | conversation mode | keeps the microphone open; the engine detects the language of each utterance and translates it into the other party's language, so both people just talk in turn. The microphone is muted while a translation is read aloud, so the phone does not transcribe its own voice; long speech is cut at pauses and translated in pieces |
 | keyboard | type a sentence instead of speaking it |
 | settings | languages, speak-aloud and speed, translation backend, which speech model (Whisper small or medium, downloaded when chosen) and which LLM to use (Qwen2.5 1.5B or 3B, downloaded when the languages need one), installed models with sizes and delete, engine build info |

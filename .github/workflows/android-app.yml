@@ -113,6 +113,9 @@ jobs:
         run: |
           # Same command as the Release workflow: an optimised Release build. A debug build of the
           # native code would make speech recognition and the LLM far too slow to judge on a phone.
+          # The Vulkan backend's shaders are compiled with the NDK's glslc.
+          export GLSLC="${ANDROID_SDK_ROOT:-$ANDROID_HOME}/ndk/27.2.12479018/shader-tools/linux-x86_64/glslc"
+          "$GLSLC" --version | head -1
           gradle --no-daemon assembleRelease
           version=$(grep -oP 'val engineVersion = "\K[^"]+' "$GITHUB_WORKSPACE/apps/android/app/build.gradle.kts")
           mkdir -p "$GITHUB_WORKSPACE/apps/android/app/libs"

@@ -33,6 +33,19 @@ class Prefs(context: Context) {
         get() = sp.getString("llmId", null)
         set(v) = sp.edit().putString("llmId", v).apply()
 
+    /** Whisper on the GPU (Vulkan), experimental; off by default. */
+    var useGpu: Boolean
+        get() = sp.getBoolean("useGpu", false)
+        set(v) = sp.edit().putBoolean("useGpu", v).apply()
+
+    /**
+     * True from the moment the engine is opened with the GPU until that succeeded. Still true at
+     * the next launch means the app died inside the GPU driver: the switch is turned off again.
+     */
+    var gpuTrialPending: Boolean
+        get() = sp.getBoolean("gpuTrialPending", false)
+        set(v) = sp.edit().putBoolean("gpuTrialPending", v).apply()
+
     /** Manifest id of the speech (whisper) model to use; null means the manifest's default. */
     var sttId: String?
         get() = sp.getString("sttId", null)
