@@ -15,7 +15,9 @@ android {
     ndkVersion = "27.2.12479018"
 
     defaultConfig {
-        minSdk = 26 // std::filesystem needs NDK r22+ / API 26+ for reliable support
+        // Android 9: the Vulkan 1.1 entry points ggml-vulkan links against (vkEnumerateInstanceVersion,
+        // vkGetPhysicalDeviceProperties2) exist in the system libvulkan.so from API 28 on.
+        minSdk = 28
         consumerProguardFiles("consumer-rules.pro")
 
         externalNativeBuild {

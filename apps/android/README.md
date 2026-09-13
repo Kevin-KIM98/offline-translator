@@ -52,7 +52,7 @@ Release APKs are attached to the [releases](https://github.com/Kevin-KIM98/offli
 with `gh workflow run android-app.yml -f release_tag=vX.Y.Z`. The key's password is Android's
 public debug default: it keeps development builds updatable and is not meant for a store release.
 
-Requirements: Android 8.0 (API 26) or newer, arm64 device. Android Studio opens the
+Requirements: Android 9 (API 28) or newer, arm64 device (the Vulkan backend links against API 28). Android Studio opens the
 `apps/android` folder directly.
 
 ## What the app does

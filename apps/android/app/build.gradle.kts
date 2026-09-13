@@ -54,7 +54,7 @@ android {
 
     defaultConfig {
         applicationId = "com.offlinetranslator.app"
-        minSdk = 26
+        minSdk = 28   // the engine AAR needs API 28 (Vulkan 1.1 in the system loader)
         targetSdk = 35
         versionCode = appVersionCode
         versionName = appVersionName

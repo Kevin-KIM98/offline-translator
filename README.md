@@ -27,7 +27,7 @@ push-to-talk per speaker, a replayable transcript, a conversation mode that reco
 language was spoken and needs no buttons, keyboard input and model
 management. Grab
 [offline-interpreter-1.0.0.apk](https://github.com/Kevin-KIM98/offline-translator/releases/download/v0.3.13/offline-interpreter-1.0.0.apk)
-for an arm64 Android 8+ device, or build either app from source:
+for an arm64 Android 9+ device, or build either app from source:
 
 ```
 cd apps/android && ./gradlew assembleDebug          # no NDK needed
@@ -88,7 +88,7 @@ implementation(files("libs/offline-translator-0.3.13.aar"))
 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 ```
 
-Add `<uses-permission android:name="android.permission.RECORD_AUDIO" />` (INTERNET is declared by the library). `minSdk 26`, `arm64-v8a`.
+Add `<uses-permission android:name="android.permission.RECORD_AUDIO" />` (INTERNET is declared by the library). `minSdk 28`, `arm64-v8a`.
 
 ```kotlin
 // e.g. in a ViewModel / lifecycleScope
