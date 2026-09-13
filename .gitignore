@@ -46,3 +46,8 @@ pc-3b/
 pc-upload/
 build-llama/
 build-llama.log
+.venv-train/
+.pipcache/
+.hf/
+runs/
+data/
