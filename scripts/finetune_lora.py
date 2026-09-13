@@ -40,27 +40,53 @@ LANG_NAMES = {
 TATOEBA = {"ko": "kor", "en": "eng", "es": "spa", "vi": "vie", "th": "tha", "ja": "jpn", "zh": "cmn", "id": "ind"}
 
 
+SCRIPT_NAMES = {"ko": "Hangul", "ja": "Japanese (kana and kanji)", "zh": "Simplified Chinese characters", "th": "Thai"}
+
+# The three demonstrations LlmEngine::exampleSet puts into every prompt (LlmExamples::Diverse):
+# a statement with a day, a polite request and a count. Must stay identical to src/LlmEngine.cpp.
+EXAMPLES = {
+    "ko": ["회의가 금요일로 미뤄졌어요.", "음악 소리를 조금만 줄여 주시겠어요?", "어제 책을 두 권 샀어요."],
+    "en": ["The meeting has been moved to Friday.", "Could you turn the music down a little?", "I bought two books yesterday."],
+    "es": ["La reunión se ha aplazado al viernes.", "¿Podría bajar un poco la música?", "Ayer compré dos libros."],
+    "vi": ["Cuộc họp đã được dời sang thứ Sáu.", "Bạn có thể vặn nhỏ nhạc một chút được không?", "Hôm qua tôi đã mua hai cuốn sách."],
+    "th": ["การประชุมถูกเลื่อนไปเป็นวันศุกร์ครับ", "ช่วยเบาเสียงเพลงลงหน่อยได้ไหมครับ", "เมื่อวานผมซื้อหนังสือสองเล่มครับ"],
+    "ja": ["会議は金曜日に延期されました。", "音楽を少し小さくしていただけますか？", "昨日、本を二冊買いました。"],
+    "zh": ["会议推迟到星期五了。", "可以把音乐调小一点吗？", "我昨天买了两本书。"],
+    "id": ["Rapatnya dipindahkan ke hari Jumat.", "Bisakah Anda mengecilkan musiknya sedikit?", "Kemarin saya membeli dua buku."],
+}
+
+
 def instruction(src: str, tgt: str) -> str:
     """Must stay identical to LlmEngine::buildInstruction (src/LlmEngine.cpp)."""
     target = LANG_NAMES.get(tgt, tgt)
+    script = SCRIPT_NAMES.get(tgt, "the Latin alphabet")
     if src in ("", "auto"):
         s = f"You are a professional interpreter. Detect the language of the user's message and translate it into {target}. "
     else:
         s = f"You are a professional interpreter. Translate the user's message from {LANG_NAMES.get(src, src)} into {target}. "
     s += (f"Rules: output ONLY the {target} translation, nothing else; no explanations, no notes, no quotes; "
+          f"write every word in {target} using {script} (never mix in other languages or scripts); "
           "keep the meaning, tone and politeness level; keep numbers, names, times and units unchanged; "
           f"if the message is already in {target}, output it unchanged.")
     return s
 
 
 def to_messages(ex: dict) -> dict:
-    # 30% of examples use "auto" so the model also learns source-language detection.
+    # 30% of examples use "auto" so the model also learns source-language detection. The
+    # demonstrations follow the engine exactly: the source language's set (English for "auto")
+    # paired with the target's, omitted when they coincide.
     src = "auto" if random.random() < 0.3 else ex["src_lang"]
-    return {"messages": [
-        {"role": "system", "content": instruction(src, ex["tgt_lang"])},
-        {"role": "user", "content": ex["src"]},
-        {"role": "assistant", "content": ex["tgt"]},
-    ]}
+    tgt = ex["tgt_lang"]
+    msgs = [{"role": "system", "content": instruction(src, tgt)}]
+    ex_lang = "en" if src == "auto" else src
+    if ex_lang != tgt and ex_lang in EXAMPLES and tgt in EXAMPLES:
+        for a, b in zip(EXAMPLES[ex_lang], EXAMPLES[tgt]):
+            msgs.append({"role": "user", "content": a})
+            msgs.append({"role": "assistant", "content": b})
+    msgs.append({"role": "user", "content": ex["src"]})
+    # Prompt/completion form: the loss is computed on the translation only, not on the fixed
+    # instruction and demonstrations (TRL's conversational "messages" form would train on all).
+    return {"prompt": msgs, "completion": [{"role": "assistant", "content": ex["tgt"]}]}
 
 
 # ---------------------------------------------------------------------------
@@ -95,6 +121,40 @@ def cmd_data(a: argparse.Namespace) -> None:
     print(f"→ {out}: {n_total} examples")
 
 
+def cmd_data_opus(a: argparse.Namespace) -> None:
+    """Parallel sentences from Helsinki-NLP/opus-100 (a million-pair corpus per English pair), the
+    given number per direction, kept to sentence length so they match spoken turns."""
+    from datasets import load_dataset  # noqa: WPS433
+
+    random.seed(42)
+    out = Path(a.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    n_total = 0
+    with open(out, "w", encoding="utf-8") as fh:
+        for spec in a.pairs:
+            direction, _, count = spec.partition(":")
+            sl, tl = direction.split("-")
+            count = int(count or 5000)
+            cfg = "-".join(sorted([sl, tl]))          # opus-100 names configs alphabetically (en-th, en-ko, ...)
+            ds = load_dataset("Helsinki-NLP/opus-100", cfg, split="train")
+            rows, seen = [], set()
+            for r in ds:
+                s, t = r["translation"][sl].strip(), r["translation"][tl].strip()
+                if not (a.min_chars <= len(s) <= a.max_chars and a.min_chars <= len(t) <= a.max_chars):
+                    continue
+                if s.lower() in seen or "http" in s or "http" in t:
+                    continue
+                seen.add(s.lower())
+                rows.append((s, t))
+            random.shuffle(rows)
+            rows = rows[:count]
+            for s, t in rows:
+                fh.write(json.dumps({"src_lang": sl, "tgt_lang": tl, "src": s, "tgt": t}, ensure_ascii=False) + "\n")
+            n_total += len(rows)
+            print(f"  {sl}->{tl}: {len(rows)} of {len(ds)}")
+    print(f"→ {out}: {n_total} examples")
+
+
 def cmd_train(a: argparse.Namespace) -> None:
     import torch
     from datasets import load_dataset
@@ -103,7 +163,16 @@ def cmd_train(a: argparse.Namespace) -> None:
     from trl import SFTConfig, SFTTrainer
 
     tok = AutoTokenizer.from_pretrained(a.base)
-    model = AutoModelForCausalLM.from_pretrained(a.base, torch_dtype=torch.bfloat16, device_map="auto")
+    if a.load_4bit:
+        # QLoRA: the frozen base in 4-bit NF4 so a 6 GB GPU holds a 1.5B model plus activations.
+        from peft import prepare_model_for_kbit_training
+        from transformers import BitsAndBytesConfig
+        bnb = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_use_double_quant=True,
+                                 bnb_4bit_compute_dtype=torch.bfloat16)
+        model = AutoModelForCausalLM.from_pretrained(a.base, quantization_config=bnb, device_map="auto")
+        model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
+    else:
+        model = AutoModelForCausalLM.from_pretrained(a.base, torch_dtype=torch.bfloat16, device_map="auto")
     ds = load_dataset("json", data_files=a.data, split="train").shuffle(seed=42)
     ds = ds.map(to_messages, remove_columns=ds.column_names)
     split = ds.train_test_split(test_size=min(0.02, 2000 / max(len(ds), 1)), seed=42)
@@ -113,8 +182,9 @@ def cmd_train(a: argparse.Namespace) -> None:
     cfg = SFTConfig(
         output_dir=a.out, num_train_epochs=a.epochs, per_device_train_batch_size=a.batch,
         gradient_accumulation_steps=a.grad_accum, learning_rate=a.lr, lr_scheduler_type="cosine",
-        warmup_ratio=0.03, logging_steps=20, eval_strategy="steps", eval_steps=500, save_steps=500,
-        save_total_limit=2, bf16=True, max_length=512, packing=False, report_to="none",
+        warmup_ratio=0.03, logging_steps=20, eval_strategy="steps", eval_steps=a.eval_steps, save_steps=a.eval_steps,
+        save_total_limit=2, bf16=True, max_length=a.max_length, packing=False, report_to="none",
+        gradient_checkpointing=a.load_4bit, max_steps=a.max_steps,
     )
     trainer = SFTTrainer(model=model, args=cfg, train_dataset=split["train"], eval_dataset=split["test"],
                          processing_class=tok, peft_config=lora)
@@ -140,8 +210,10 @@ def cmd_export(a: argparse.Namespace) -> None:
     conv = llama / "convert_hf_to_gguf.py"
     f16 = Path(a.out).with_suffix("").as_posix() + "-f16.gguf"
     subprocess.run([sys.executable, str(conv), merged, "--outfile", f16, "--outtype", "f16"], check=True)
-    quant = next((p for p in [llama / "build/bin/llama-quantize", llama / "build/bin/Release/llama-quantize.exe",
-                              llama / "llama-quantize"] if p.exists()), None)
+    candidates = [Path(a.quantize_bin)] if a.quantize_bin else []
+    candidates += [llama / "build/bin/llama-quantize", llama / "build/bin/Release/llama-quantize.exe",
+                   llama / "llama-quantize", Path("build-llama/bin/Release/llama-quantize.exe"), Path("build-llama/bin/llama-quantize")]
+    quant = next((p for p in candidates if p.exists()), None)
     if quant is None:
         print(f"!! llama-quantize not found under {llama}; build llama.cpp, then run:\n"
               f"   llama-quantize {f16} {a.out} {a.quant}", file=sys.stderr)
@@ -161,7 +233,19 @@ def main() -> None:
     d.add_argument("--out", default="data/train.jsonl")
     d.set_defaults(fn=cmd_data)
 
+    o = sub.add_parser("data-opus", help="build a JSONL training set from Helsinki-NLP/opus-100")
+    o.add_argument("--pairs", nargs="+", default=["en-th:12000", "en-ko:1000", "en-ja:1000", "en-zh:1000", "en-vi:1000", "en-id:1000", "en-es:1000"],
+                   help="direction:count, e.g. en-th:12000 (source->target, English pairs only in opus-100)")
+    o.add_argument("--min-chars", type=int, default=4)
+    o.add_argument("--max-chars", type=int, default=140)
+    o.add_argument("--out", default="data/train_opus.jsonl")
+    o.set_defaults(fn=cmd_data_opus)
+
     t = sub.add_parser("train", help="LoRA fine-tune")
+    t.add_argument("--load-4bit", action="store_true", help="QLoRA: 4-bit NF4 base (fits a 6 GB GPU for 1.5B)")
+    t.add_argument("--max-length", type=int, default=512)
+    t.add_argument("--max-steps", type=int, default=-1, help="stop after this many optimizer steps (-1 = whole epoch)")
+    t.add_argument("--eval-steps", type=int, default=500)
     t.add_argument("--base", default="Qwen/Qwen2.5-1.5B-Instruct")
     t.add_argument("--data", required=True)
     t.add_argument("--out", required=True)
@@ -173,6 +257,7 @@ def main() -> None:
     t.set_defaults(fn=cmd_train)
 
     e = sub.add_parser("export", help="merge LoRA and export a quantized GGUF")
+    e.add_argument("--quantize-bin", help="path to llama-quantize (default: looks under --llama-cpp and build-llama/)")
     e.add_argument("--base", default="Qwen/Qwen2.5-1.5B-Instruct")
     e.add_argument("--lora", required=True)
     e.add_argument("--llama-cpp", default="third_party/llama.cpp")

@@ -44,3 +44,5 @@ tests/eval/out/
 # Desktop test model directories
 pc-3b/
 pc-upload/
+build-llama/
+build-llama.log

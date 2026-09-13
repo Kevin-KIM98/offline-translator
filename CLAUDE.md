@@ -113,6 +113,13 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
 - **Thai.** Only the LLM translates into Thai. The default hands it Marian's English and three
   diverse demonstrations: 26 of 40 test sentences correct against 17 before; Qwen2.5-3B reaches 31.
   Judge a change by reading the output with `python tests/eval/run_th_eval.py`; chrF alone misled.
+- **LoRA (2026-09-14, not shipped).** QLoRA of Qwen2.5-1.5B on 11k opus-100 pairs (7.5k en→th,
+  back-translation filtered by `scripts/filter_parallel.py`) ran in 73 min on the RTX 4050 6 GB
+  (`finetune_lora.py train --load-4bit`; prompt/completion form so only the translation is
+  scored). Gold-English → Thai improved (chrF 41.3 → 45.4) but the app route did not (39.9 →
+  39.4; held-out 28.9 → 28.0) and the model turned casual (ฉัน, no ครับ) from the subtitle data.
+  `run_th_eval.py --tuned <gguf>` compares any GGUF. Do not fine-tune on subtitles for an
+  interpreter; the Korean→English hop and polite conversational Thai data are the levers.
 - **GPU (0.3.14, experimental, unmeasured).** The Android AAR compiles ggml's Vulkan backend
   (`TRANSLATOR_VULKAN=ON`; glslc from the NDK's shader-tools via `GLSLC` in the workflows).
   Whether whisper uses it is `PipelineConfig.useGpu`, off by default in the Kotlin library and

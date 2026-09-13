@@ -28,8 +28,8 @@ sys.path.insert(0, str(HERE))
 import chrf  # noqa: E402
 
 LLM = {
-    "1.5b": ROOT / "models" / "llm" / "qwen2.5-1.5b-instruct-q4_k_m.gguf",
-    "3b": ROOT / "models" / "llm" / "qwen2.5-3b-instruct-q4_k_m.gguf",
+    "1.5b": ROOT / "models" / "release" / "llm" / "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+    "3b": ROOT / "models" / "release" / "llm" / "qwen2.5-3b-instruct-q4_k_m.gguf",
 }
 
 CONFIGS = [
@@ -85,7 +85,17 @@ def main() -> int:
     ap.add_argument("--cli", default=str(ROOT / "build-full" / "Release" / "translator_cli.exe"))
     ap.add_argument("--models", default=str(ROOT / "models" / "release"))
     ap.add_argument("--only", help="comma-separated configuration names")
+    ap.add_argument("--tuned", help="a fine-tuned GGUF (scripts/finetune_lora.py export) to compare: adds the "
+                                    "app-tuned, app-tuned-noex and gold-tuned configurations")
     args = ap.parse_args()
+
+    if args.tuned:
+        LLM["tuned"] = pathlib.Path(args.tuned)
+        CONFIGS.extend([
+            ("app-tuned",      "app",  "tuned", []),
+            ("app-tuned-noex", "app",  "tuned", ["--llm-examples", "none"]),
+            ("gold-tuned",     "gold", "tuned", []),
+        ])
 
     data = json.load(open(args.set, encoding="utf-8"))["sentences"]
     out = pathlib.Path(args.out) / pathlib.Path(args.set).stem

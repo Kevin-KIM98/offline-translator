@@ -87,10 +87,39 @@ median 2.10 s → 1.08 s per sentence on the desktop CPU (`app-1.5b` 841 ms medi
 ko-en hop, 988 ms with tc-big), the first sentence of a direction unchanged, chrF 39.2 → 39.5.
 
 **Teaching it your domain ("학습")**: `scripts/finetune_lora.py` fine-tunes the same Qwen model
-with LoRA on parallel sentences (Tatoeba for all 8 languages, plus your own JSONL — glossaries,
-corrected app outputs), merges the adapter and exports a quantized GGUF that drops into the
-manifest. The training prompt is byte-identical to what `LlmEngine` sends at runtime. It needs a
-GPU machine (≈ 12 GB VRAM for 1.5B); nothing is trained on the phone.
+with LoRA on parallel sentences, merges the adapter and exports a quantized GGUF that drops into
+the manifest. The training prompt is byte-identical to what `LlmEngine` sends at runtime,
+demonstrations included, and the loss is computed on the translation only. Nothing is trained on
+the phone. The recipe as it was run on 2026-09-14 on a laptop RTX 4050 with 6 GB (the result was
+measured but not shipped — see below):
+
+```
+python scripts/finetune_lora.py data-opus --out data/train_opus.jsonl        # opus-100: en→th 12k + 1k each en→ko/ja/zh/vi/id/es
+python scripts/filter_parallel.py --in data/train_opus.jsonl --out data/train_filtered.jsonl
+python scripts/finetune_lora.py train --base Qwen/Qwen2.5-1.5B-Instruct --data data/train_filtered.jsonl \
+    --out runs/thai --load-4bit --batch 4 --grad-accum 4 --max-length 384      # QLoRA, ~1 h, 5.9 GB
+python scripts/finetune_lora.py export --base Qwen/Qwen2.5-1.5B-Instruct --lora runs/thai \
+    --llama-cpp third_party/llama.cpp --quant Q4_K_M --out dist/llm/qwen2.5-1.5b-th-q4_k_m.gguf
+python tests/eval/run_th_eval.py --set tests/eval/th_conversation.json --tuned dist/llm/qwen2.5-1.5b-th-q4_k_m.gguf
+```
+
+`filter_parallel.py` matters: opus-100's subtitle pairs are often misaligned ("How could you tell?"
+against a Thai line meaning "I have seen this before"). It translates the target side back to
+English with the engine's own Marian models and keeps pairs with chrF ≥ 35 — 7,492 of 12,000 for
+Thai. `--load-4bit` is QLoRA (NF4 base, bf16 compute, gradient checkpointing); without it 1.5B
+needs about 12 GB. One epoch over 11,253 pairs took 73 minutes (690 steps of 16); eval loss
+1.35 → 1.28.
+
+What it gave: from clean English the tuned model is better (chrF 41.3 → 45.4 on the 30 sentences,
+35.0 → 35.9 held out), but through the app's route, where the English comes from the Korean→English
+Marian model, it is not (39.9 → 39.4 and 28.9 → 28.0), and read side by side the two are about even:
+the tuned model fixes some sentences ("Where is the restroom?" → ห้องน้ำอยู่ที่ไหน instead of the
+base's wrong ที่ไหนบ้าน, "the air conditioner is broken" → แอร์ในห้องเสียแล้ว) and breaks others
+("I lost my passport" → ฉันเสียบัตรประจำตัว, "a bad headache" → chest pain), and it answers in the
+casual register of the subtitles it learned from (ฉัน, no ครับ), which an interpreter should not.
+So it stays a tool, not a shipped model: what would move Korean→Thai is a Marian-quality
+Korean→English hop (most remaining errors start there) and a few thousand *conversational, polite*
+Thai pairs rather than subtitles. The 3B model (Settings) remains the measured improvement.
 
 Everything the devices download is produced by `scripts/prepare_models.py` and published as a
 static file tree + `manifest.json`. No server logic is needed — any CDN / object storage works.
