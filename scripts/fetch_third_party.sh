@@ -13,6 +13,7 @@ CT2_REF="${CT2_REF:-v4.5.0}"
 SPM_REF="${SPM_REF:-v0.2.0}"
 LLAMA_REF="${LLAMA_REF:-b5030}"   # same-week ggml as whisper.cpp v1.7.5
 MINIAUDIO_REF="${MINIAUDIO_REF:-0.11.25}"  # single header, capture only, used by the CLI
+VKHEADERS_REF="${VKHEADERS_REF:-v1.4.309}" # vulkan.hpp for ggml's Vulkan backend; the NDK ships only vulkan.h
 
 DEPTH=""
 [[ "${1:-}" == "--shallow" ]] && DEPTH="--depth 1"
@@ -33,6 +34,7 @@ clone whisper.cpp   https://github.com/ggml-org/whisper.cpp    "$WHISPER_REF"
 clone ctranslate2   https://github.com/OpenNMT/CTranslate2     "$CT2_REF" recursive
 clone sentencepiece https://github.com/google/sentencepiece    "$SPM_REF"
 clone llama.cpp     https://github.com/ggml-org/llama.cpp      "$LLAMA_REF"
+clone Vulkan-Headers https://github.com/KhronosGroup/Vulkan-Headers "$VKHEADERS_REF"
 
 # media.xiph.org (RNNoise weights) drops connections now and then; a CI run should not fail
 # on one timeout. Retries cover connection and transfer errors alike.

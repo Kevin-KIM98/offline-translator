@@ -40,6 +40,17 @@ endif()
 if(ANDROID)
     set(GGML_VULKAN ${TRANSLATOR_VULKAN} CACHE BOOL "" FORCE)
     set(GGML_OPENCL ${TRANSLATOR_OPENCL} CACHE BOOL "" FORCE)
+    if(TRANSLATOR_VULKAN)
+        # ggml-vulkan includes the C++ bindings (vulkan/vulkan.hpp), which the NDK sysroot lacks;
+        # Khronos' Vulkan-Headers supply them, ahead of the NDK's vulkan.h so the two match.
+        set(_vkh ${TRANSLATOR_TP_DIR}/Vulkan-Headers/include)
+        if(EXISTS ${_vkh}/vulkan/vulkan.hpp)
+            set(Vulkan_INCLUDE_DIR ${_vkh} CACHE PATH "" FORCE)
+            include_directories(BEFORE SYSTEM ${_vkh})
+        else()
+            message(WARNING "Vulkan-Headers not found under third_party (run scripts/fetch_third_party.sh); the Vulkan backend needs vulkan/vulkan.hpp")
+        endif()
+    endif()
 endif()
 
 # Recursively set a target property on every buildable target created under `dir`.

@@ -13,6 +13,7 @@ $refs = @{
     ctranslate2   = @{ url = "https://github.com/OpenNMT/CTranslate2";   ref = "v4.5.0"; recursive = $true }
     sentencepiece = @{ url = "https://github.com/google/sentencepiece";  ref = "v0.2.0"; recursive = $false }
     "llama.cpp"   = @{ url = "https://github.com/ggml-org/llama.cpp";    ref = "b5030";  recursive = $false }
+    "Vulkan-Headers" = @{ url = "https://github.com/KhronosGroup/Vulkan-Headers"; ref = "v1.4.309"; recursive = $false }
 }
 
 foreach ($name in $refs.Keys) {
