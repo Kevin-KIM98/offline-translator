@@ -357,3 +357,18 @@ AAR on Ubuntu, the XCFramework on macOS, rewrites `Package.swift` with the new c
   While checking the pivot, the en→ko model turned out to append its English input to the Korean
   now and then ("택시로 공항까지 얼마나 걸립니까? How long is the ride…"); the post-processing now
   drops a trailing run of Latin words behind Korean, Japanese, Chinese or Thai text.
+* **Faster LLM turns, faster detection, a stronger Korean→English model (0.3.13).** The LLM keeps
+  the KV cache of its prompt prefix (instruction and demonstrations, identical for every sentence
+  of a direction) and decodes only the sentence: ko→th median 2.10 s → 1.08 s per sentence on the
+  desktop CPU, first sentence unchanged, Thai chrF 39.2 → 39.5 on the 30-sentence set. Language
+  detection now encodes a 5 s / 256-position window instead of the utterance: 0.1–0.4 s less per
+  utterance in conversation mode, identification unchanged (160/160 fixed, 159/160 auto). The
+  translation models a session will use are loaded when it starts, not on the first utterance.
+  `ko-en` is now the OPUS-MT **tc-big** model (212 MB, converted from the original Marian
+  weights like `en-ko`): chrF 59.1 → 62.9 on the 30 conversation sentences and 44.2 → 53.9 on the
+  10 held-out ones against English references ("Can I pay you off with a card?" → "Can I pay by
+  card?", "What time does the next train start?" → "leave"), at 420 ms instead of 233 ms per
+  sentence for that hop. It is the source hop of every Korean→X direction; for Korean→Thai the LLM
+  step still decides the result (chrF 39.9 / 28.9 against 39.5 / 33.2 with the old hop, mixed by
+  reading, 10 held-out sentences). Whisper beam 3 and flash attention were tried and dropped: beam
+  3 cost Thai and Vietnamese accuracy for 11% speed, flash attention changed nothing on CPU.

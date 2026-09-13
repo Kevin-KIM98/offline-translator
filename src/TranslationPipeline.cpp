@@ -457,7 +457,11 @@ TranslationResult TranslationPipeline::processSpeechToTranslation(const float* p
 bool TranslationPipeline::preloadPair(const std::string& src, const std::string& tgt, std::string* error) {
     std::lock_guard<std::mutex> lock(impl_->engineMutex);
     std::string err;
-    const bool ok = impl_->nmt.loadPair(src, tgt, &err);
+    // Every hop of the route, so the first utterance of a session does not wait for a model load.
+    const auto route = impl_->nmt.resolveRoute(src, tgt, impl_->cfg.pivotLangs, &err);
+    bool ok = !route.empty();
+    for (const auto& hop : route)
+        ok = impl_->nmt.loadPair(hop.first, hop.second, &err) && ok;
     if (!ok) impl_->setError(err);
     if (error) *error = err;
     return ok;

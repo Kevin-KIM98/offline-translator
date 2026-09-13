@@ -113,6 +113,16 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
 - **Thai.** Only the LLM translates into Thai. The default hands it Marian's English and three
   diverse demonstrations: 26 of 40 test sentences correct against 17 before; Qwen2.5-3B reaches 31.
   Judge a change by reading the output with `python tests/eval/run_th_eval.py`; chrF alone misled.
+- **Speed (0.3.13).** `LlmEngine` reuses the KV cache of the shared prompt prefix
+  (`cachedPrompt`, `llama_kv_self_seq_rm` from the first differing token): ko→th 2.1 → 1.1 s per
+  sentence on the desktop; outputs differ slightly (batch-size rounding), Thai chrF 39.2 → 39.5.
+  `SttEngine::detectLanguage` encodes 5 s / 256 positions: −0.1–0.4 s per auto utterance,
+  identification unchanged. `TranslatorSession.start` preloads the route(s) (`preloadPair` loads
+  every hop). Tried and dropped: whisper beam 3 (th/vi worse for 11% speed), flash attention on
+  CPU (no change), `large-v3-turbo` (repeats). `ko-en` is tc-big since 0.3.13 (manifest 1.6.0,
+  entry version 2 → devices re-download it): chrF 59.1 → 62.9 / 44.2 → 53.9 against English
+  references, 420 vs 233 ms per sentence; converted from pouta with `vocab_to_yml` (the .vocab
+  files are one token per line) + `ctranslate2.converters.marian`, py -3.11.
 - **Indonesian (0.3.12).** `id` is the eighth language: OPUS-MT `id-en`/`en-id` on `models-v1`
   (manifest 1.5.0), routes through English, LLM only for id → th. Whisper small on the 20-clip set:
   3.5% CER app path, language id 20/20 (auto 19/20; a three-word clip went to Thai). Adding a

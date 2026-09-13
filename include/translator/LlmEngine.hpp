@@ -30,6 +30,7 @@ struct LlmResult {
     std::string error;
     std::string text;
     int promptTokens = 0;
+    int cachedPromptTokens = 0;   // prompt tokens served from the KV cache of the previous call
     int outputTokens = 0;
     bool retried = false;        // a second pass was needed because the first output mixed scripts
     double elapsedMs = 0.0;

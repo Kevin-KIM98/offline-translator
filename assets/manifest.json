@@ -1,5 +1,5 @@
 {
-  "manifest_version": "1.5.0",
+  "manifest_version": "1.6.0",
   "base_url": "https://github.com/Kevin-KIM98/offline-translator/releases/download/models-v1/",
   "stt": {
     "id": "whisper-small-q5_1",
@@ -384,37 +384,43 @@
     {
       "pair": "ko-en",
       "dir_name": "ko-en",
-      "version": "1",
+      "version": "2",
       "files": [
         {
           "filename": "config.json",
-          "size_bytes": 223,
-          "sha256": "8f6496adfc930cbfecbe8281112197705c488fab47d34b4829b06d7f478909af",
+          "size_bytes": 231,
+          "sha256": "95dabd564e6abdb470e95f9106766647d8dc59e1bc2a1517d292c0cee5ca5812",
           "download_url": "nmt_ko-en_config.json"
         },
         {
           "filename": "model.bin",
-          "size_bytes": 79567635,
-          "sha256": "777822da53524112be3b198dfbe59026d4de04f68175d1ba1ddfd9d0361c4cca",
+          "size_bytes": 218915789,
+          "sha256": "641b3f89e45d080d6b1d22b88c4bb75e2de4e75d5165566c7ef594b06de8db6c",
           "download_url": "nmt_ko-en_model.bin"
         },
         {
-          "filename": "shared_vocabulary.json",
-          "size_bytes": 1405962,
-          "sha256": "598510ee69f4cbdaeed42f5a583f0a1260b175199a277ef79b2504ffac1565de",
-          "download_url": "nmt_ko-en_shared_vocabulary.json"
-        },
-        {
           "filename": "source.spm",
-          "size_bytes": 841805,
-          "sha256": "c9496f7c2be9aecb84c751ae9f35a875915dde8e3892f652a5c76811ab2a0f49",
+          "size_bytes": 815483,
+          "sha256": "bcf0b63c9685de766ab3e10571a9a7f4a38eb39da51a4d64462757051d1986c7",
           "download_url": "nmt_ko-en_source.spm"
         },
         {
+          "filename": "source_vocabulary.json",
+          "size_bytes": 777969,
+          "sha256": "e9d0300fce8fa7a734a7cede1b0faf9dba3328432652e607d2c8eebdb026e8b1",
+          "download_url": "nmt_ko-en_source_vocabulary.json"
+        },
+        {
           "filename": "target.spm",
-          "size_bytes": 813126,
-          "sha256": "f1531ac8576fe64267dfca0dc33950a6e9a2d3fd9e05346558ad7ea5ee0e65bf",
+          "size_bytes": 789870,
+          "sha256": "7188e2e643ef82257f2d0d5e2592185a42b0e472aff8ee6880331a0bff8904cd",
           "download_url": "nmt_ko-en_target.spm"
+        },
+        {
+          "filename": "target_vocabulary.json",
+          "size_bytes": 562596,
+          "sha256": "a87e56c72f921d1c1fffe747098228bdb7a5cb7b16b86372a34419b1bb275028",
+          "download_url": "nmt_ko-en_target_vocabulary.json"
         }
       ]
     },

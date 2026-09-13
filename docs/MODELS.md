@@ -81,6 +81,11 @@ Run through the pipeline's own Auto route rather than as two separate passes, th
 identical and every sentence takes `ko-en → llm`. The extra Marian hop raises the median time per
 sentence on a desktop CPU from 1.7–2.0 s to 2.1–2.3 s; the 3B model takes 4.6–4.8 s.
 
+Since 0.3.13 `LlmEngine` keeps the KV cache of the prompt prefix between calls (the instruction
+and the demonstrations do not change within a direction) and decodes only the sentence: ko→th
+median 2.10 s → 1.08 s per sentence on the desktop CPU (`app-1.5b` 841 ms median with the base
+ko-en hop, 988 ms with tc-big), the first sentence of a direction unchanged, chrF 39.2 → 39.5.
+
 **Teaching it your domain ("학습")**: `scripts/finetune_lora.py` fine-tunes the same Qwen model
 with LoRA on parallel sentences (Tatoeba for all 8 languages, plus your own JSONL — glossaries,
 corrected app outputs), merges the adapter and exports a quantized GGUF that drops into the
@@ -163,7 +168,8 @@ converter did not (the normal case for transformers-converted Marian models).
 |---|---|---|---|
 | STT | whisper `small-q5_1` | 190 MB | all eight languages |
 | STT option | whisper `medium-q5_0` | 539 MB | `stt_options`: chosen in Settings; better Thai and Vietnamese, ~3× the time |
-| ko-en, ja-en, zh-en, es-en | OPUS-MT base INT8 | ≈ 80 MB each | pre-converted (Hugging Face `jiangzhuo9357/*-ct2`) |
+| ja-en, zh-en, es-en | OPUS-MT base INT8 | ≈ 80 MB each | pre-converted (Hugging Face `jiangzhuo9357/*-ct2`) |
+| ko-en | `opus-mt-tc-big-ko-en` INT8, converted from the original Marian weights | 212 MB | 0.3.13 (manifest entry version 2): chrF 59.1 → 62.9 / 44.2 → 53.9 against the base model on the 30 + 10 test sentences; 420 ms against 233 ms per sentence |
 | en-zh, en-es | OPUS-MT base INT8 | ≈ 80 MB each | same source |
 | en-ja | `opus-tatoeba-en-ja` INT8 | 78 MB | `opus-mt-en-jap` is trained on Bible text and unusable for modern Japanese |
 | en-ko | `opus-mt-tc-big-en-ko` INT8, converted from the original Marian weights | ≈ 215 MB | see below |

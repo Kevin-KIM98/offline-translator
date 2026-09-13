@@ -95,6 +95,7 @@ class TranslatorSession(
         this.targetLang = targetLang
         if (capture.isRunning) return true
         translator.resetAudio()
+        warmRoutes()
         // Push-to-talk restarts capture many times; keep a single consumer of [ready].
         if (worker?.isActive == true) return capture.start()
         worker = scope.launch {
@@ -119,6 +120,14 @@ class TranslatorSession(
             }
         }
         return capture.start()
+    }
+
+    /** Loads the translation models the current languages use, so the first utterance is not slowed by it. */
+    private fun warmRoutes() {
+        val pairs = if (otherLang.isNotEmpty()) listOf(otherLang to targetLang, targetLang to otherLang)
+                    else if (sourceLang != "auto") listOf(sourceLang to targetLang) else emptyList()
+        if (pairs.isEmpty()) return
+        scope.launch { for ((s, t) in pairs) runCatching { translator.preloadPair(s, t) } }
     }
 
     /**

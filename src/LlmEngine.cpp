@@ -199,6 +199,10 @@ struct LlmEngine::Impl {
     // greedy / sampling stage. This structurally prevents the language mixing small models show.
     std::map<std::string, llama_sampler*> samplers;
     std::vector<std::vector<Script>> tokenScripts; // per vocab id: scripts of the letters in its piece
+    // Prompt tokens whose KV entries the context currently holds from position 0. The system
+    // instruction and the demonstrations are the same for every sentence of a direction, so the
+    // next prompt shares a long prefix with this one and only its tail needs decoding.
+    std::vector<llama_token> cachedPrompt;
 
     void classifyVocab() {
         const int n = llama_vocab_n_tokens(vocab);
@@ -351,6 +355,7 @@ void LlmEngine::unload() {
     if (impl_->ctx) { llama_free(impl_->ctx); impl_->ctx = nullptr; }
     if (impl_->model) { llama_model_free(impl_->model); impl_->model = nullptr; }
     impl_->vocab = nullptr;
+    impl_->cachedPrompt.clear();
 #endif
     impl_->path.clear();
 }
@@ -442,13 +447,26 @@ LlmResult LlmEngine::translate(const std::string& text, const std::string& src, 
             return false;
         }
 
-        // 3. Prompt processing.
-        llama_kv_self_clear(impl_->ctx);
-        llama_batch batch = llama_batch_get_one(tokens.data(), nTok);
+        // 3. Prompt processing. Keep the KV entries of the longest prefix shared with the previous
+        //    prompt (instruction + demonstrations: most of it) and decode only what follows; at
+        //    least the last token is decoded so its logits are fresh.
+        std::size_t common = 0;
+        while (common < impl_->cachedPrompt.size() && common + 1 < tokens.size() && impl_->cachedPrompt[common] == tokens[common])
+            ++common;
+        if (common == 0) llama_kv_self_clear(impl_->ctx);
+        else if (!llama_kv_self_seq_rm(impl_->ctx, 0, static_cast<llama_pos>(common), -1)) {
+            llama_kv_self_clear(impl_->ctx);
+            common = 0;
+        }
+        impl_->cachedPrompt.clear();
+        llama_batch batch = llama_batch_get_one(tokens.data() + common, nTok - static_cast<int>(common));
         if (llama_decode(impl_->ctx, batch) != 0) {
+            llama_kv_self_clear(impl_->ctx);
             err = "llama: prompt decode failed";
             return false;
         }
+        impl_->cachedPrompt = tokens;
+        r.cachedPromptTokens = static_cast<int>(common);
 
         // 4. Greedy generation until EOS / cap, with the target's script constraints.
         llama_sampler* sampler = impl_->samplerFor(tgt);

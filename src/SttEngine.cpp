@@ -87,13 +87,13 @@ namespace {
 // whisper rejects input shorter than 1 s; pad with silence.
 constexpr std::size_t kMinSamples = static_cast<std::size_t>(kSampleRate) * 11 / 10;
 
-// 1500 encoder positions ↔ 30 s. Keep ≥ 1.5 s of headroom and a floor of 512 (~10 s);
-// 0 (whisper's full window) for audio of 20 s and more.
-int adaptiveAudioCtx(std::size_t samples) {
+// 1500 encoder positions ↔ 30 s. Keep ≥ 1.5 s of headroom and a floor (512 ≈ 10 s for
+// transcription); 0 (whisper's full window) for audio of 20 s and more.
+int adaptiveAudioCtx(std::size_t samples, int floor = 512) {
     const double seconds = static_cast<double>(samples) / kSampleRate;
     if (seconds >= 20.0) return 0;
     const int ctx = static_cast<int>(seconds * 50.0) + 96;
-    return std::max(512, std::min(1500, ctx));
+    return std::max(floor, std::min(1500, ctx));
 }
 } // namespace
 #endif
@@ -123,8 +123,10 @@ std::string SttEngine::detectLanguage(const float* pcm, std::size_t n, bool adap
     wparams.language = "auto";
     wparams.detect_language = true;     // whisper_full returns right after the detection pass
     if (adaptiveAudioContext) {
-        const int ctx = adaptiveAudioCtx(count);
-        if (ctx > 0) wparams.audio_ctx = ctx;   // honoured by the detection pass: see cmake/patches
+        // Language identification needs a few seconds, not the whole utterance: a 256-position
+        // window (~5 s) halves the detection pass. Honoured by the detection pass: see cmake/patches.
+        const int ctx = adaptiveAudioCtx(std::min(count, static_cast<std::size_t>(kSampleRate) * 5), 256);
+        if (ctx > 0) wparams.audio_ctx = ctx;
     }
     if (whisper_full(impl_->ctx, wparams, data, static_cast<int>(count)) != 0) return std::string();
     const int langId = whisper_full_lang_id(impl_->ctx);

@@ -13,6 +13,7 @@ Configurations (each is one translator_cli invocation per clip, so whisper loads
   noprompt  oneshot without the per-language style prompt
   fullctx   oneshot with whisper's full 30 s encoder window instead of the adaptive one
   greedy    oneshot with beam size 1
+  beam3     oneshot with beam size 3
   auto      oneshot with `--lang auto`: measures language identification
 
 Scores: CER = character error rate after normalisation (NFC, lower case, punctuation and spaces
@@ -108,6 +109,8 @@ def run(cli, models, config, wav, lang):
         cmd.append("--full-audio-ctx")
     elif config == "greedy":
         cmd += ["--stt-beam", "1"]
+    elif config == "beam3":
+        cmd += ["--stt-beam", "3"]
     out = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8").stdout
     m = re.search(r"^\[(\w+)\] (.*)\n\((\d+) ms\)", out, re.S | re.M)
     if not m:
