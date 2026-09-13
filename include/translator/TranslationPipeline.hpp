@@ -40,12 +40,18 @@ public:
     std::size_t pendingUtteranceCount() const;
     // Force-close the current utterance (push-to-talk release). Returns true if one was emitted.
     bool flushAudio();
+    // Drops whatever audio is buffered or segmented but keeps the conversation context: use it
+    // after the device played a translation so its own voice is not transcribed.
+    void discardAudio();
     void resetAudio();
     void setSegmenterConfig(const SegmenterConfig& cfg);
     const SegmenterConfig& segmenterConfig() const;
 
     // Pops the oldest utterance and runs STT + NMT on it (blocking; run off the audio thread).
-    TranslationResult processPendingUtterance(const std::string& sourceLang, const std::string& targetLang);
+    // otherLang: for a two-language conversation with sourceLang "auto". When the detected
+    // language is targetLang itself, the other party spoke, so the translation goes to otherLang.
+    TranslationResult processPendingUtterance(const std::string& sourceLang, const std::string& targetLang,
+                                              const std::string& otherLang = "");
     // Pops the oldest utterance without processing it (e.g. to hand the audio to a caller).
     std::vector<float> popPendingUtterance();
 
@@ -53,7 +59,8 @@ public:
     SttResult transcribe(const float* pcm, std::size_t n, const std::string& sourceLang);
     TranslationResult translateText(const std::string& text, const std::string& sourceLang, const std::string& targetLang);
     TranslationResult processSpeechToTranslation(const float* pcm, std::size_t n,
-                                                 const std::string& sourceLang, const std::string& targetLang);
+                                                 const std::string& sourceLang, const std::string& targetLang,
+                                                 const std::string& otherLang = "");
 
     // ---- NMT management --------------------------------------------------------
     bool preloadPair(const std::string& src, const std::string& tgt, std::string* error = nullptr);

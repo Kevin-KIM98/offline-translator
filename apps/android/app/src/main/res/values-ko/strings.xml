@@ -36,11 +36,11 @@
     <string name="talk_hold">길게 눌러 말하기</string>
     <string name="swap_languages">언어 방향 바꾸기</string>
     <string name="settings">설정</string>
-    <string name="hands_free">핸즈프리</string>
+    <string name="hands_free">대화 모드</string>
     <string name="keyboard_input">키보드로 입력</string>
     <string name="clear_conversation">대화 지우기</string>
-    <string name="hands_free_title">핸즈프리로 듣는 중</string>
-    <string name="hands_free_body">말이 끝나면 자동으로 통역합니다. 두 사람이 번갈아 말해도 됩니다.</string>
+    <string name="hands_free_title">대화 모드</string>
+    <string name="hands_free_body">버튼 없이 말하면 됩니다. 말한 언어를 자동으로 알아내어 말이 잠시 멈출 때마다 상대 언어로 통역합니다. 두 사람이 번갈아 말하세요. 통역이 읽히는 동안에는 마이크가 잠시 닫히고, 길게 이어지는 말은 쉬는 지점에서 나누어 통역합니다.</string>
     <string name="hands_free_stop">중지</string>
     <string name="mic_needed_title">마이크 권한이 필요합니다</string>
     <string name="mic_needed_body">음성은 기기 안에서만 처리되며 어디로도 전송되지 않습니다.</string>

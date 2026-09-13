@@ -235,21 +235,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(working = false) }
             return
         }
-        // Hands-free listens with source "auto" toward B. When the engine reports that B's
-        // language was spoken, the other party answered — translate that back into A instead.
-        val answeredBack = s.handsFree && s.langA != s.langB && r.sourceLang == s.langB
-        if (answeredBack) {
-            viewModelScope.launch {
-                val back = session?.translate(r.sourceText, r.sourceLang, s.langA)
-                if (back == null || !back.ok) {
-                    _state.update { it.copy(message = back?.error ?: str(R.string.err_translate), working = false) }
-                } else {
-                    addTurn(back, Side.B)
-                }
-            }
-            return
-        }
-        val side = if (s.handsFree) (if (r.sourceLang == s.langB) Side.B else Side.A) else pendingSide
+        // Conversation mode: the engine detected the language and chose the direction itself
+        // (B's language goes to A, anything else goes to B); the side follows the detection.
+        val side = if (s.handsFree) (if (r.sourceLang == s.langB && s.langA != s.langB) Side.B else Side.A) else pendingSide
         addTurn(r, side)
     }
 
@@ -317,7 +305,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun startHandsFree() {
         val s = _state.value
         if (s.phase != Phase.Ready) return
-        if (session?.start(sourceLang = "auto", targetLang = s.langB) != true) {
+        // The microphone is muted while a translation is spoken (TranslatorSession.speak), so the
+        // phone does not transcribe its own voice; both people then simply talk in turn.
+        if (session?.startConversation(s.langA, s.langB) != true) {
             _state.update { it.copy(message = str(R.string.err_mic), handsFree = false) }
             return
         }

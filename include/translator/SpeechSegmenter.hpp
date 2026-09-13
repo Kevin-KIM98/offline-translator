@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <deque>
+#include <utility>
 #include <vector>
 
 namespace translator {
@@ -17,6 +18,11 @@ struct SegmenterConfig {
     int minUtteranceMs = 400;      // shorter utterances are discarded
     int maxUtteranceMs = 15000;    // force-close (whisper works on ≤ 30 s windows)
     int preRollMs = 300;           // audio kept before the detected start
+    // A speaker who does not pause for endSilenceMs still has to be cut at maxUtteranceMs. The
+    // cut goes to the middle of the longest dip in voice activity of at least this length that
+    // sits in the second half of the utterance, so the piece ends between words, not inside one.
+    // (RNNoise's smoothed probability needs ~3 frames to fall, so a 250 ms pause shows ~150 ms.)
+    int splitPauseMs = 120;
 
     // Loudness gate. RNNoise's voice-activity probability alone fires on room noise, and
     // whisper answers a noise-only segment with a fluent invented sentence. An utterance is
@@ -58,6 +64,7 @@ public:
 
 private:
     void emitCurrent();
+    void splitCurrent();
     void appendFrame(const float* frame480, float rms);
     void trimTail(std::size_t samples);
     bool loudEnough() const;
@@ -71,6 +78,8 @@ private:
     bool inSpeech_ = false;
     int voicedRun_ = 0;
     int silenceRun_ = 0;
+    int splitPauseFrames_ = 0;
+    std::vector<std::pair<std::size_t, int>> dips_;   // (sample offset of the dip's middle in current_, frames)
     int preRollFrames_ = 0;
     int endSilenceFrames_ = 0;
     std::size_t minSamples_ = 0;

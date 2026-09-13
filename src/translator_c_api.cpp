@@ -266,9 +266,18 @@ TR_API void tr_pipeline_reset_audio(tr_pipeline* p) {
     if (p) p->impl.resetAudio();
 }
 
+TR_API void tr_pipeline_discard_audio(tr_pipeline* p) {
+    if (p) p->impl.discardAudio();
+}
+
 TR_API char* tr_pipeline_process_pending(tr_pipeline* p, const char* source_lang, const char* target_lang) {
+    return tr_pipeline_process_pending2(p, source_lang, target_lang, "");
+}
+
+TR_API char* tr_pipeline_process_pending2(tr_pipeline* p, const char* source_lang, const char* target_lang,
+                                          const char* other_lang) {
     if (!p) return dupString("{\"ok\":false,\"error\":\"null pipeline\"}");
-    return dupString(p->impl.processPendingUtterance(safe(source_lang, "auto"), safe(target_lang, "en")).toJson().dump());
+    return dupString(p->impl.processPendingUtterance(safe(source_lang, "auto"), safe(target_lang, "en"), safe(other_lang)).toJson().dump());
 }
 
 TR_API char* tr_pipeline_transcribe(tr_pipeline* p, const float* pcm, size_t n, const char* source_lang) {

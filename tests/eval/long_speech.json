@@ -1,0 +1,6 @@
+{
+  "description": "Long-form check: one speaker talks for well over 30 seconds without a button press. Each entry is synthesised as a single clip; the reference is the text itself. Sentences are separated by normal pauses, so the segmenter has to cut the stream into pieces itself.",
+  "ko": "안녕하세요, 저는 서울에서 온 김민수라고 합니다. 이번 출장은 처음이라서 조금 긴장이 되네요. 내일 오전 열 시에 본사에서 회의가 있는데, 회의 전에 잠깐 만나서 발표 자료를 같이 확인하고 싶습니다. 그리고 점심은 근처에 괜찮은 식당이 있으면 추천해 주세요. 저는 해산물을 잘 못 먹어서 가능하면 고기나 채소 위주의 메뉴가 좋겠습니다. 회의가 끝나면 공항까지 택시로 얼마나 걸리는지도 알려 주시면 감사하겠습니다. 마지막으로 호텔 체크아웃 시간이 열두 시인데, 짐을 프런트에 맡길 수 있는지도 확인 부탁드립니다.",
+  "en": "Good morning, my name is Sarah and I am visiting from London. This is my first time in the city, so I am still finding my way around. We have a meeting tomorrow at ten in the morning at the head office, and I would like to meet briefly before it to go over the slides together. For lunch, could you recommend a good restaurant nearby? I do not eat seafood, so a place with meat or vegetable dishes would be ideal. After the meeting I need to get to the airport, so please let me know how long the taxi ride usually takes. And one last thing: my hotel checkout is at noon, so could you check whether I can leave my luggage at the front desk?",
+  "voices": {"ko": "ko-KR-SunHiNeural", "en": "en-US-JennyNeural"}
+}

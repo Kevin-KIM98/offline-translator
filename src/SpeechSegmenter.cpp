@@ -23,6 +23,7 @@ float dbToLinear(float db) { return std::pow(10.0f, db / 20.0f); }
 SpeechSegmenter::SpeechSegmenter(const SegmenterConfig& cfg) : cfg_(cfg) {
     preRollFrames_ = msToFrames(cfg_.preRollMs);
     endSilenceFrames_ = msToFrames(cfg_.endSilenceMs);
+    splitPauseFrames_ = msToFrames(cfg_.splitPauseMs);
     minSamples_ = static_cast<std::size_t>(cfg_.minUtteranceMs) * kSampleRate / 1000;
     maxSamples_ = static_cast<std::size_t>(cfg_.maxUtteranceMs) * kSampleRate / 1000;
 }
@@ -36,6 +37,7 @@ void SpeechSegmenter::reset() {
     inSpeech_ = false;
     voicedRun_ = 0;
     silenceRun_ = 0;
+    dips_.clear();
     noiseFloor_ = -1.0f;
 }
 
@@ -83,6 +85,39 @@ void SpeechSegmenter::emitCurrent() {
     inSpeech_ = false;
     voicedRun_ = 0;
     silenceRun_ = 0;
+    dips_.clear();
+}
+
+// The utterance reached its maximum length. Emit it up to the longest pause in its second half
+// and keep speaking from there; without such a pause, cut where we are.
+void SpeechSegmenter::splitCurrent() {
+    const std::size_t half = current_.size() / 2;
+    std::size_t splitAt = 0;
+    int longest = 0;
+    for (const auto& d : dips_)
+        if (d.first >= half && d.first >= minSamples_ && d.first < current_.size() && d.second > longest) {
+            splitAt = d.first;
+            longest = d.second;
+        }
+    if (splitAt == 0) {
+        emitCurrent();
+        return;
+    }
+    std::vector<float> rest(current_.begin() + static_cast<std::ptrdiff_t>(splitAt), current_.end());
+    const std::size_t restFrames = rest.size() / kFrameSize;
+    std::vector<float> restRms(currentRms_.end() - static_cast<std::ptrdiff_t>(std::min(restFrames, currentRms_.size())), currentRms_.end());
+    current_.resize(splitAt);
+    currentRms_.resize(currentRms_.size() - restRms.size());
+    if (loudEnough()) ready_.push_back(std::move(current_));
+    else ++droppedQuiet_;
+    current_ = std::move(rest);
+    currentRms_ = std::move(restRms);
+    // Pauses after the cut stay usable, rebased to the new start. The speaker has not stopped:
+    // inSpeech_, voicedRun_ and silenceRun_ carry on.
+    std::vector<std::pair<std::size_t, int>> kept;
+    for (const auto& d : dips_)
+        if (d.first > splitAt) kept.emplace_back(d.first - splitAt, d.second);
+    dips_ = std::move(kept);
 }
 
 bool SpeechSegmenter::pushFrame(const float* frame480, float vadProb, const float* levelFrame480) {
@@ -135,10 +170,14 @@ bool SpeechSegmenter::pushFrame(const float* frame480, float vadProb, const floa
             emitCurrent();
         }
     } else {
+        // Voice is back. A dip that did not close the utterance still marks a word boundary;
+        // the frame just appended is the first voiced one, so the dip ends one frame back.
+        if (silenceRun_ >= splitPauseFrames_)
+            dips_.emplace_back(current_.size() - kFrameSize - static_cast<std::size_t>(silenceRun_) * kFrameSize / 2, silenceRun_);
         silenceRun_ = 0;
     }
 
-    if (inSpeech_ && current_.size() >= maxSamples_) emitCurrent();
+    if (inSpeech_ && current_.size() >= maxSamples_) splitCurrent();
 
     return ready_.size() > before;
 }

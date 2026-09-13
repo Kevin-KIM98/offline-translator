@@ -87,6 +87,13 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   first so the prompt applies (`SttEngine::detectLanguage`, `Impl::resolveLang`). Thai is whisper
   small's weak language; only a bigger whisper model helps. Re-run the eval after touching
   SttEngine, the prompts in TextUtil, the segmenter or the denoiser (clips: `stt_synthesize.py`).
+- **Conversation mode (0.3.11).** The app's "hands-free" toggle is `TranslatorSession.startConversation(A, B)`:
+  `process_pending2(p, "auto", B, A)` picks the direction in the engine (detected B → A, anything
+  else → B), the microphone frames are dropped while a translation is spoken and `discard_audio()`
+  runs afterwards. Without that mute the phone transcribed its own TTS and answered itself.
+  Long speech: the segmenter cuts a non-stop speaker at the longest short pause (≥ 120 ms,
+  `splitPauseMs`) in the second half before 15 s; measured with `tests/eval/run_long_eval.py`
+  (40 s monologues, pauses shortened to 250 ms): ko 3.3% → 1.4% CER, cuts on clause boundaries.
 - **Automatic language detection.** Hands-free mode passes `auto`. Upstream whisper.cpp applies
   `audio_ctx` after language detection, so auto cost 4× a fixed language; `cmake/patches/` moves
   the assignment and `cmake/ThirdParty.cmake` applies it at configure time (auto now ≈ +0.8 s, one

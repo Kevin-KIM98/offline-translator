@@ -300,11 +300,16 @@ bool TranslationPipeline::flushAudio() {
     return impl_->segmenter.flush();
 }
 
-void TranslationPipeline::resetAudio() {
+void TranslationPipeline::discardAudio() {
     std::lock_guard<std::mutex> lock(impl_->audioMutex);
     impl_->frameBuf.clear();
     impl_->segmenter.reset();
     impl_->denoiser.reset();
+}
+
+void TranslationPipeline::resetAudio() {
+    discardAudio();
+    std::lock_guard<std::mutex> lock(impl_->audioMutex);
     impl_->previousTranscript.clear();
 }
 
@@ -320,7 +325,8 @@ std::vector<float> TranslationPipeline::popPendingUtterance() {
     return impl_->segmenter.popUtterance();
 }
 
-TranslationResult TranslationPipeline::processPendingUtterance(const std::string& sourceLang, const std::string& targetLang) {
+TranslationResult TranslationPipeline::processPendingUtterance(const std::string& sourceLang, const std::string& targetLang,
+                                                               const std::string& otherLang) {
     const std::vector<float> audio = popPendingUtterance();
     if (audio.empty()) {
         TranslationResult r;
@@ -328,7 +334,7 @@ TranslationResult TranslationPipeline::processPendingUtterance(const std::string
         r.targetLang = targetLang;
         return r;
     }
-    return processSpeechToTranslation(audio.data(), audio.size(), sourceLang, targetLang);
+    return processSpeechToTranslation(audio.data(), audio.size(), sourceLang, targetLang, otherLang);
 }
 
 // ---------------------------------------------------------------------------
@@ -382,10 +388,12 @@ TranslationResult TranslationPipeline::translateText(const std::string& text, co
 }
 
 TranslationResult TranslationPipeline::processSpeechToTranslation(const float* pcm, std::size_t n,
-                                                                  const std::string& sourceLang, const std::string& targetLang) {
+                                                                  const std::string& sourceLang, const std::string& requestedTarget,
+                                                                  const std::string& otherLang) {
     TranslationResult r;
     r.sourceLang = sourceLang;
-    r.targetLang = targetLang;
+    r.targetLang = requestedTarget;
+    std::string targetLang = requestedTarget;
     const auto t0 = std::chrono::steady_clock::now();
 
     std::lock_guard<std::mutex> lock(impl_->engineMutex);
@@ -409,6 +417,11 @@ TranslationResult TranslationPipeline::processSpeechToTranslation(const float* p
         return r;
     }
     if (!stt.detectedLang.empty()) r.sourceLang = stt.detectedLang;
+    // Conversation: the party who speaks the target language answered, so translate the other way.
+    if (!otherLang.empty() && r.sourceLang == targetLang && otherLang != targetLang) {
+        targetLang = otherLang;
+        r.targetLang = targetLang;
+    }
     r.sourceText = impl_->cfg.cleanTranscripts ? text::cleanTranscript(stt.text, r.sourceLang) : stt.text;
     impl_->rememberTranscript(r.sourceText, r.sourceLang);
     if (r.sourceText.empty()) {

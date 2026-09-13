@@ -34,6 +34,15 @@ class TranslatorSession(
 
     @Volatile var sourceLang: String = "auto"
     @Volatile var targetLang: String = "en"
+    /** Conversation partner's language: see [startConversation]. Empty outside a conversation. */
+    @Volatile var otherLang: String = ""
+
+    /**
+     * True while the device plays a translation. The microphone stays open but its frames are
+     * dropped, and what it caught around the playback is discarded afterwards: without this the
+     * phone transcribes its own voice and answers itself.
+     */
+    @Volatile private var muted = false
 
     /** Speak each translation through the OS TTS. Can be toggled while running (mute). */
     @Volatile var speakResults: Boolean = speakResults
@@ -75,6 +84,7 @@ class TranslatorSession(
                 cb(((db + 50.0) / 50.0).coerceIn(0.0, 1.0).toFloat())
             }
         }
+        if (muted) return@AudioCapture
         if (translator.feedAudio(pcm, n)) ready.trySend(Unit)
     }, onError = { onError?.invoke(it) })
 
@@ -92,7 +102,8 @@ class TranslatorSession(
                 while (translator.pendingCount > 0) {
                     // Pause TTS so the mic does not pick up our own voice.
                     tts.stop()
-                    val r = translator.processPending(this@TranslatorSession.sourceLang, this@TranslatorSession.targetLang)
+                    val r = translator.processPending(this@TranslatorSession.sourceLang, this@TranslatorSession.targetLang,
+                                                      this@TranslatorSession.otherLang)
                     if (!r.ok) onError?.invoke(r.error ?: "unknown error")
                     if (r.isEmpty) {
                         onNoSpeech?.invoke()
@@ -101,13 +112,24 @@ class TranslatorSession(
                     onResult?.invoke(r)
                     if (r.ok && speakResults && r.translatedText.isNotBlank()) {
                         onSpeechState?.invoke(true)
-                        tts.speakAndWait(r.translatedText, r.targetLang, speechRate)
+                        speak(r.translatedText, r.targetLang, speechRate)
                         onSpeechState?.invoke(false)
                     }
                 }
             }
         }
         return capture.start()
+    }
+
+    /**
+     * Two-language conversation without buttons: the language of each utterance is detected;
+     * [langA] speakers are translated into [langB] and [langB] speakers into [langA]. A third
+     * language is treated as A's side. Translations are spoken (when [speakResults]) with the
+     * microphone muted meanwhile.
+     */
+    fun startConversation(langA: String, langB: String): Boolean {
+        otherLang = langA
+        return start(sourceLang = "auto", targetLang = langB)
     }
 
     /** Push-to-talk release: close the current utterance immediately. */
@@ -119,6 +141,7 @@ class TranslatorSession(
 
     fun stop() {
         capture.stop()
+        otherLang = ""
         onAudioLevel?.invoke(0f)
         endUtterance()
     }
@@ -128,7 +151,18 @@ class TranslatorSession(
         translator.translateText(text, src, tgt)
     }
 
-    suspend fun speak(text: String, lang: String, rate: Float = speechRate) = tts.speakAndWait(text, lang, rate)
+    /** Speaks through the OS TTS with the microphone muted, then drops what the microphone caught. */
+    suspend fun speak(text: String, lang: String, rate: Float = speechRate): Boolean {
+        muted = true
+        try {
+            return tts.speakAndWait(text, lang, rate)
+        } finally {
+            // The speaker's tail reaches the microphone a little after TTS reports completion.
+            kotlinx.coroutines.delay(250)
+            if (capture.isRunning) translator.discardAudio()
+            muted = false
+        }
+    }
 
     /** Cuts off whatever the TTS is currently saying. */
     fun stopSpeaking() = tts.stop()

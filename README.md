@@ -23,7 +23,8 @@ releases — no server of your own is needed.
 ## Try it: the app
 
 `apps/` holds a finished two-way interpreter for both platforms — first-run model download,
-push-to-talk per speaker, a replayable transcript, hands-free mode, keyboard input and model
+push-to-talk per speaker, a replayable transcript, a conversation mode that recognises which
+language was spoken and needs no buttons, keyboard input and model
 management. Grab
 [offline-interpreter-1.0.0.apk](https://github.com/Kevin-KIM98/offline-translator/releases/download/v0.3.10/offline-interpreter-1.0.0.apk)
 for an arm64 Android 8+ device, or build either app from source:
@@ -140,7 +141,7 @@ Point `manifestUrl` at your own copy of `assets/manifest.json` (regenerate it wi
 
 | stage | engine | notes |
 |---|---|---|
-| noise suppression + VAD | RNNoise | 30 ms frames: voice activity and the level for the loudness gate; utterance segmentation with pre-roll / hangover. Whisper hears the microphone audio, not RNNoise's output (0.3.9) |
+| noise suppression + VAD | RNNoise | 30 ms frames: voice activity and the level for the loudness gate; utterance segmentation with pre-roll / hangover; a speaker who never pauses is cut at the longest short pause before 15 s (0.3.11). Whisper hears the microphone audio, not RNNoise's output (0.3.9) |
 | speech recognition | whisper.cpp `small-q5_1` (190 MB); `medium-q5_0` (539 MB) selectable in Settings (0.3.10) | beam 5, punctuated per-language prompts, conversation context, hallucination filter, adaptive encoder window (also for automatic language detection, 0.3.9) |
 | translation (Marian) | CTranslate2 OPUS-MT INT8 (≈ 80 MB / pair, 11 pairs) | beam 4, repetition control, sentence batching, English-pivot routing, per-language post-processing |
 | translation (LLM) | llama.cpp + Qwen2.5-1.5B-Instruct Q4_K_M (1.1 GB) | directions no dedicated model covers, starting from Marian's English where a pair reaches it; three demonstrations, script guard, greedy decoding, output cleanup; any→any with source auto-detect when used on its own; `scripts/finetune_lora.py` adapts it to your domain |
@@ -335,3 +336,15 @@ AAR on Ubuntu, the XCFramework on macOS, rewrites `Package.swift` with the new c
   `large-v3-turbo` was tried and dropped: with the adaptive encoder window it repeated sentences
   from the first Korean clips on. `translator_cli ... --stt-id whisper-medium-q5_0` and
   `scripts/fetch_models.py --stt-id ...` select it on the desktop.
+* **Conversation mode and long speech (0.3.11).** The app's hands-free mode became a conversation
+  mode: the engine detects the language of every utterance and chooses the direction itself
+  (`process_pending2`: a speaker of B's language is translated into A, everyone else into B), and
+  the microphone is muted while a translation is read aloud, then whatever it caught is discarded
+  (`discard_audio`), so the phone no longer hears its own voice and answers itself. Long speech,
+  measured with `tests/eval/run_long_eval.py` on 40 s monologues (`tests/eval/long_speech.json`):
+  a speaker who pauses between sentences is cut at those pauses, 7 pieces, CER ko 2.4% / en 0.4%.
+  A speaker who never pauses for the 700 ms that closes an utterance used to be cut at a hard 15 s,
+  in the middle of a word (근처에 → "근대 | 저에"): the cut now goes to the longest short pause in
+  the second half of the piece, ko 3.3% → 1.4% CER with every cut at a clause boundary, en 0.0%.
+  Each piece is translated as soon as it closes, so a long speech arrives in parts, a few seconds
+  behind the speaker. The 140-clip per-language numbers did not move.

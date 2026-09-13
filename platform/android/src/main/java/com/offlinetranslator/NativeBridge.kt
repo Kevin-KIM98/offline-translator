@@ -38,6 +38,8 @@ object NativeBridge {
     external fun pipelineFlushAudio(handle: Long): Boolean
     external fun pipelineResetAudio(handle: Long)
     external fun pipelineProcessPending(handle: Long, sourceLang: String, targetLang: String): String
+    external fun pipelineProcessPending2(handle: Long, sourceLang: String, targetLang: String, otherLang: String): String
+    external fun pipelineDiscardAudio(handle: Long)
     external fun pipelineTranscribe(handle: Long, pcm: FloatArray, sourceLang: String): String
     external fun pipelineTranslateText(handle: Long, text: String, sourceLang: String, targetLang: String): String
     external fun pipelineProcessSpeech(handle: Long, pcm: FloatArray, sourceLang: String, targetLang: String): String

@@ -242,6 +242,35 @@ void testSegmenter() {
         CHECK(std::fabs(u[std::size_t(5) * kFrameSize] - 0.002f) < 1e-6f);   // the stored audio is the raw frame
     }
 
+    // A speaker who runs past the maximum length is cut at their last short pause, not mid-word:
+    // 1.2 s speech, a 210 ms dip (too short to close the utterance), then speech past the 2 s
+    // maximum. The first piece ends in the dip; the second carries on from there.
+    {
+        SpeechSegmenter run(cfg);
+        std::vector<float> loud(kFrameSize, 0.3f), dip(kFrameSize, 0.01f);
+        for (int i = 0; i < 20; ++i) run.pushFrame(silence.data(), 0.05f);
+        for (int i = 0; i < 40; ++i) run.pushFrame(loud.data(), 0.95f);
+        for (int i = 0; i < 7; ++i) run.pushFrame(dip.data(), 0.05f);
+        CHECK(run.inSpeech());
+        bool split = false;
+        for (int i = 0; i < 30; ++i) split |= run.pushFrame(loud.data(), 0.95f);
+        CHECK(split);
+        CHECK(run.inSpeech());                           // the speaker has not stopped
+        std::vector<float> first = run.popUtterance();
+        // The pre-roll holds the 3 onset frames, so: 40 speech frames + half the dip (3 or 4 frames).
+        CHECK(first.size() >= std::size_t(40 + 3) * kFrameSize);
+        CHECK(first.size() <= std::size_t(40 + 4) * kFrameSize);
+        CHECK(std::fabs(first[std::size_t(3) * kFrameSize] - 0.3f) < 1e-6f);
+        CHECK(std::fabs(first[first.size() - kFrameSize] - 0.01f) < 1e-6f);   // ends inside the dip
+        bool closed = false;
+        for (int i = 0; i < 15; ++i) closed |= run.pushFrame(silence.data(), 0.05f);
+        CHECK(closed);
+        std::vector<float> second = run.popUtterance();
+        CHECK(second.size() >= std::size_t(30) * kFrameSize);                // the rest of the speech...
+        CHECK(second.size() < std::size_t(3 + 40 + 7 + 30) * kFrameSize);      // ...not the whole stream again
+        CHECK(!run.hasUtterance());
+    }
+
     // Without a VAD (denoiser off) every frame counts as voiced; the utterance closes on flush.
     {
         SpeechSegmenter seg2(cfg);

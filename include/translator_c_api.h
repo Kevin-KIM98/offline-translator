@@ -109,8 +109,17 @@ TR_API int tr_pipeline_feed_audio_i16(tr_pipeline* p, const int16_t* pcm, size_t
 TR_API int tr_pipeline_pending_count(tr_pipeline* p);
 TR_API int tr_pipeline_flush_audio(tr_pipeline* p);
 TR_API void tr_pipeline_reset_audio(tr_pipeline* p);
+/* Drops buffered and segmented audio but keeps the conversation context (0.3.11). Call it after
+   the device played a translation, so the microphone's recording of that playback is not
+   transcribed. */
+TR_API void tr_pipeline_discard_audio(tr_pipeline* p);
 /* Pops the oldest utterance and runs STT+NMT. Returns TranslationResult JSON. Blocking. */
 TR_API char* tr_pipeline_process_pending(tr_pipeline* p, const char* source_lang, const char* target_lang);
+/* Two-language conversation with source_lang "auto" (0.3.11): when the detected language is
+   target_lang itself, the other party spoke, and the translation goes to other_lang instead.
+   other_lang NULL or "" behaves like tr_pipeline_process_pending. */
+TR_API char* tr_pipeline_process_pending2(tr_pipeline* p, const char* source_lang, const char* target_lang,
+                                          const char* other_lang);
 
 /* One-shot ----------------------------------------------------------------- */
 /* {"ok":bool,"text":"...","detected_lang":"ko","elapsed_ms":123.4,"error":"..."} */

@@ -183,6 +183,13 @@ JNI_FN(jstring, pipelineProcessPending)(JNIEnv* env, jobject, jlong h, jstring s
     return takeString(env, tr_pipeline_process_pending(P(h), s.c_str(), t.c_str()));
 }
 
+JNI_FN(jstring, pipelineProcessPending2)(JNIEnv* env, jobject, jlong h, jstring src, jstring tgt, jstring other) {
+    OptString s(env, src), t(env, tgt), o(env, other);
+    return takeString(env, tr_pipeline_process_pending2(P(h), s.c_str(), t.c_str(), o.c_str()));
+}
+
+JNI_FN(void, pipelineDiscardAudio)(JNIEnv*, jobject, jlong h) { tr_pipeline_discard_audio(P(h)); }
+
 JNI_FN(jstring, pipelineTranscribe)(JNIEnv* env, jobject, jlong h, jfloatArray pcm, jstring src) {
     OptString s(env, src);
     jfloat* data = pcm ? env->GetFloatArrayElements(pcm, nullptr) : nullptr;

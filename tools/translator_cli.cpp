@@ -94,6 +94,7 @@ void usage() {
         "             [--llm-examples none|single|diverse] [--no-llm-pivot] [--lines]  --lines: one sentence per stdin line\n"
         "  speech     --models <dir> --wav <file> [--src auto] --tgt en [--stream] [--no-denoise] [--no-llm]\n"
         "             [--stt-denoised]  whisper hears RNNoise's output instead of the microphone audio\n"
+        "             [--other <lang>]  conversation: with --src auto, speakers of --tgt are translated to --other\n"
         "  listen     --models <dir> [--src auto] --tgt en [--device N] [--seconds N] [--list-devices]\n"
         "             [--record <out.wav>] keeps what the microphone heard, for replay\n"
         "             live microphone; speak, pause, and each utterance is translated\n",
@@ -408,20 +409,22 @@ int cmdSpeech(const Args& a) {
     }
 
     // Streaming mode: simulate a microphone delivering 20 ms chunks through the segmenter.
+    // --other <lang> makes it a conversation: --src auto, speakers of --tgt are translated to --other.
+    const std::string other = a.get("other", "");
     int utterances = 0;
     const std::size_t chunk = 320;
     for (std::size_t i = 0; i < pcm.size(); i += chunk) {
         const std::size_t n = std::min(chunk, pcm.size() - i);
         if (p.feedAudio(pcm.data() + i, n)) {
             while (p.hasPendingUtterance()) {
-                const TranslationResult r = p.processPendingUtterance(src, tgt);
+                const TranslationResult r = p.processPendingUtterance(src, tgt, other);
                 std::printf("--- utterance %d ---\n%s\n", ++utterances, r.toJson().dump(2).c_str());
             }
         }
     }
     if (p.flushAudio()) {
         while (p.hasPendingUtterance()) {
-            const TranslationResult r = p.processPendingUtterance(src, tgt);
+            const TranslationResult r = p.processPendingUtterance(src, tgt, other);
             std::printf("--- utterance %d (flushed) ---\n%s\n", ++utterances, r.toJson().dump(2).c_str());
         }
     }

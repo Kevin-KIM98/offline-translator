@@ -87,8 +87,20 @@ feed_audio(pcm, n)  → 1 when an utterance is complete
    └─ SpeechSegmenter: start after 3 voiced frames, end after 700 ms silence,
       300 ms pre-roll, 400 ms min, 15 s max (tr_pipeline_set_segmenter_config)
 process_pending(src, tgt) → TranslationResult JSON (pops the oldest utterance)
+process_pending2(src, tgt, other)
+                          → conversation (0.3.11): with src "auto", an utterance detected as tgt
+                            is the other party's and is translated into `other` instead
 flush_audio()             → force-close (push-to-talk release)
+discard_audio()           → drop buffered/segmented audio, keep the conversation context (0.3.11):
+                            call it after the device played a translation
 ```
+
+A two-language conversation without buttons is `process_pending2(p, "auto", langB, langA)` on
+every utterance, with the microphone frames dropped while a translation is being spoken and
+`discard_audio()` afterwards; `TranslatorSession.startConversation(langA, langB)` does exactly
+that. The segmenter cuts a speaker who never pauses for `end_silence_ms` at `max_utterance_ms`,
+choosing the longest short pause (`SegmenterConfig::splitPauseMs`, 120 ms, C++ only) in the second half of the utterance
+so the cut falls between words.
 
 ### One-shot
 

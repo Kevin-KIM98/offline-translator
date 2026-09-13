@@ -148,8 +148,15 @@ class OfflineTranslator(config: PipelineConfig) : Closeable {
     val pendingCount: Int get() = NativeBridge.pipelinePendingCount(h())
     fun flushAudio(): Boolean = NativeBridge.pipelineFlushAudio(h())
     fun resetAudio() = NativeBridge.pipelineResetAudio(h())
-    fun processPending(sourceLang: String = "auto", targetLang: String): TranslationResult =
-        TranslationResult.fromJson(NativeBridge.pipelineProcessPending(h(), sourceLang, targetLang))
+    /** Drops buffered and segmented audio, keeping the conversation context (after TTS playback). */
+    fun discardAudio() = NativeBridge.pipelineDiscardAudio(h())
+    /**
+     * Pops the oldest utterance and runs recognition and translation on it. With [sourceLang]
+     * "auto" and a non-empty [otherLang], a two-language conversation: when the detected language
+     * is [targetLang] itself, the other party spoke and the translation goes to [otherLang].
+     */
+    fun processPending(sourceLang: String = "auto", targetLang: String, otherLang: String = ""): TranslationResult =
+        TranslationResult.fromJson(NativeBridge.pipelineProcessPending2(h(), sourceLang, targetLang, otherLang))
 
     // ---- One-shot ----
     fun transcribe(pcm: FloatArray, sourceLang: String = "auto"): SttResult =
