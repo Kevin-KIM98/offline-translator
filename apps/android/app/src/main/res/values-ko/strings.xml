@@ -27,7 +27,7 @@
     <string name="model_llm">다국어 통역 LLM</string>
     <string name="model_nmt_pair">%1$s → %2$s 번역</string>
     <string name="model_nmt_generic">번역 모델 %1$s</string>
-    <string name="model_stt_sub">whisper · 8개 언어 공용</string>
+    <string name="model_stt_sub">whisper · 10개 언어 공용</string>
     <string name="model_llm_sub">Qwen2.5 · 모든 언어 조합</string>
     <string name="model_nmt_sub">OPUS-MT</string>
 
@@ -59,6 +59,32 @@
     <string name="text_placeholder">번역할 문장을 입력하세요</string>
     <string name="text_translate">번역</string>
     <string name="turn_footer">%1$s → %2$s · %3$d ms</string>
+
+    <!-- Camera translation -->
+    <string name="camera_translate">사진 번역</string>
+    <string name="camera_title">사진 번역</string>
+    <string name="camera_text_language">사진 속 글자의 언어</string>
+    <string name="camera_hint">간판·메뉴·문서를 향해 사진을 찍거나, 갤러리에서 사진을 고르세요.</string>
+    <string name="camera_shutter">사진 찍기</string>
+    <string name="camera_gallery">갤러리에서 선택</string>
+    <string name="camera_needed_title">카메라 권한이 필요합니다</string>
+    <string name="camera_needed_body">사진은 기기 안에서만 처리되며 어디로도 전송되지 않습니다.</string>
+    <string name="camera_reading">글자를 읽는 중</string>
+    <string name="camera_recognized">사진에서 읽은 글</string>
+    <string name="camera_retake">다시 찍기</string>
+    <string name="camera_done">완료</string>
+    <string name="camera_image_failed">이미지를 열 수 없습니다.</string>
+    <string name="err_camera">카메라를 열 수 없습니다</string>
+    <string name="err_ocr">글자 인식에 실패했습니다</string>
+    <string name="ocr_no_text">사진에서 글자를 찾지 못했습니다. 글자가 수평이 되게, 더 가까이에서 밝은 곳에서 다시 찍어 보세요.</string>
+    <string name="ocr_model_title">글자 인식 · %1$s</string>
+    <string name="ocr_download_body">사진에서 %1$s 글자를 읽으려면 %2$s 파일을 한 번만 내려받으면 됩니다.</string>
+    <string name="ocr_downloading">글자 인식 데이터를 내려받는 중</string>
+    <string name="ocr_missing_catalog">이 모델 목록에는 글자 인식 데이터가 아직 없습니다. 인터넷에 한 번 연결한 뒤 앱을 다시 시작해 주세요.</string>
+    <string name="ocr_not_installed">%1$s 글자 인식 데이터가 아직 설치되지 않았습니다.</string>
+    <string name="settings_ocr">글자 인식 (카메라)</string>
+    <string name="settings_ocr_desc">사진을 읽는 Tesseract 언어 파일입니다. 언어당 몇 MB이며, 카메라에서 그 언어를 처음 쓸 때 내려받습니다.</string>
+    <string name="settings_ocr_none">아직 내려받은 글자 인식 데이터가 없습니다.</string>
 
     <!-- Settings -->
     <string name="settings_languages">언어</string>

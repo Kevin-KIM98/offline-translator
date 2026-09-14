@@ -12,9 +12,9 @@ namespace translator {
 constexpr int kSampleRate = 16000;   // Hz — the whole pipeline runs at 16 kHz mono
 constexpr int kFrameSize = 480;      // RNNoise frame: 480 samples = 30 ms @ 16 kHz
 
-// ISO-639-1 codes used throughout: ko en es vi th ja zh id. "auto" = detect.
+// ISO-639-1 codes used throughout: ko en es vi th ja zh id fr ru. "auto" = detect.
 inline const std::vector<std::string>& supportedLanguages() {
-    static const std::vector<std::string> langs = {"ko", "en", "es", "vi", "th", "ja", "zh", "id"};
+    static const std::vector<std::string> langs = {"ko", "en", "es", "vi", "th", "ja", "zh", "id", "fr", "ru"};
     return langs;
 }
 

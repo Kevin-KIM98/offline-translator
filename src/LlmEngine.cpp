@@ -97,6 +97,8 @@ std::string LlmEngine::exampleSentence(const std::string& code) {
     if (code == "ja") return "すみません、一番近い駅はどこですか？";
     if (code == "zh") return "请问，最近的车站在哪里？";
     if (code == "id") return "Permisi, di mana stasiun terdekat?";
+    if (code == "fr") return "Excusez-moi, où est la gare la plus proche ?";
+    if (code == "ru") return "Извините, где ближайшая станция?";
     return {};
 }
 
@@ -111,6 +113,8 @@ std::vector<std::string> LlmEngine::exampleSet(const std::string& code) {
     if (code == "ja") return {"会議は金曜日に延期されました。", "音楽を少し小さくしていただけますか？", "昨日、本を二冊買いました。"};
     if (code == "zh") return {"会议推迟到星期五了。", "可以把音乐调小一点吗？", "我昨天买了两本书。"};
     if (code == "id") return {"Rapatnya dipindahkan ke hari Jumat.", "Bisakah Anda mengecilkan musiknya sedikit?", "Kemarin saya membeli dua buku."};
+    if (code == "fr") return {"La réunion a été reportée à vendredi.", "Pourriez-vous baisser un peu la musique ?", "Hier, j'ai acheté deux livres."};
+    if (code == "ru") return {"Встреча перенесена на пятницу.", "Не могли бы вы сделать музыку немного тише?", "Вчера я купил две книги."};
     return {};
 }
 
@@ -129,10 +133,11 @@ std::uint32_t decodeUtf8(const std::string& s, std::size_t& i) {
     return cp;
 }
 
-enum class Script { Latin, Hangul, Han, Kana, Thai, Jamo, Other };
+enum class Script { Latin, Hangul, Han, Kana, Thai, Cyrillic, Jamo, Other };
 
 Script scriptOf(std::uint32_t cp) {
     if ((cp >= 'A' && cp <= 'Z') || (cp >= 'a' && cp <= 'z') || (cp >= 0x00C0 && cp <= 0x024F) || (cp >= 0x1E00 && cp <= 0x1EFF)) return Script::Latin;
+    if ((cp >= 0x0400 && cp <= 0x04FF) || (cp >= 0x0500 && cp <= 0x052F)) return Script::Cyrillic;
     if (cp >= 0xAC00 && cp <= 0xD7AF) return Script::Hangul;
     // Conjoining / compatibility jamo never appear in normal Korean text (precomposed syllables do).
     if ((cp >= 0x1100 && cp <= 0x11FF) || (cp >= 0x3130 && cp <= 0x318F) || (cp >= 0xA960 && cp <= 0xA97F) || (cp >= 0xD7B0 && cp <= 0xD7FF)) return Script::Jamo;
@@ -148,7 +153,8 @@ bool scriptAllowed(Script s, const std::string& lang) {
     if (lang == "ja") return s == Script::Kana || s == Script::Han;
     if (lang == "zh") return s == Script::Han;
     if (lang == "th") return s == Script::Thai;
-    if (lang == "en" || lang == "es" || lang == "vi" || lang == "id") return s == Script::Latin;
+    if (lang == "ru") return s == Script::Cyrillic;
+    if (lang == "en" || lang == "es" || lang == "vi" || lang == "id" || lang == "fr") return s == Script::Latin;
     return true;
 }
 
@@ -157,6 +163,7 @@ const char* scriptName(const std::string& lang) {
     if (lang == "ja") return "Japanese (kana and kanji)";
     if (lang == "zh") return "Simplified Chinese characters";
     if (lang == "th") return "Thai";
+    if (lang == "ru") return "the Cyrillic alphabet";
     return "the Latin alphabet";
 }
 
@@ -232,7 +239,8 @@ struct LlmEngine::Impl {
         if (it != samplers.end()) return it->second;
 
         std::vector<llama_logit_bias> biases;
-        const bool known = tgt == "ko" || tgt == "ja" || tgt == "zh" || tgt == "th" || tgt == "en" || tgt == "es" || tgt == "vi" || tgt == "id";
+        const bool known = tgt == "ko" || tgt == "ja" || tgt == "zh" || tgt == "th" || tgt == "en" || tgt == "es" || tgt == "vi" || tgt == "id" ||
+                           tgt == "fr" || tgt == "ru";
         if (known) {
             for (std::size_t id = 0; id < tokenScripts.size(); ++id) {
                 const auto& scripts = tokenScripts[id];

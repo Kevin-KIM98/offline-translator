@@ -28,7 +28,7 @@
     <string name="model_llm">Multilingual LLM</string>
     <string name="model_nmt_pair">%1$s to %2$s translation</string>
     <string name="model_nmt_generic">Translation model %1$s</string>
-    <string name="model_stt_sub">whisper · shared by all eight languages</string>
+    <string name="model_stt_sub">whisper · shared by all ten languages</string>
     <string name="model_llm_sub">Qwen2.5 · every language pair</string>
     <string name="model_nmt_sub">OPUS-MT</string>
 
@@ -60,6 +60,32 @@
     <string name="text_placeholder">Type a sentence to translate</string>
     <string name="text_translate">Translate</string>
     <string name="turn_footer">%1$s → %2$s · %3$d ms</string>
+
+    <!-- Camera translation -->
+    <string name="camera_translate">Translate a photo</string>
+    <string name="camera_title">Photo translation</string>
+    <string name="camera_text_language">The text in the photo is in</string>
+    <string name="camera_hint">Point at a sign, a menu or a page and take a photo, or pick one from the gallery.</string>
+    <string name="camera_shutter">Take a photo</string>
+    <string name="camera_gallery">Choose from the gallery</string>
+    <string name="camera_needed_title">Camera access is needed</string>
+    <string name="camera_needed_body">Photos are read on this device only and are never sent anywhere.</string>
+    <string name="camera_reading">Reading the text</string>
+    <string name="camera_recognized">Text in the photo</string>
+    <string name="camera_retake">Take another</string>
+    <string name="camera_done">Done</string>
+    <string name="camera_image_failed">That image could not be opened.</string>
+    <string name="err_camera">Could not open the camera</string>
+    <string name="err_ocr">Text recognition failed</string>
+    <string name="ocr_no_text">No text was found in the photo. Try again closer and in better light, with the text level.</string>
+    <string name="ocr_model_title">Text recognition · %1$s</string>
+    <string name="ocr_download_body">Reading %1$s from a photo needs a %2$s file, downloaded once.</string>
+    <string name="ocr_downloading">Downloading text recognition</string>
+    <string name="ocr_missing_catalog">Text recognition is not in this model list yet. Connect to a network once and restart the app.</string>
+    <string name="ocr_not_installed">Text recognition for %1$s is not installed yet.</string>
+    <string name="settings_ocr">Text recognition (camera)</string>
+    <string name="settings_ocr_desc">Tesseract language files for reading photos, a few MB each, fetched the first time a language is used with the camera.</string>
+    <string name="settings_ocr_none">No text recognition data downloaded yet.</string>
 
     <!-- Settings -->
     <string name="settings_languages">Languages</string>

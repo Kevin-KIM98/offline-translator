@@ -1,6 +1,6 @@
 # offline-translator
 
-On-device, offline speech interpreter (ko en es vi th ja zh id): a C++ engine (RNNoise, whisper.cpp, CTranslate2/Marian,
+On-device, offline speech interpreter (ko en es vi th ja zh id fr ru): a C++ engine (RNNoise, whisper.cpp, CTranslate2/Marian,
 llama.cpp) with a C ABI, and an Android app in `apps/android` that uses it. The user runs the app on
 **Android only**; `apps/ios` and the iOS workflows exist but are not in use, so do not spend effort
 there unless asked.
@@ -149,6 +149,24 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   TextUtil, `exampleSentence`/`exampleSet`/`scriptAllowed`/the `known` list in LlmEngine,
   `OfflineTranslator.supportedLanguages`, `OfflineTTSManager.localeFor`, the app's `Lang.ALL`,
   `stt_sentences.json` + `NUMBER_WORDS`/`SPACED` in run_stt_eval.py, `finetune_lora.py` tables.
+- **French and Russian (0.3.17).** `fr` and `ru` are the ninth and tenth languages: OPUS-MT
+  `fr-en`/`en-fr`/`ru-en`/`en-ru` (base, converted with `prepare_models.py nmt` from the Hugging
+  Face repos, which are fine for the base models) on `models-v1`, manifest 1.7.0. Both route
+  through English; only X → th needs the LLM. `Script::Cyrillic` in LlmEngine: Russian output may
+  only use Cyrillic, French only Latin; `dropAppendedSource` also strips trailing English behind
+  Russian. Hallucination matching folds Cyrillic case (`toLowerCyrillic`). Checking a converted
+  pair from Python needs `</s>` appended to the source tokens (the engine does it itself).
+- **Photo translation (0.3.17, app only, unmeasured on a device).** Camera button on the
+  conversation screen → `CameraScreen` (CameraX viewfinder or the gallery) → `OcrEngine`
+  (tesseract4android-openmp 4.9.0 from JitPack, `PSM_AUTO`, longest side scaled to 2000 px) →
+  `OcrEngine.tidy` joins a block's lines into one paragraph (no space for ja/zh/th, hyphenation
+  mended, Tesseract's spaces between CJK characters removed) → `TranslatorSession.translate` per
+  paragraph → a `Turn` with `fromImage`. Language files are Tesseract `tessdata_fast`
+  (`ocr_<code>.traineddata` on `models-v1`, listed in the manifest's `ocr` array with the ISO
+  code; `prepare_models.py manifest` emits it from `<root>/ocr`) and live in `files/ocr/tessdata`,
+  downloaded by `OcrModels` on first use (sha256-checked), separate from the engine's store. The
+  engine and older apps ignore the `ocr` key. The text must be in one of the two conversation
+  languages; the user picks which.
 - **Model selection.** A language choice must download every pair its routes use, including the
   English hops. Before 0.3.7 `ko,ja` got speech recognition only and could not translate.
 

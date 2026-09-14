@@ -96,6 +96,30 @@
       "Saya kehilangan paspor dan harus pergi ke kantor polisi.",
       "Tolong beri tahu saya apakah bus ini pergi ke pusat kota.",
       "Katanya malam ini akan hujan, jadi saya membawa payung."
+    ],
+    "fr": [
+      "Où sont les toilettes ?",
+      "Retrouvons-nous demain à trois heures de l'après-midi dans le hall de l'hôtel.",
+      "Y a-t-il une pharmacie près d'ici ?",
+      "Combien de temps faut-il pour aller à l'aéroport en taxi ?",
+      "Je suis allergique aux cacahuètes, donc je dois faire attention.",
+      "Deux billets, s'il vous plaît.",
+      "Pourriez-vous parler un peu plus lentement ?",
+      "J'ai perdu mon passeport et je dois aller au commissariat.",
+      "Dites-moi si ce bus va au centre-ville.",
+      "On a dit qu'il pleuvrait ce soir, alors j'ai pris un parapluie."
+    ],
+    "ru": [
+      "Где туалет?",
+      "Давайте встретимся завтра в три часа дня в холле гостиницы.",
+      "Здесь есть аптека поблизости?",
+      "Сколько ехать до аэропорта на такси?",
+      "У меня аллергия на арахис, поэтому мне нужно быть осторожным.",
+      "Два билета, пожалуйста.",
+      "Не могли бы вы говорить немного медленнее?",
+      "Я потерял паспорт, и мне нужно в полицейский участок.",
+      "Скажите, пожалуйста, идёт ли этот автобус в центр города.",
+      "Сказали, что вечером будет дождь, поэтому я взял зонт."
     ]
   },
   "voices": {
@@ -130,6 +154,14 @@
     "id": [
       "id-ID-GadisNeural",
       "id-ID-ArdiNeural"
+    ],
+    "fr": [
+      "fr-FR-DeniseNeural",
+      "fr-FR-HenriNeural"
+    ],
+    "ru": [
+      "ru-RU-SvetlanaNeural",
+      "ru-RU-DmitryNeural"
     ]
   }
 }

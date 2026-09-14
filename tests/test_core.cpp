@@ -346,7 +346,7 @@ void testLlmEngine() {
     CHECK_EQ(LlmEngine::buildInstruction("ko", "en", "custom"), "custom");
     CHECK(!LlmEngine::exampleSentence("th").empty());
     // Diverse demonstrations pair up by index, so every language needs the same count.
-    for (const char* code : {"ko", "en", "es", "vi", "th", "ja", "zh", "id"})
+    for (const char* code : {"ko", "en", "es", "vi", "th", "ja", "zh", "id", "fr", "ru"})
         CHECK_EQ(LlmEngine::exampleSet(code).size(), std::size_t(3));
     CHECK(LlmEngine::exampleSet("xx").empty());
     CHECK(LlmEngine::exampleSentence("xx").empty());
@@ -367,10 +367,25 @@ void testLlmEngine() {
     CHECK(!r.error.empty());
 
     // Languages
-    CHECK_EQ(supportedLanguages().size(), std::size_t(8));
+    CHECK_EQ(supportedLanguages().size(), std::size_t(10));
     CHECK(isSupportedLanguage("vi"));
     CHECK(isSupportedLanguage("th"));
     CHECK(isSupportedLanguage("id"));
+    CHECK(isSupportedLanguage("fr"));
+    CHECK(isSupportedLanguage("ru"));
+    CHECK(!text::defaultPromptFor("fr").empty());
+    CHECK(!text::defaultPromptFor("ru").empty());
+    CHECK(text::isHallucination("Merci d'avoir regardé !", "fr"));
+    CHECK(text::isHallucination("Спасибо за просмотр.", "ru"));
+    CHECK_EQ(LlmEngine::languageName("fr"), "French");
+    CHECK_EQ(LlmEngine::languageName("ru"), "Russian");
+    // Cyrillic is its own script: Latin words are foreign in Russian and Cyrillic ones in French.
+    CHECK(LlmEngine::foreignScriptRatio("Где ближайшая станция?", "ru") < 0.01);
+    CHECK(LlmEngine::foreignScriptRatio("Где nearest station находится", "ru") > 0.3);
+    CHECK(LlmEngine::foreignScriptRatio("Où est la gare ?", "fr") < 0.01);
+    CHECK(LlmEngine::foreignScriptRatio("Où est la станция", "fr") > 0.3);
+    // An appended English copy behind Russian output is dropped like behind Korean.
+    CHECK_EQ(text::postProcessTranslation("Где ближайшая станция? Where is the nearest station here", "ru"), "Где ближайшая станция?");
     CHECK(!text::defaultPromptFor("id").empty());
     CHECK(text::isHallucination("Terima kasih telah menonton!", "id"));
     CHECK_EQ(LlmEngine::languageName("id"), "Indonesian");
