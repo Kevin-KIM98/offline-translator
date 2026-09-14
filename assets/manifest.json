@@ -1,5 +1,5 @@
 {
-  "manifest_version": "1.6.0",
+  "manifest_version": "1.7.0",
   "base_url": "https://github.com/Kevin-KIM98/offline-translator/releases/download/models-v1/",
   "stt": {
     "id": "whisper-small-q5_1",
@@ -76,6 +76,43 @@
           "size_bytes": 825924,
           "sha256": "e236ee6d866b635c0142114f8647f39831f9d92534aa2aad75c942f6a78ad0e3",
           "download_url": "nmt_en-es_target.spm"
+        }
+      ]
+    },
+    {
+      "pair": "en-fr",
+      "dir_name": "en-fr",
+      "version": "1",
+      "files": [
+        {
+          "filename": "config.json",
+          "size_bytes": 233,
+          "sha256": "72901fbd8abd89fb5cf4a388f26fc681f5c4c58a1e1a88b30b879f107270e7ee",
+          "download_url": "nmt_en-fr_config.json"
+        },
+        {
+          "filename": "model.bin",
+          "size_bytes": 76714395,
+          "sha256": "236b63e3029611a328693d704067ebdd75b800e5b3011cdec3dad4287fd29a36",
+          "download_url": "nmt_en-fr_model.bin"
+        },
+        {
+          "filename": "shared_vocabulary.json",
+          "size_bytes": 1112211,
+          "sha256": "528a527b3504bda364600f8bd7a2db1b0d7f82ef97a33ba0e80c289c4ae63c24",
+          "download_url": "nmt_en-fr_shared_vocabulary.json"
+        },
+        {
+          "filename": "source.spm",
+          "size_bytes": 778395,
+          "sha256": "173e9f493a668fe396d599e28d414a201193094e6ffd7a4678e5aab0f6d3d838",
+          "download_url": "nmt_en-fr_source.spm"
+        },
+        {
+          "filename": "target.spm",
+          "size_bytes": 802397,
+          "sha256": "78d0e717c77053f1c4b856d8661d9cb87c64f083a35418c087b9146300e4f585",
+          "download_url": "nmt_en-fr_target.spm"
         }
       ]
     },
@@ -197,6 +234,43 @@
       ]
     },
     {
+      "pair": "en-ru",
+      "dir_name": "en-ru",
+      "version": "1",
+      "files": [
+        {
+          "filename": "config.json",
+          "size_bytes": 233,
+          "sha256": "72901fbd8abd89fb5cf4a388f26fc681f5c4c58a1e1a88b30b879f107270e7ee",
+          "download_url": "nmt_en-ru_config.json"
+        },
+        {
+          "filename": "model.bin",
+          "size_bytes": 78276475,
+          "sha256": "f5ae1da30bcb61e877c549be8fb5a434193893eb97509ccd0b954465f9a8f80c",
+          "download_url": "nmt_en-ru_model.bin"
+        },
+        {
+          "filename": "shared_vocabulary.json",
+          "size_bytes": 2362787,
+          "sha256": "b7316527801953077381d37db3780b6efce1f56bc3429d07c2236fe5f84e8ca8",
+          "download_url": "nmt_en-ru_shared_vocabulary.json"
+        },
+        {
+          "filename": "source.spm",
+          "size_bytes": 802781,
+          "sha256": "16bebef1389a0b8ab452772c4e35b9e605e5713f8ac7baa71ca701394eaa086d",
+          "download_url": "nmt_en-ru_source.spm"
+        },
+        {
+          "filename": "target.spm",
+          "size_bytes": 1080169,
+          "sha256": "745998e51ba5b058e38b7ac7765c25c43ed5c1c39cc92b27163b9b2e323c9d7c",
+          "download_url": "nmt_en-ru_target.spm"
+        }
+      ]
+    },
+    {
       "pair": "en-vi",
       "dir_name": "en-vi",
       "version": "1",
@@ -304,6 +378,43 @@
           "size_bytes": 801636,
           "sha256": "4dd547c24816a335e7b0b2e63376a8f1b3cbfc671eda5ab808dd44fdadaa8791",
           "download_url": "nmt_es-en_target.spm"
+        }
+      ]
+    },
+    {
+      "pair": "fr-en",
+      "dir_name": "fr-en",
+      "version": "1",
+      "files": [
+        {
+          "filename": "config.json",
+          "size_bytes": 233,
+          "sha256": "72901fbd8abd89fb5cf4a388f26fc681f5c4c58a1e1a88b30b879f107270e7ee",
+          "download_url": "nmt_fr-en_config.json"
+        },
+        {
+          "filename": "model.bin",
+          "size_bytes": 76714395,
+          "sha256": "8c070c110a94dca4693be7c93ecbfdd09bce99eefbf902b1e7b45cbea2a10fd4",
+          "download_url": "nmt_fr-en_model.bin"
+        },
+        {
+          "filename": "shared_vocabulary.json",
+          "size_bytes": 1112211,
+          "sha256": "528a527b3504bda364600f8bd7a2db1b0d7f82ef97a33ba0e80c289c4ae63c24",
+          "download_url": "nmt_fr-en_shared_vocabulary.json"
+        },
+        {
+          "filename": "source.spm",
+          "size_bytes": 802397,
+          "sha256": "78d0e717c77053f1c4b856d8661d9cb87c64f083a35418c087b9146300e4f585",
+          "download_url": "nmt_fr-en_source.spm"
+        },
+        {
+          "filename": "target.spm",
+          "size_bytes": 778395,
+          "sha256": "173e9f493a668fe396d599e28d414a201193094e6ffd7a4678e5aab0f6d3d838",
+          "download_url": "nmt_fr-en_target.spm"
         }
       ]
     },
@@ -425,6 +536,43 @@
       ]
     },
     {
+      "pair": "ru-en",
+      "dir_name": "ru-en",
+      "version": "1",
+      "files": [
+        {
+          "filename": "config.json",
+          "size_bytes": 233,
+          "sha256": "72901fbd8abd89fb5cf4a388f26fc681f5c4c58a1e1a88b30b879f107270e7ee",
+          "download_url": "nmt_ru-en_config.json"
+        },
+        {
+          "filename": "model.bin",
+          "size_bytes": 78276475,
+          "sha256": "0efde44155f1d73b07d81bae640d9cca79657c6ade8e338d0862e34c30ffeee9",
+          "download_url": "nmt_ru-en_model.bin"
+        },
+        {
+          "filename": "shared_vocabulary.json",
+          "size_bytes": 2362787,
+          "sha256": "b7316527801953077381d37db3780b6efce1f56bc3429d07c2236fe5f84e8ca8",
+          "download_url": "nmt_ru-en_shared_vocabulary.json"
+        },
+        {
+          "filename": "source.spm",
+          "size_bytes": 1080169,
+          "sha256": "745998e51ba5b058e38b7ac7765c25c43ed5c1c39cc92b27163b9b2e323c9d7c",
+          "download_url": "nmt_ru-en_source.spm"
+        },
+        {
+          "filename": "target.spm",
+          "size_bytes": 802781,
+          "sha256": "16bebef1389a0b8ab452772c4e35b9e605e5713f8ac7baa71ca701394eaa086d",
+          "download_url": "nmt_ru-en_target.spm"
+        }
+      ]
+    },
+    {
       "pair": "th-en",
       "dir_name": "th-en",
       "version": "1",
@@ -534,6 +682,98 @@
           "download_url": "nmt_zh-en_target.spm"
         }
       ]
+    }
+  ],
+  "ocr": [
+    {
+      "lang": "zh",
+      "tess_lang": "chi_sim",
+      "version": "1",
+      "filename": "chi_sim.traineddata",
+      "size_bytes": 2469156,
+      "sha256": "a5fcb6f0db1e1d6d8522f39db4e848f05984669172e584e8d76b6b3141e1f730",
+      "download_url": "ocr_chi_sim.traineddata"
+    },
+    {
+      "lang": "en",
+      "tess_lang": "eng",
+      "version": "1",
+      "filename": "eng.traineddata",
+      "size_bytes": 4113088,
+      "sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "download_url": "ocr_eng.traineddata"
+    },
+    {
+      "lang": "fr",
+      "tess_lang": "fra",
+      "version": "1",
+      "filename": "fra.traineddata",
+      "size_bytes": 1130365,
+      "sha256": "ced037562e8c80c13122dece28dd477d399af80911a28791a66a63ac1e3445ca",
+      "download_url": "ocr_fra.traineddata"
+    },
+    {
+      "lang": "id",
+      "tess_lang": "ind",
+      "version": "1",
+      "filename": "ind.traineddata",
+      "size_bytes": 1122661,
+      "sha256": "69786901da87ab8766c1ea7fbb10b28f2110c14da3f6c8f2735df131fba95d88",
+      "download_url": "ocr_ind.traineddata"
+    },
+    {
+      "lang": "ja",
+      "tess_lang": "jpn",
+      "version": "1",
+      "filename": "jpn.traineddata",
+      "size_bytes": 2471260,
+      "sha256": "1f5de9236d2e85f5fdf4b3c500f2d4926f8d9449f28f5394472d9e8d83b91b4d",
+      "download_url": "ocr_jpn.traineddata"
+    },
+    {
+      "lang": "ko",
+      "tess_lang": "kor",
+      "version": "1",
+      "filename": "kor.traineddata",
+      "size_bytes": 1677415,
+      "sha256": "6b85e11d9bbf07863b97b3523b1b112844c43e713df8b66418a081fd1060b3b2",
+      "download_url": "ocr_kor.traineddata"
+    },
+    {
+      "lang": "ru",
+      "tess_lang": "rus",
+      "version": "1",
+      "filename": "rus.traineddata",
+      "size_bytes": 3861738,
+      "sha256": "e16e5e036cce1d9ec2b00063cf8b54472625b9e14d893a169e2b0dedeb4df225",
+      "download_url": "ocr_rus.traineddata"
+    },
+    {
+      "lang": "es",
+      "tess_lang": "spa",
+      "version": "1",
+      "filename": "spa.traineddata",
+      "size_bytes": 2294433,
+      "sha256": "6f2e04d02774a18f01bed44b1111f2cd7f3ba7ac9dc4373cd3f898a40ea6b464",
+      "download_url": "ocr_spa.traineddata"
+    },
+    {
+      "lang": "th",
+      "tess_lang": "tha",
+      "version": "1",
+      "filename": "tha.traineddata",
+      "size_bytes": 1072600,
+      "sha256": "294227cc2d1292b0acb28d61d4115c88252b96d466ca90b417cf4cf0c67bf07c",
+      "download_url": "ocr_tha.traineddata"
+    },
+    {
+      "lang": "vi",
+      "tess_lang": "vie",
+      "version": "1",
+      "filename": "vie.traineddata",
+      "size_bytes": 531275,
+      "sha256": "79df64caf7bcfb2a27df5042ecb6121e196eada34da774956995747636d5bfa1",
+      "download_url": "ocr_vie.traineddata"
     }
   ]
 }
