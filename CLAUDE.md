@@ -156,6 +156,8 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   only use Cyrillic, French only Latin; `dropAppendedSource` also strips trailing English behind
   Russian. Hallucination matching folds Cyrillic case (`toLowerCyrillic`). Checking a converted
   pair from Python needs `</s>` appended to the source tokens (the engine does it itself).
+  Whisper app-path CER on the 20-clip sets: small fr 3.7 / ru 0.3 %, medium fr 0.0 / ru 0.4 %,
+  language id 40/40 both (`run_stt_eval.py --langs fr,ru`, ~1.2 s vs ~3.7 s per clip on the desktop).
 - **Photo translation (0.3.17, app only, unmeasured on a device).** Camera button on the
   conversation screen → `CameraScreen` (CameraX viewfinder or the gallery) → `OcrEngine`
   (tesseract4android-openmp 4.9.0 from JitPack, `PSM_AUTO`, longest side scaled to 2000 px) →

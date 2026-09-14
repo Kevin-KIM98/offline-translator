@@ -374,7 +374,9 @@ AAR on Ubuntu, the XCFramework on macOS, rewrites `Package.swift` with the new c
   3 cost Thai and Vietnamese accuracy for 11% speed, flash attention changed nothing on CPU.
 * **French, Russian and photo translation (0.3.17).** Ninth and tenth languages: OPUS-MT `fr-en` /
   `en-fr` (79 MB each) and `ru-en` / `en-ru` (83 MB each), converted to CTranslate2 INT8, so every
-  direction reaches them through English with Marian; whisper recognises both. Russian is its
+  direction reaches them through English with Marian. Whisper on 20 synthesised clips per language
+  through the app path: small fr 3.7% / ru 0.3% character error rate ("Deux billets" heard as
+  "Debiez"), medium fr 0.0% / ru 0.4%, language identified 40/40 with both. Russian is its
   own script for the LLM guard (Cyrillic tokens allowed, Latin banned) and for the trailing-English
   cleanup. The Android app can now translate a photo: a camera button on the conversation screen
   opens a viewfinder (or the gallery), the text is read on the phone by Tesseract
