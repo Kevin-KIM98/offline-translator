@@ -311,6 +311,51 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
                 }
             }
 
+            // Text recognition for the camera lives outside the engine's model store (the app
+            // runs Tesseract itself), so it gets its own list.
+            Spacer(Modifier.height(20.dp))
+            SectionLabel(stringResource(R.string.settings_ocr))
+            Card {
+                val ocrReady = state.ocrCatalog.filter { it.lang in state.ocrInstalled }
+                if (ocrReady.isEmpty()) {
+                    Text(
+                        stringResource(R.string.settings_ocr_none),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                } else {
+                    ocrReady.forEachIndexed { i, m ->
+                        if (i > 0) Divider()
+                        Row(Modifier.padding(start = 16.dp, end = 6.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(stringResource(R.string.ocr_model_title, Lang.of(m.lang).name), style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    mb(m.sizeBytes),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            IconButton(onClick = { vm.removeOcr(m.lang) }) {
+                                Icon(
+                                    Icons.Filled.DeleteOutline,
+                                    stringResource(R.string.delete),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+                Divider()
+                Text(
+                    stringResource(R.string.settings_ocr_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp),
+                )
+            }
+
             Spacer(Modifier.height(20.dp))
             SectionLabel(stringResource(R.string.settings_about))
             Card {

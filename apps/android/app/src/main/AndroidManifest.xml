@@ -4,6 +4,10 @@
     <!-- RECORD_AUDIO / INTERNET / ACCESS_NETWORK_STATE and the TTS <queries> come from the
          engine library's manifest and are merged in automatically. -->
 
+    <!-- Camera translation: photos are read on the device by Tesseract and never leave it. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"

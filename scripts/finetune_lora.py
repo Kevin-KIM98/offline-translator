@@ -34,13 +34,14 @@ from pathlib import Path
 
 LANG_NAMES = {
     "ko": "Korean", "en": "English", "es": "Spanish", "vi": "Vietnamese", "th": "Thai", "id": "Indonesian",
-    "ja": "Japanese", "zh": "Chinese (Simplified)",
+    "ja": "Japanese", "zh": "Chinese (Simplified)", "fr": "French", "ru": "Russian",
 }
 # Tatoeba uses ISO-639-3 codes.
-TATOEBA = {"ko": "kor", "en": "eng", "es": "spa", "vi": "vie", "th": "tha", "ja": "jpn", "zh": "cmn", "id": "ind"}
+TATOEBA = {"ko": "kor", "en": "eng", "es": "spa", "vi": "vie", "th": "tha", "ja": "jpn", "zh": "cmn", "id": "ind", "fr": "fra", "ru": "rus"}
 
 
-SCRIPT_NAMES = {"ko": "Hangul", "ja": "Japanese (kana and kanji)", "zh": "Simplified Chinese characters", "th": "Thai"}
+SCRIPT_NAMES = {"ko": "Hangul", "ja": "Japanese (kana and kanji)", "zh": "Simplified Chinese characters", "th": "Thai",
+                "ru": "the Cyrillic alphabet"}
 
 # The three demonstrations LlmEngine::exampleSet puts into every prompt (LlmExamples::Diverse):
 # a statement with a day, a polite request and a count. Must stay identical to src/LlmEngine.cpp.
@@ -53,6 +54,8 @@ EXAMPLES = {
     "ja": ["会議は金曜日に延期されました。", "音楽を少し小さくしていただけますか？", "昨日、本を二冊買いました。"],
     "zh": ["会议推迟到星期五了。", "可以把音乐调小一点吗？", "我昨天买了两本书。"],
     "id": ["Rapatnya dipindahkan ke hari Jumat.", "Bisakah Anda mengecilkan musiknya sedikit?", "Kemarin saya membeli dua buku."],
+    "fr": ["La réunion a été reportée à vendredi.", "Pourriez-vous baisser un peu la musique ?", "Hier, j'ai acheté deux livres."],
+    "ru": ["Встреча перенесена на пятницу.", "Не могли бы вы сделать музыку немного тише?", "Вчера я купил две книги."],
 }
 
 
@@ -228,7 +231,7 @@ def main() -> None:
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     d = sub.add_parser("data", help="build a Tatoeba-based JSONL training set")
-    d.add_argument("--languages", nargs="+", default=["ko", "en", "es", "vi", "th", "ja", "zh", "id"])
+    d.add_argument("--languages", nargs="+", default=["ko", "en", "es", "vi", "th", "ja", "zh", "id", "fr", "ru"])
     d.add_argument("--max-per-pair", type=int, default=20000)
     d.add_argument("--out", default="data/train.jsonl")
     d.set_defaults(fn=cmd_data)

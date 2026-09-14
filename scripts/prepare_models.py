@@ -34,6 +34,13 @@ from pathlib import Path
 
 WHISPER_BASE = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/"
 
+# Tesseract language codes of the text-recognition files (tessdata_fast) -> the engine's ISO codes.
+#   for l in eng kor jpn chi_sim spa vie tha ind fra rus; do
+#     curl -sL -o <root>/ocr/$l.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/$l.traineddata
+#   done
+TESS_TO_ISO = {"kor": "ko", "eng": "en", "spa": "es", "vie": "vi", "tha": "th", "jpn": "ja", "chi_sim": "zh",
+               "ind": "id", "fra": "fr", "rus": "ru"}
+
 DEFAULT_HF = {
     "ko-en": "Helsinki-NLP/opus-mt-ko-en",
     "en-ko": "Helsinki-NLP/opus-mt-tc-big-en-ko",
@@ -228,6 +235,30 @@ def cmd_manifest(a: argparse.Namespace) -> None:
             print(f"nmt: {d.name} ({len(files)} files, {sum(x['size_bytes'] for x in files) / 1e6:.0f} MB)")
     manifest["nmt"] = nmt
 
+    # Text recognition (the app's camera translation): one Tesseract `tessdata_fast` file per
+    # language under <root>/ocr, named by Tesseract's code (kor.traineddata). Read only by the
+    # Android app; the engine and older apps ignore the key.
+    ocr_dir = root / "ocr"
+    ocr_files = sorted(ocr_dir.glob("*.traineddata")) if ocr_dir.exists() else []
+    ocr = []
+    for f in ocr_files:
+        lang = TESS_TO_ISO.get(f.stem)
+        if lang is None:
+            print(f"ocr: skipping {f.name} (no language code for it in TESS_TO_ISO)", file=sys.stderr)
+            continue
+        ocr.append({
+            "lang": lang,
+            "tess_lang": f.stem,
+            "version": a.model_version,
+            "filename": f.name,
+            "size_bytes": f.stat().st_size,
+            "sha256": sha256_of(f),
+            "download_url": url("ocr", "", f.name),
+        })
+        print(f"ocr: {f.name} -> {lang} ({f.stat().st_size / 1e6:.1f} MB)")
+    if ocr:
+        manifest["ocr"] = ocr
+
     out = Path(a.out) if a.out else root / "manifest.json"
     out.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"→ {out}")
@@ -275,6 +306,9 @@ def cmd_manifest(a: argparse.Namespace) -> None:
             for fi in entry["files"]:
                 lines.append(f"up \"{(nmt_root / entry['dir_name'] / fi['filename']).as_posix()}\" \"{flat_name('nmt', entry['dir_name'], fi['filename'])}\"")
                 count += 1
+        for entry in ocr:
+            lines.append(f"up \"{(ocr_dir / entry['filename']).as_posix()}\" \"{flat_name('ocr', '', entry['filename'])}\"")
+            count += 1
         lines.append(f"echo \"done: {count} assets, $FAILED failed\"; exit $((FAILED > 0))")
         with open(a.upload_script, "w", encoding="utf-8", newline="\n") as fh:  # bash needs LF even on Windows
             fh.write("\n".join(lines) + "\n")

@@ -30,10 +30,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -89,6 +91,7 @@ fun ConversationScreen(
     onRequestMic: () -> Unit,
     onOpenAppSettings: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenCamera: () -> Unit,
 ) {
     val speakers = LocalSpeakerColors.current
     val snackbar = remember { SnackbarHostState() }
@@ -132,6 +135,7 @@ fun ConversationScreen(
                 ActionRow(
                     state = state,
                     onTyping = { typing = true },
+                    onCamera = onOpenCamera,
                     onClear = vm::clearConversation,
                     onHandsFree = { vm.setHandsFree(!state.handsFree) },
                 )
@@ -268,7 +272,7 @@ private fun LanguageChip(name: String, accent: Color, modifier: Modifier, onClic
 }
 
 @Composable
-private fun ActionRow(state: UiState, onTyping: () -> Unit, onClear: () -> Unit, onHandsFree: () -> Unit) {
+private fun ActionRow(state: UiState, onTyping: () -> Unit, onCamera: () -> Unit, onClear: () -> Unit, onHandsFree: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         FilterChip(
             selected = state.handsFree,
@@ -278,6 +282,9 @@ private fun ActionRow(state: UiState, onTyping: () -> Unit, onClear: () -> Unit,
             colors = FilterChipDefaults.filterChipColors(),
         )
         Spacer(Modifier.weight(1f))
+        IconButton(onClick = onCamera) {
+            Icon(Icons.Filled.PhotoCamera, stringResource(R.string.camera_translate), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         IconButton(onClick = onTyping) {
             Icon(Icons.Filled.Keyboard, stringResource(R.string.keyboard_input), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -434,6 +441,15 @@ private fun TurnCard(turn: Turn, speaking: Boolean, onReplay: () -> Unit, onCopy
                     )
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (turn.fromImage) {
+                            Icon(
+                                Icons.Filled.CameraAlt,
+                                contentDescription = stringResource(R.string.camera_title),
+                                tint = MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Spacer(Modifier.width(4.dp))
+                        }
                         Text(
                             stringResource(
                                 R.string.turn_footer,

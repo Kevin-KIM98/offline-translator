@@ -40,12 +40,20 @@ fun InterpreterApp(
     val state by vm.state.collectAsStateWithLifecycle()
     val mic by micGranted.collectAsStateWithLifecycle()
     var showSettings by remember { mutableStateOf(false) }
+    var showCamera by remember { mutableStateOf(false) }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         // Settings stays reachable during setup so the languages can be changed before a
         // 0.5 GB download starts.
         if (showSettings) {
             SettingsScreen(vm, state, onBack = { showSettings = false })
+        } else if (showCamera && state.phase is Phase.Ready) {
+            CameraScreen(
+                vm = vm,
+                state = state,
+                onBack = { showCamera = false; vm.resumeMic() },
+                onOpenAppSettings = onOpenAppSettings,
+            )
         } else {
             when (val phase = state.phase) {
                 is Phase.Checking -> Busy(stringResource(R.string.checking_models))
@@ -60,6 +68,9 @@ fun InterpreterApp(
                     onRequestMic = onRequestMic,
                     onOpenAppSettings = onOpenAppSettings,
                     onOpenSettings = { showSettings = true },
+                    // The microphone stays closed while a photo is taken: conversation mode
+                    // would otherwise keep transcribing the room behind the camera.
+                    onOpenCamera = { vm.pauseMic(); showCamera = true },
                 )
             }
         }

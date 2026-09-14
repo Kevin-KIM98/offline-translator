@@ -25,6 +25,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // tesseract4android (text recognition for the camera) is published on JitPack only.
+        maven { url = uri("https://jitpack.io") }
     }
 }
 

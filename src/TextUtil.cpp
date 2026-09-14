@@ -60,12 +60,23 @@ std::string toLowerAscii(std::string s) {
     return s;
 }
 
+// Lower-cases the Cyrillic capitals (U+0410–U+042F → U+0430–U+044F, Ё → ё) so a Russian stock
+// phrase matches however whisper capitalised it; other scripts pass through untouched.
+std::string toLowerCyrillic(const std::string& ch) {
+    if (ch.size() != 2) return ch;
+    const unsigned char b0 = static_cast<unsigned char>(ch[0]), b1 = static_cast<unsigned char>(ch[1]);
+    if (b0 == 0xD0 && b1 >= 0x90 && b1 <= 0x9F) return std::string{static_cast<char>(0xD0), static_cast<char>(b1 + 0x20)};  // А–П
+    if (b0 == 0xD0 && b1 >= 0xA0 && b1 <= 0xAF) return std::string{static_cast<char>(0xD1), static_cast<char>(b1 - 0x20)};  // Р–Я
+    if (b0 == 0xD0 && b1 == 0x81) return std::string{static_cast<char>(0xD1), static_cast<char>(0x91)};                     // Ё
+    return ch;
+}
+
 // Strip trailing punctuation/spaces for hallucination comparison.
 std::string normalizeForMatch(const std::string& s) {
     std::string out;
     for (const auto& ch : utf8Chars(toLowerAscii(s))) {
         if (isAsciiPunct(ch) || isCjkPunct(ch) || ch == " " || ch == "\"" || ch == "'" || ch == "\xE2\x80\x9C" || ch == "\xE2\x80\x9D") continue;
-        out += ch;
+        out += toLowerCyrillic(ch);
     }
     return out;
 }
@@ -87,6 +98,10 @@ const std::vector<std::string>& hallucinations(const std::string& lang) {
         {"th", {"ขอบคุณที่รับชม", "ขอบคุณครับ", "ขอบคุณค่ะ", "กดติดตาม", "แล้วพบกันใหม่", "คำบรรยายโดย"}},
         {"id", {"terima kasih telah menonton", "terima kasih sudah menonton", "jangan lupa subscribe",
                 "sampai jumpa di video berikutnya", "subtitle oleh", "terima kasih"}},
+        {"fr", {"merci d'avoir regardé", "merci de votre attention", "abonnez-vous", "sous-titres réalisés par",
+                "sous-titrage société radio-canada", "sous-titres par la communauté d'amara.org", "merci", "à la prochaine"}},
+        {"ru", {"спасибо за просмотр", "подписывайтесь на канал", "субтитры сделал", "субтитры создавал",
+                "редактор субтитров", "продолжение следует", "спасибо", "до новых встреч"}},
     };
     static const std::vector<std::string> empty;
     const auto it = table.find(lang);
@@ -140,6 +155,8 @@ std::string defaultPromptFor(const std::string& lang) {
     if (lang == "vi") return "Xin chào. Cuộc họp hôm nay bắt đầu lúc 3 giờ chiều. Vâng, tôi hiểu rồi. Cảm ơn.";
     if (lang == "th") return "สวัสดีครับ การประชุมวันนี้เริ่มตอนบ่ายสามโมง ครับ เข้าใจแล้ว ขอบคุณครับ";
     if (lang == "id") return "Halo. Rapat hari ini dimulai pukul 3 sore. Ya, saya mengerti. Terima kasih.";
+    if (lang == "fr") return "Bonjour. La réunion d'aujourd'hui commence à 15 heures. Oui, je comprends. Merci.";
+    if (lang == "ru") return "Здравствуйте. Сегодняшняя встреча начинается в три часа дня. Да, я понимаю. Спасибо.";
     return {};
 }
 
@@ -271,7 +288,7 @@ namespace {
 // long is the ride to the airport in a cab?"). Behind text in a non-Latin target script, a run of
 // four or more Latin-alphabet words at the very end is that copy, never the translation.
 std::string dropAppendedSource(const std::string& s, const std::string& lang) {
-    if (lang != "ko" && lang != "ja" && lang != "zh" && lang != "th") return s;
+    if (lang != "ko" && lang != "ja" && lang != "zh" && lang != "th" && lang != "ru") return s;
     const auto chars = utf8Chars(s);
     auto latinWord = [](const std::string& ch) {
         if (ch.size() == 1) return true;                       // ASCII letters, digits, punctuation

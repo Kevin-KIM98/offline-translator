@@ -1,6 +1,7 @@
 package com.offlinetranslator.app
 
 import android.app.Application
+import android.graphics.Bitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.offlinetranslator.InstallEvent
@@ -58,7 +59,24 @@ data class Turn(
     val targetLang: String,
     val route: List<String>,
     val totalMs: Double,
+    /** The source text was read from a photo rather than spoken or typed. */
+    val fromImage: Boolean = false,
 )
+
+/** What the camera screen shows. */
+sealed interface CameraPhase {
+    data object Preview : CameraPhase
+
+    /** Reading the photo ([translating] false) or translating what was read (true). */
+    data class Working(val image: Bitmap, val translating: Boolean) : CameraPhase
+
+    data class Result(val image: Bitmap, val turn: Turn) : CameraPhase
+
+    data class Failed(val image: Bitmap?, val message: String) : CameraPhase
+}
+
+/** A text-recognition file on its way in. */
+data class OcrDownload(val lang: String, val bytesDone: Long, val bytesTotal: Long)
 
 data class UiState(
     val phase: Phase = Phase.Checking,
@@ -83,6 +101,11 @@ data class UiState(
     val sttOptions: List<ModelStatus> = emptyList(),
     /** Whisper on the GPU (experimental). */
     val useGpu: Boolean = false,
+    /** Camera translation: the screen's phase, the text-recognition files the manifest offers and the ones on the phone. */
+    val camera: CameraPhase = CameraPhase.Preview,
+    val ocrCatalog: List<OcrModel> = emptyList(),
+    val ocrInstalled: Set<String> = emptySet(),
+    val ocrDownload: OcrDownload? = null,
 ) {
     val langs: List<String> get() = listOf(langA, langB)
 }
@@ -108,6 +131,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private var session: TranslatorSession? = null
     private var downloadJob: Job? = null
     private var busyWatcher: Job? = null
+    private var ocrJob: Job? = null
+    private val ocr = OcrModels(app)
     private var nextTurnId = 1L
 
     /** Side the user is currently holding the talk button for, in manual mode. */
@@ -402,6 +427,99 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---------------------------------------------------------------- camera
+
+    /**
+     * Reads the text in [image] (written in the language of [from]) and translates it into the
+     * other language, paragraph by paragraph so a sign's lines stay lines. The result joins the
+     * conversation like a typed sentence and is read aloud when speech is on.
+     */
+    fun translateImage(image: Bitmap, from: Side) {
+        val s = _state.value
+        if (s.phase != Phase.Ready) return
+        val src = if (from == Side.A) s.langA else s.langB
+        val tgt = if (from == Side.A) s.langB else s.langA
+        val model = s.ocrCatalog.firstOrNull { it.lang == src }
+        if (model == null || src !in s.ocrInstalled) {
+            _state.update { it.copy(camera = CameraPhase.Failed(image, str(R.string.ocr_not_installed, Lang.of(src).name))) }
+            return
+        }
+        ocrJob?.cancel()
+        ocrJob = viewModelScope.launch {
+            _state.update { it.copy(camera = CameraPhase.Working(image, translating = false)) }
+            val read = runCatching {
+                withContext(Dispatchers.Default) { OcrEngine.recognize(ocr.root, image, src, model.tessLang) }
+            }
+            val text = read.getOrNull()
+            if (text == null) {
+                _state.update { it.copy(camera = CameraPhase.Failed(image, read.exceptionOrNull()?.message ?: str(R.string.err_ocr))) }
+                return@launch
+            }
+            if (text.isBlank()) {
+                _state.update { it.copy(camera = CameraPhase.Failed(image, str(R.string.ocr_no_text))) }
+                return@launch
+            }
+            _state.update { it.copy(camera = CameraPhase.Working(image, translating = true)) }
+            val out = ArrayList<String>()
+            var route: List<String> = emptyList()
+            var ms = 0.0
+            for (paragraph in text.split('\n')) {
+                val r = session?.translate(paragraph, src, tgt)
+                if (r == null || !r.ok) {
+                    _state.update { it.copy(camera = CameraPhase.Failed(image, r?.error ?: str(R.string.err_translate))) }
+                    return@launch
+                }
+                out += r.translatedText
+                if (route.isEmpty()) route = r.route
+                ms += r.totalMs
+            }
+            val turn = Turn(nextTurnId++, from, text, src, out.joinToString("\n"), tgt, route, ms, fromImage = true)
+            _state.update { it.copy(turns = it.turns + turn, camera = CameraPhase.Result(image, turn)) }
+            if (_state.value.speak) speakTurn(turn)
+        }
+    }
+
+    /** Back to the viewfinder; also cancels a recognition still running. */
+    fun resetCamera() {
+        ocrJob?.cancel()
+        _state.update { it.copy(camera = CameraPhase.Preview) }
+    }
+
+    /** The text-recognition entry for [lang], null when the manifest does not offer one. */
+    fun ocrModelFor(lang: String): OcrModel? = _state.value.ocrCatalog.firstOrNull { it.lang == lang }
+
+    /** Fetches the text-recognition file for [lang] (a few MB) and reports progress in the state. */
+    fun downloadOcr(lang: String) {
+        val model = ocrModelFor(lang) ?: return
+        if (_state.value.ocrDownload != null) return
+        viewModelScope.launch {
+            _state.update { it.copy(ocrDownload = OcrDownload(lang, 0, model.sizeBytes)) }
+            val r = runCatching {
+                ocr.install(model) { done, total -> _state.update { it.copy(ocrDownload = OcrDownload(lang, done, total)) } }
+            }
+            _state.update { it.copy(ocrDownload = null) }
+            r.onFailure { e -> showMessage(e.message ?: str(R.string.err_download_failed)) }
+            refreshOcr()
+        }
+    }
+
+    fun removeOcr(lang: String) {
+        val model = ocrModelFor(lang) ?: return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { ocr.remove(model) }
+            refreshOcr()
+            _state.update { it.copy(message = str(R.string.msg_removed, str(R.string.ocr_model_title, Lang.of(lang).name))) }
+        }
+    }
+
+    private fun refreshOcr() {
+        viewModelScope.launch {
+            val catalog = withContext(Dispatchers.IO) { ocr.catalog() }
+            val installed = withContext(Dispatchers.IO) { ocr.installed(catalog) }.map { it.lang }.toSet()
+            _state.update { it.copy(ocrCatalog = catalog, ocrInstalled = installed) }
+        }
+    }
+
     // -------------------------------------------------------------- settings
 
     fun setLanguages(a: String, b: String) {
@@ -478,6 +596,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 it.copy(installed = list, llmOptions = list.filter { m -> m.kind == "llm" }, sttOptions = list.filter { m -> m.kind == "stt" })
             }
         }
+        refreshOcr()
     }
 
     fun removeModel(id: String) {

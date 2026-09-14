@@ -1,7 +1,7 @@
-# Offline 8-language speech translator
+# Offline 10-language speech translator
 
 On-device, no-network speech translation for **Android and iOS** — Korean · English · Spanish ·
-Vietnamese · Thai · Japanese · Chinese · Indonesian, in every direction:
+Vietnamese · Thai · Japanese · Chinese · Indonesian · French · Russian, in every direction:
 
 ```
 mic 16 kHz ─► RNNoise ─► VAD segmenter ─► whisper.cpp ─► translation ─────────────────► OS TTS
@@ -24,8 +24,8 @@ releases — no server of your own is needed.
 
 `apps/` holds a finished two-way interpreter for both platforms — first-run model download,
 push-to-talk per speaker, a replayable transcript, a conversation mode that recognises which
-language was spoken and needs no buttons, keyboard input and model
-management. Grab
+language was spoken and needs no buttons, keyboard input, photo translation (the camera reads a
+sign or a menu on the phone) and model management. Grab
 [offline-interpreter-1.0.0.apk](https://github.com/Kevin-KIM98/offline-translator/releases/download/v0.3.16/offline-interpreter-1.0.0.apk)
 for an arm64 Android 9+ device, or build either app from source:
 
@@ -372,3 +372,14 @@ AAR on Ubuntu, the XCFramework on macOS, rewrites `Package.swift` with the new c
   step still decides the result (chrF 39.9 / 28.9 against 39.5 / 33.2 with the old hop, mixed by
   reading, 10 held-out sentences). Whisper beam 3 and flash attention were tried and dropped: beam
   3 cost Thai and Vietnamese accuracy for 11% speed, flash attention changed nothing on CPU.
+* **French, Russian and photo translation (0.3.17).** Ninth and tenth languages: OPUS-MT `fr-en` /
+  `en-fr` (79 MB each) and `ru-en` / `en-ru` (83 MB each), converted to CTranslate2 INT8, so every
+  direction reaches them through English with Marian. Whisper on 20 synthesised clips per language
+  through the app path: small fr 3.7% / ru 0.3% character error rate ("Deux billets" heard as
+  "Debiez"), medium fr 0.0% / ru 0.4%, language identified 40/40 with both. Russian is its
+  own script for the LLM guard (Cyrillic tokens allowed, Latin banned) and for the trailing-English
+  cleanup. The Android app can now translate a photo: a camera button on the conversation screen
+  opens a viewfinder (or the gallery), the text is read on the phone by Tesseract
+  (tesseract4android, `tessdata_fast` files of 0.5–4 MB per language listed in the manifest's
+  `ocr` section and fetched on first use) and translated like typed text, paragraph by paragraph.
+  Nothing about the camera path has been measured on a device yet.

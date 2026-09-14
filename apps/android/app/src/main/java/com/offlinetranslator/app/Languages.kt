@@ -1,6 +1,6 @@
 package com.offlinetranslator.app
 
-/** One of the eight languages the engine supports, as shown in the UI. */
+/** One of the ten languages the engine supports, as shown in the UI. */
 data class Lang(
     val code: String,
     /** Endonym — what speakers of the language call it. */
@@ -18,6 +18,8 @@ data class Lang(
             Lang("vi", "Tiếng Việt", "Tiếng Việt"),
             Lang("th", "ไทย", "ไทย"),
             Lang("id", "Bahasa Indonesia", "Indonesia"),
+            Lang("fr", "Français", "Français"),
+            Lang("ru", "Русский", "Русский"),
         )
 
         fun of(code: String): Lang = ALL.firstOrNull { it.code == code } ?: Lang(code, code.uppercase(), code.uppercase())

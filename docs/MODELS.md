@@ -1,10 +1,10 @@
 # Model preparation
 
-## 0. LLM backend (any→any, 8 languages)
+## 0. LLM backend (any→any, 10 languages)
 
 Since 0.3 the engine can translate with a small instruction-tuned LLM through llama.cpp instead
 of (or in addition to) the per-pair Marian models. One GGUF file covers every direction among
-Korean, English, Spanish, Vietnamese, Thai, Japanese, Chinese and Indonesian, and the source language may be
+Korean, English, Spanish, Vietnamese, Thai, Japanese, Chinese, Indonesian, French and Russian, and the source language may be
 left to the model (`"auto"`).
 
 | model | file | size | CPU latency (desktop, 4 threads, 2–3 sentences) | notes |
@@ -195,7 +195,7 @@ converter did not (the normal case for transformers-converted Marian models).
 
 | pair | model | size | notes |
 |---|---|---|---|
-| STT | whisper `small-q5_1` | 190 MB | all eight languages |
+| STT | whisper `small-q5_1` | 190 MB | all ten languages |
 | STT option | whisper `medium-q5_0` | 539 MB | `stt_options`: chosen in Settings; better Thai and Vietnamese, ~3× the time |
 | ja-en, zh-en, es-en | OPUS-MT base INT8 | ≈ 80 MB each | pre-converted (Hugging Face `jiangzhuo9357/*-ct2`) |
 | ko-en | `opus-mt-tc-big-ko-en` INT8, converted from the original Marian weights | 212 MB | 0.3.13 (manifest entry version 2): chrF 59.1 → 62.9 / 44.2 → 53.9 against the base model on the 30 + 10 test sentences; 420 ms against 233 ms per sentence |
@@ -205,6 +205,9 @@ converter did not (the normal case for transformers-converted Marian models).
 | vi-en, en-vi | OPUS-MT base INT8 (`dekthedev/*-ct2-int8`) | 73 MB each | |
 | th-en | OPUS-MT base INT8 (converted from `Helsinki-NLP/opus-mt-th-en`) | 82 MB | no Marian en→th exists → the LLM handles it |
 | id-en, en-id | OPUS-MT base INT8 (converted from `Helsinki-NLP/opus-mt-id-en` / `-en-id`) | 77 MB each | 0.3.12; every direction reaches Indonesian through English |
+| fr-en, en-fr | OPUS-MT base INT8 (converted from `Helsinki-NLP/opus-mt-fr-en` / `-en-fr`) | 79 MB each | 0.3.17 (manifest 1.7.0); through English like Indonesian |
+| ru-en, en-ru | OPUS-MT base INT8 (converted from `Helsinki-NLP/opus-mt-ru-en` / `-en-ru`) | 83 MB each | 0.3.17 |
+| OCR | Tesseract `tessdata_fast`, one file per language (`ocr` section) | 0.5–4.1 MB each | 0.3.17; read by the Android app's camera translation only |
 | LLM | Qwen2.5-1.5B-Instruct Q4_K_M | 1.12 GB | any direction without a Marian route; downloaded only when needed |
 
 Every other direction pivots through English automatically when both halves exist (ko↔ja, ko↔zh, vi→ko, th→ko, …); directions that cannot be pivoted (anything → Thai, and any pair the LLM-only backend is asked for) go to the LLM.
@@ -269,6 +272,13 @@ downloads, no zip step on device). The README-style zip mode is also accepted �
 
 Bump `--model-version` (per model) whenever you replace a file; devices report
 `update_available` and re-download only the changed model.
+
+**Text recognition (`ocr`).** Files under `<root>/ocr/<tesseract code>.traineddata` (fetch them
+from `https://github.com/tesseract-ocr/tessdata_fast/raw/main/`) become an `ocr` array of
+`{lang, tess_lang, filename, size_bytes, sha256, download_url}` entries, `lang` being the engine's
+ISO code (`TESS_TO_ISO` in the script). The Android app reads this array from the manifest the
+engine cached and downloads a file the first time its language is used with the camera; the
+engine itself and app versions before 0.3.17 ignore the key.
 
 Upload the whole `dist/models/` tree. Serve with `Accept-Ranges: bytes` so interrupted
 downloads resume.

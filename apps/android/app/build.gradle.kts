@@ -112,4 +112,13 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // Camera translation: CameraX takes the photo, Tesseract reads it (language files come from
+    // the model manifest's `ocr` section), the engine translates the text like typed input.
+    val camerax = "1.4.2"
+    implementation("androidx.camera:camera-core:$camerax")
+    implementation("androidx.camera:camera-camera2:$camerax")
+    implementation("androidx.camera:camera-lifecycle:$camerax")
+    implementation("androidx.camera:camera-view:$camerax")
+    implementation("cz.adaptech.tesseract4android:tesseract4android-openmp:4.9.0")
 }
