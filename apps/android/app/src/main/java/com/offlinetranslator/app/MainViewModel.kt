@@ -104,11 +104,16 @@ data class UiState(
     val backend: TranslationBackend = TranslationBackend.AUTO,
     val message: String? = null,
     val installed: List<ModelStatus> = emptyList(),
-    /** Chosen LLM id, null for the manifest's default; every LLM the manifest offers. */
+    /**
+     * The LLM in use (picked by [ModelPolicy] from the languages when [llmAuto], else the user's
+     * choice), null for the manifest's default; every LLM the manifest offers.
+     */
     val llmId: String? = null,
+    val llmAuto: Boolean = true,
     val llmOptions: List<ModelStatus> = emptyList(),
-    /** Chosen speech model id, null for the manifest's default; every whisper model the manifest offers. */
+    /** The speech model in use (as [llmId]); every whisper model the manifest offers. */
     val sttId: String? = null,
+    val sttAuto: Boolean = true,
     val sttOptions: List<ModelStatus> = emptyList(),
     /** Whisper on the GPU (experimental). */
     val useGpu: Boolean = false,
@@ -131,8 +136,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             speak = prefs.speak,
             speechRate = prefs.speechRate,
             backend = prefs.backend,
-            llmId = prefs.llmId,
-            sttId = prefs.sttId,
+            llmId = if (prefs.llmAuto) ModelPolicy.llmFor(listOf(prefs.langA, prefs.langB), prefs.roomy) else prefs.llmId,
+            llmAuto = prefs.llmAuto,
+            sttId = if (prefs.sttAuto) ModelPolicy.sttFor(listOf(prefs.langA, prefs.langB), prefs.roomy) else prefs.sttId,
+            sttAuto = prefs.sttAuto,
             useGpu = prefs.useGpu,
         )
     )
@@ -163,8 +170,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             prefs.gpuTrialPending = false
             _state.update { it.copy(useGpu = false, message = str(R.string.gpu_disabled_after_crash)) }
         }
+        // The languages may have changed since the models were picked.
+        _state.update {
+            it.copy(
+                phase = Phase.Checking,
+                sttId = if (it.sttAuto) ModelPolicy.sttFor(it.langs, prefs.roomy) else it.sttId,
+                llmId = if (it.llmAuto) ModelPolicy.llmFor(it.langs, prefs.roomy) else it.llmId,
+            )
+        }
         viewModelScope.launch {
-            _state.update { it.copy(phase = Phase.Checking) }
             val r = runCatching {
                 withContext(Dispatchers.IO) {
                     val repository = repo ?: ModelRepository(getApplication<Application>()).also { repo = it }
@@ -635,23 +649,37 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         boot()
     }
 
-    /** Switches the speech model. One that is not installed yet goes through the normal download screen. */
+    /**
+     * Switches the speech model: [id] null leaves the choice to [ModelPolicy]. One that is not
+     * installed yet goes through the normal download screen.
+     */
     fun setStt(id: String?) {
-        if (id == _state.value.sttId) return
-        prefs.sttId = id
+        val s = _state.value
+        val auto = id == null
+        val effective = id ?: ModelPolicy.sttFor(s.langs, prefs.roomy)
+        prefs.sttAuto = auto
+        if (!auto) prefs.sttId = id
+        if (auto == s.sttAuto && effective == s.sttId) return
         pauseMic()
-        _state.update { it.copy(sttId = id) }
+        _state.update { it.copy(sttAuto = auto, sttId = effective) }
         boot()
     }
 
-    /** Switches the LLM. One that is not installed yet goes through the normal download screen. */
+    /** Switches the LLM, as [setStt] does the speech model. */
     fun setLlm(id: String?) {
-        if (id == _state.value.llmId) return
-        prefs.llmId = id
+        val s = _state.value
+        val auto = id == null
+        val effective = id ?: ModelPolicy.llmFor(s.langs, prefs.roomy)
+        prefs.llmAuto = auto
+        if (!auto) prefs.llmId = id
+        if (auto == s.llmAuto && effective == s.llmId) return
         pauseMic()
-        _state.update { it.copy(llmId = id) }
+        _state.update { it.copy(llmAuto = auto, llmId = effective) }
         boot()
     }
+
+    /** The language that makes the automatic choice pick whisper medium for the current pair, null when it picks small. */
+    fun autoSttReason(): String? = ModelPolicy.sttReason(_state.value.langs, prefs.roomy)
 
     fun clearConversation() {
         stopSpeaking()

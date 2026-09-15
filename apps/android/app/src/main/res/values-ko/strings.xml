@@ -112,11 +112,15 @@
     <string name="backend_marian_desc">전용 번역 모델만 사용합니다. 태국어처럼 모델이 없는 방향은 번역되지 않습니다.</string>
     <string name="backend_llm_desc">모든 방향을 LLM 하나로 번역합니다. 느리지만 말한 언어를 스스로 알아냅니다. 1.1 GB가 필요합니다.</string>
     <string name="settings_llm">번역 LLM</string>
-    <string name="settings_llm_desc">태국어처럼 전용 모델이 없는 방향에 씁니다. 큰 모델은 번역이 눈에 띄게 좋아지지만 두 배쯤 느리며, 메모리 8 GB 이상인 폰에서는 기본값입니다(최소 6 GB 필요). 설치되지 않은 모델을 고르면, 선택한 언어에 LLM이 필요할 때 내려받습니다.</string>
+    <string name="settings_llm_desc">전용 모델이 없는 방향, 즉 태국어로 번역할 때만 씁니다. 자동은 대화 언어에 태국어가 있으면 큰 모델(시험 문장 40개 중 26개 → 31개 정답, 시간은 두 배쯤; 메모리 8 GB 이상인 폰), 아니면 작은 모델을 고릅니다. 설치되지 않은 모델은 선택한 언어에 필요할 때 내려받습니다.</string>
+    <string name="model_auto">자동(권장)</string>
+    <string name="model_auto_now">지금: %1$s</string>
+    <string name="model_auto_now_for">지금: %1$s — %2$s 때문에</string>
+    <string name="model_auto_now_unused">지금: %1$s (이 언어들에는 쓰이지 않음)</string>
     <string name="llm_installed">설치됨</string>
     <string name="llm_not_installed">미설치</string>
     <string name="settings_stt">음성 인식 모델</string>
-    <string name="settings_stt_desc">Whisper small(190 MB)은 한국어·영어·스페인어·일본어·중국어를 잘 알아듣고 가장 빠릅니다. Whisper medium은 태국어·베트남어·인도네시아어를 눈에 띄게 더 잘 알아듣지만 문장당 세 배쯤 걸리며, 메모리 8 GB 이상인 폰에서는 기본값입니다. 설치되지 않은 모델을 고르면 내려받습니다.</string>
+    <string name="settings_stt_desc">자동은 대화 언어를 따릅니다. Whisper small(190 MB)은 한국어·영어·스페인어·러시아어를 medium만큼 알아들으면서 시간은 3분의 1이라 그 언어들에 쓰고, 두 언어 중 하나라도 medium이 눈에 띄게 더 잘 알아듣는 언어(태국어·베트남어·프랑스어 등 측정된 언어)면 medium을 씁니다(메모리 8 GB 이상인 폰). 설치되지 않은 모델은 필요할 때 내려받습니다.</string>
     <string name="settings_llm_memory_warning">이 폰의 메모리는 %1$s입니다. 큰 모델은 열리지 않거나 폰이 느려질 수 있습니다.</string>
     <string name="settings_installed">설치된 모델</string>
     <string name="settings_none_installed">아직 설치된 모델이 없습니다.</string>

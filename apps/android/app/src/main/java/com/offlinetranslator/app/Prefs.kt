@@ -12,9 +12,21 @@ class Prefs(context: Context) {
     // default (whisper medium: th 14.5% -> 9.1% CER, vi 3.9% -> 0.8%; Qwen2.5 3B: 26 -> 31 of 40
     // Korean->Thai sentences right), at two to three times the time per sentence. Smaller phones
     // start with the fast models. Either way the user can change them in Settings.
-    private val roomy: Boolean = totalMemoryBytes(context) >= 7_500_000_000L
-    val defaultSttId: String = if (roomy) "whisper-medium-q5_0" else "whisper-small-q5_1"
-    val defaultLlmId: String = if (roomy) "qwen2.5-3b-instruct-q4_k_m" else "qwen2.5-1.5b-instruct-q4_k_m"
+    val roomy: Boolean = totalMemoryBytes(context) >= 7_500_000_000L
+    val defaultSttId: String = if (roomy) ModelPolicy.STT_MEDIUM else ModelPolicy.STT_SMALL
+    val defaultLlmId: String = if (roomy) ModelPolicy.LLM_LARGE else ModelPolicy.LLM_SMALL
+
+    /**
+     * The app picks the speech model and the LLM from the conversation languages ([ModelPolicy])
+     * unless the user chose one in Settings; then [sttId] / [llmId] is that choice.
+     */
+    var sttAuto: Boolean
+        get() = sp.getBoolean("sttAuto", true)
+        set(v) = sp.edit().putBoolean("sttAuto", v).apply()
+
+    var llmAuto: Boolean
+        get() = sp.getBoolean("llmAuto", true)
+        set(v) = sp.edit().putBoolean("llmAuto", v).apply()
 
     var langA: String
         get() = sp.getString("langA", "ko")!!

@@ -109,6 +109,15 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   to small + 1.5B; the settings radios store explicit ids now (null used to mean "manifest
   default", which the app default no longer equals). The manifest's own `stt`/`llm` defaults are
   unchanged for library consumers.
+- **Automatic model choice (0.3.17, app only).** `ModelPolicy` picks per conversation pair when
+  Settings says "Automatic" (`Prefs.sttAuto/llmAuto`, default on; a tapped model fixes it):
+  whisper small unless a language of the pair is in `MEDIUM_LANGS` (th, vi, fr, ja, zh, id) and the
+  phone has ≥ 7.5 GB, Qwen 3B only when th is in the pair (1.5B otherwise: no other direction uses
+  the LLM). Basis, app-path CER small → medium on the 20-clip sets: ko 0.0/–, en 0.0/–, es 0.1/–,
+  ru 0.3/0.4, th 14.5/9.1, vi 3.9/0.8, fr 3.7/0.0, ja 2.1/0.0, zh 2.7/0.4, id 3.5/2.4
+  (`run_stt_eval.py --configs app --langs ja,zh,id [--whisper medium]`, 2026-09-15; desktop
+  ~1.2 s vs ~2.9 s per clip). `boot()` re-evaluates the policy, so a language change downloads
+  and opens the model it calls for.
 - **Several speech models (0.3.10).** The manifest's `stt` is the default (whisper small) and
   `stt_options` adds whisper medium (`stt_whisper-medium-q5_0.bin` on `models-v1`, label "Whisper
   medium"); same rules as `llm_options`, never turn `stt` into an array. Selected by id (`sttId` in
