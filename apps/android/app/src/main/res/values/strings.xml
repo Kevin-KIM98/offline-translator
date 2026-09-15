@@ -71,7 +71,10 @@
     <string name="camera_needed_title">Camera access is needed</string>
     <string name="camera_needed_body">Photos are read on this device only and are never sent anywhere.</string>
     <string name="camera_reading">Reading the text</string>
-    <string name="camera_recognized">Text in the photo</string>
+    <string name="camera_translating_progress">Translating %1$d of %2$d</string>
+    <string name="camera_show_original">Original</string>
+    <string name="camera_text_list">Show as text</string>
+    <string name="camera_tap_hint">Tap a translation to see the original under it. Pinch or double-tap to zoom.</string>
     <string name="camera_retake">Take another</string>
     <string name="camera_done">Done</string>
     <string name="camera_image_failed">That image could not be opened.</string>

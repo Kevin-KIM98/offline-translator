@@ -31,7 +31,10 @@ jobs:
         run: bash scripts/fetch_third_party.sh --shallow
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "17" }
+      # Default packages include "tools", which cmdline-tools 16.0 no longer has (sdkmanager fails).
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Install NDK + CMake
         run: |
           sdkmanager "ndk;27.2.12479018" "cmake;3.22.1" > /dev/null
