@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.NoPhotography
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.VolumeUp
@@ -252,6 +253,10 @@ fun CameraScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit, onOpenAp
                     Box(Modifier.fillMaxWidth().weight(1f)) {
                         TranslatedPhoto(phase.image, phase.texts, showOriginal)
                         TopBar(onBack = leave) {
+                            IconButton(onClick = vm::rotateCameraImage) {
+                                Icon(Icons.Filled.RotateRight, stringResource(R.string.camera_rotate), tint = Color.White)
+                            }
+                            Spacer(Modifier.width(4.dp))
                             FilterChip(
                                 selected = showOriginal,
                                 onClick = { showOriginal = !showOriginal },
@@ -343,7 +348,17 @@ fun CameraScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit, onOpenAp
                     Spacer(Modifier.height(12.dp))
                     Text(phase.message, style = MaterialTheme.typography.bodyMedium, color = Color.White, textAlign = TextAlign.Center)
                     Spacer(Modifier.height(18.dp))
-                    Button(onClick = vm::resetCamera) { Text(stringResource(R.string.camera_retake)) }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (phase.image != null) {
+                            OutlinedButton(onClick = vm::rotateCameraImage) {
+                                Icon(Icons.Filled.RotateRight, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(stringResource(R.string.camera_rotate_short), color = Color.White)
+                            }
+                            Spacer(Modifier.width(10.dp))
+                        }
+                        Button(onClick = vm::resetCamera) { Text(stringResource(R.string.camera_retake)) }
+                    }
                 }
             }
         }

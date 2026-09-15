@@ -433,16 +433,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------------------------------------------------------------- camera
 
+    /** Side whose language the last photo was read in, for reading it again after turning it. */
+    private var cameraSide = Side.A
+
     /**
      * Reads the text in [image] (written in the language of [from]) and translates it into the
      * other language piece by piece, so each translation can be painted where its text stands. The
      * result joins the conversation like a typed sentence and is read aloud when speech is on.
+     * With [findOrientation] a sideways or upside-down photo is turned upright first; the rotate
+     * button passes false, since the user has chosen how the photo stands.
      */
-    fun translateImage(image: Bitmap, from: Side) {
+    fun translateImage(image: Bitmap, from: Side, findOrientation: Boolean = true) {
         val s = _state.value
         if (s.phase != Phase.Ready) return
         val src = if (from == Side.A) s.langA else s.langB
         val tgt = if (from == Side.A) s.langB else s.langA
+        cameraSide = from
         val model = s.ocrCatalog.firstOrNull { it.lang == src }
         if (model == null || src !in s.ocrInstalled) {
             _state.update { it.copy(camera = CameraPhase.Failed(image, str(R.string.ocr_not_installed, Lang.of(src).name))) }
@@ -452,13 +458,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         ocrJob = viewModelScope.launch {
             _state.update { it.copy(camera = CameraPhase.Working(image, translating = false)) }
             val read = runCatching {
-                withContext(Dispatchers.Default) { OcrEngine.recognize(ocr.root, image, src, model.tessLang) }
+                withContext(Dispatchers.Default) { OcrEngine.recognize(ocr.root, image, src, model.tessLang, findOrientation) }
             }
-            val regions = read.getOrNull()
-            if (regions == null) {
+            val page = read.getOrNull()
+            if (page == null) {
                 _state.update { it.copy(camera = CameraPhase.Failed(image, read.exceptionOrNull()?.message ?: str(R.string.err_ocr))) }
                 return@launch
             }
+            // The photo as it was read: turned upright when it was sideways.
+            val image = page.image
+            val regions = page.regions
             if (regions.isEmpty()) {
                 _state.update { it.copy(camera = CameraPhase.Failed(image, str(R.string.ocr_no_text))) }
                 return@launch
@@ -504,6 +513,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(turns = it.turns + turn, camera = CameraPhase.Result(image, turn, texts)) }
             if (_state.value.speak) speakTurn(turn)
         }
+    }
+
+    /**
+     * Turns the photo on screen a quarter clockwise and reads it again as it now stands. A result
+     * read the wrong way round leaves the conversation.
+     */
+    fun rotateCameraImage() {
+        val phase = _state.value.camera
+        val image = when (phase) {
+            is CameraPhase.Result -> phase.image
+            is CameraPhase.Failed -> phase.image
+            else -> null
+        } ?: return
+        if (phase is CameraPhase.Result) _state.update { s -> s.copy(turns = s.turns.filterNot { it.id == phase.turn.id }) }
+        translateImage(OcrEngine.prepare(image, 90), cameraSide, findOrientation = false)
     }
 
     /** Back to the viewfinder; also cancels a recognition still running. */

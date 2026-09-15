@@ -160,10 +160,20 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   language id 40/40 both (`run_stt_eval.py --langs fr,ru`, ~1.2 s vs ~3.7 s per clip on the desktop).
 - **Photo translation (0.3.17, app only, unmeasured on a device).** Camera button on the
   conversation screen → `CameraScreen` (CameraX viewfinder or the gallery) → `OcrEngine`
-  (tesseract4android-openmp 4.9.0 from JitPack = Tesseract 5.5.1, `PSM_AUTO`, tiled Otsu via
-  `thresholding_method=1`, longest side scaled to 2000 px) reads positioned words through the
-  result iterator, drops words under confidence 30 and lines under 45 (hand-picked, unmeasured)
-  and groups lines into `OcrRegion`s. Within a Tesseract paragraph a line continues the previous
+  (tesseract4android-openmp 4.9.0 from JitPack = Tesseract 5.5.1, `PSM_AUTO`, default
+  thresholding, longest side scaled to 2000 px) reads positioned words through the result
+  iterator, drops words under confidence 30 and lines under 45 (on synthesised photos this cost
+  at most 2 points of the words found, 79 → 77%) and groups lines into `OcrRegion`s. Never set
+  `thresholding_method=1` (tiled Otsu): PR #2 did, and on photo-like pages Tesseract found 26%
+  (ticket) / 21% (price board) of the words against 95% / 79% with the default, so photos stopped
+  translating (`tests/eval/ocr_eval.py`, run by the `OCR eval` workflow on Linux, tesseract 5.3.4).
+  Orientation: a reading scores confident letters (≥ 70) on lines that run across; under 20 or
+  under half of all letters read, the photo is probed turned 0/90/180/270° at 1000 px and turned
+  when one scores 1.5× the as-is reading. Lines must run across: Tesseract reads text turned a
+  quarter clockwise by itself, as vertical lines the overlay cannot paint, so plain confident
+  letters scored sideways like upright. 8/8 synthesised rotations (ticket, board) turned right,
+  words found after the turn equal to upright (95% / 77%). Result and failure screens have a
+  rotate button (a quarter turn, read again without detection). Within a Tesseract paragraph a line continues the previous
   one only when the heights match, the gap is small and it starts lower-case, follows `-`/`,`,
   both lines are capitals, or the previous line ran to the paragraph's right edge; a line ending
   in a digit or `.!?:;` ends the piece (before, a block's lines were joined into one sentence,

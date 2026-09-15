@@ -8,10 +8,11 @@ import com.googlecode.tesseract.android.TessBaseAPI
 import com.googlecode.tesseract.android.TessBaseAPI.PageIteratorLevel
 import java.io.File
 import java.util.Locale
+import kotlin.math.roundToInt
 
 /**
- * One piece of text in a photo, in reading order: what it says, where it stands (pixels of the
- * image given to [OcrEngine.recognize]) and the colours a translation is painted over it with.
+ * One piece of text in a photo, in reading order: what it says, where it stands (pixels of
+ * [OcrPage.image]) and the colours a translation is painted over it with.
  */
 data class OcrRegion(
     val text: String,
@@ -23,6 +24,9 @@ data class OcrRegion(
     val background: Int,
     val foreground: Int,
 )
+
+/** What was read from a photo: the photo as it was read (turned upright when it stood sideways) and its text. */
+data class OcrPage(val image: Bitmap, val regions: List<OcrRegion>)
 
 /**
  * Reads the text in a photo with Tesseract (tesseract4android) as positioned lines and groups them
@@ -36,6 +40,9 @@ object OcrEngine {
      */
     private const val MAX_SIDE = 2000
 
+    /** Longest side of the small copies read to find which way round a photo stands. */
+    private const val PROBE_SIDE = 1000
+
     /** Languages written without spaces between words: line breaks join with nothing, and Tesseract's spaces between characters go. */
     private val unspaced = setOf("ja", "zh", "th")
 
@@ -45,33 +52,48 @@ object OcrEngine {
     /**
      * Words Tesseract is less sure of than this (0–100) are dropped, and lines whose letters average
      * below [MIN_LINE_CONFIDENCE]: edges, textures and glare read as short runs of letters, which the
-     * translator then turned into invented words. Chosen by hand, not measured.
+     * translator then turned into invented words.
      */
     private const val MIN_WORD_CONFIDENCE = 30f
     private const val MIN_LINE_CONFIDENCE = 45f
 
+    /**
+     * A photo reads the right way round when at least [UPRIGHT_LETTERS] letters, and
+     * [UPRIGHT_SHARE] of all it read, come from words of confidence [CONFIDENT] or more on lines
+     * that run across. Otherwise the four ways round are compared on small copies and the photo is
+     * turned when another one gives [TURN_MARGIN] times those letters (`tests/eval/ocr_eval.py`).
+     */
+    private const val CONFIDENT = 70f
+    private const val UPRIGHT_LETTERS = 20
+    private const val UPRIGHT_SHARE = 0.5f
+    private const val TURN_MARGIN = 1.5f
+
     /** Lines lower than this many pixels are specks, not text. */
     private const val MIN_LINE_HEIGHT = 8
 
-    /** Recognises [lang] text in [image]; [dataRoot] holds `tessdata/`. Empty when nothing readable was found. */
-    fun recognize(dataRoot: File, image: Bitmap, lang: String, tessLang: String): List<OcrRegion> {
+    /**
+     * Recognises [lang] text in [image]; [dataRoot] holds `tessdata/`. With [findOrientation] a
+     * photo that does not read well as it stands is also read turned a quarter, a half and three
+     * quarters, and the way round Tesseract is surest of wins. No regions when nothing readable
+     * was found.
+     */
+    fun recognize(dataRoot: File, image: Bitmap, lang: String, tessLang: String, findOrientation: Boolean = true): OcrPage {
         val tess = TessBaseAPI()
         try {
             if (!tess.init(dataRoot.absolutePath, tessLang)) throw IllegalStateException("tesseract init failed for $tessLang")
             tess.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO)
-            // Photos are lit unevenly; Leptonica's tiled Otsu thresholds each part of the page on
-            // its own instead of one global cut that loses the letters in a shadow.
-            tess.setVariable("thresholding_method", "1")
-            tess.setImage(image)
-            tess.getUTF8Text() // runs layout analysis and recognition; the iterator reads the result
-            val lines = readLines(tess, lang)
-            return group(lines).map { region(it, image, lang) }
+            val asItStands = read(tess, image, lang)
+            if (!findOrientation || asItStands.readsWell()) return page(image, asItStands, lang)
+            val turn = orientation(tess, image, lang)
+            if (turn == 0) return page(image, asItStands, lang)
+            val turned = prepare(image, turn)
+            return page(turned, read(tess, turned, lang), lang)
         } finally {
             tess.recycle()
         }
     }
 
-    /** Scales a photo down to [MAX_SIDE] and makes sure Tesseract can read its pixels (no hardware bitmaps). */
+    /** Scales a photo down to [MAX_SIDE], turns it clockwise by [rotationDegrees], and makes sure Tesseract can read its pixels (no hardware bitmaps). */
     fun prepare(image: Bitmap, rotationDegrees: Int = 0): Bitmap {
         val longest = maxOf(image.width, image.height)
         val scale = if (longest > MAX_SIDE) MAX_SIDE.toFloat() / longest else 1f
@@ -98,13 +120,61 @@ object OcrEngine {
     /** A recognised text line; [para] numbers Tesseract's paragraphs across the page. */
     private class Line(val text: String, val box: Rect, val para: Int)
 
-    private fun readLines(tess: TessBaseAPI, lang: String): List<Line> {
-        val iter = tess.resultIterator ?: return emptyList()
+    /**
+     * One pass of Tesseract over a bitmap: its lines, how many letters it read, and how many of them
+     * it read confidently on lines that run across the bitmap.
+     */
+    private class Reading(val lines: List<Line>, val letters: Int, val confidentLetters: Int) {
+        fun readsWell() = confidentLetters >= UPRIGHT_LETTERS && confidentLetters >= letters * UPRIGHT_SHARE
+    }
+
+    /** Clockwise quarter turns (0, 90, 180, 270) that make [image] read best, judged on small copies. */
+    private fun orientation(tess: TessBaseAPI, image: Bitmap, lang: String): Int {
+        val scale = PROBE_SIDE.toFloat() / maxOf(image.width, image.height)
+        val small = if (scale < 1f) {
+            Bitmap.createScaledBitmap(image, (image.width * scale).roundToInt(), (image.height * scale).roundToInt(), true)
+        } else {
+            image
+        }
+        val scores = IntArray(4) { i ->
+            val probe = if (i == 0) small else prepare(small, i * 90)
+            val score = read(tess, probe, lang).confidentLetters
+            if (probe !== small) probe.recycle()
+            score
+        }
+        if (small !== image) small.recycle()
+        val best = scores.indices.maxBy { scores[it] }
+        return if (best != 0 && scores[best] >= UPRIGHT_LETTERS && scores[best] > scores[0] * TURN_MARGIN) best * 90 else 0
+    }
+
+    private fun page(image: Bitmap, reading: Reading, lang: String) =
+        OcrPage(image, group(reading.lines).map { region(it, image, lang) })
+
+    private fun read(tess: TessBaseAPI, image: Bitmap, lang: String): Reading {
+        tess.setImage(image)
+        tess.getUTF8Text() // runs layout analysis and recognition; the iterator reads the result
+        val iter = tess.resultIterator ?: return Reading(emptyList(), 0, 0)
         val lines = ArrayList<Line>()
+        val unfiltered = ArrayList<Line>()
+        var letters = 0
+        var confident = 0
         var para = -1
         var words = ArrayList<Word>()
         fun close() {
-            if (words.isNotEmpty()) lineOf(words, para, lang)?.let { line -> lines += line }
+            if (words.isNotEmpty()) {
+                // Tesseract also reads text turned a quarter clockwise, as lines running down; those
+                // count as letters read but not as confident ones, so such a photo gets turned.
+                val box = Rect(words[0].box)
+                words.forEach { box.union(it.box) }
+                val runsAcross = box.width() >= box.height()
+                for (w in words) {
+                    val n = w.text.count { it.isLetterOrDigit() }
+                    letters += n
+                    if (runsAcross && w.confidence >= CONFIDENT) confident += n
+                }
+                lineOf(words, para, lang, filter = true)?.let { line -> lines += line }
+                lineOf(words, para, lang, filter = false)?.let { line -> unfiltered += line }
+            }
             words = ArrayList()
         }
         try {
@@ -125,15 +195,18 @@ object OcrEngine {
         } finally {
             iter.delete()
         }
-        return lines
+        // When the confidence bars leave nothing, what was read is still better than "no text".
+        return Reading(lines.ifEmpty { unfiltered }, letters, confident)
     }
 
-    /** The line made of [words], or null when it is noise. */
-    private fun lineOf(words: List<Word>, para: Int, lang: String): Line? {
-        val chars = words.sumOf { it.text.length }
-        val mean = words.sumOf { (it.confidence * it.text.length).toDouble() } / maxOf(1, chars)
-        if (mean < MIN_LINE_CONFIDENCE) return null
-        val kept = words.filter { it.confidence >= MIN_WORD_CONFIDENCE }
+    /** The line made of [words], or null when it is noise; [filter] applies the confidence bars. */
+    private fun lineOf(words: List<Word>, para: Int, lang: String, filter: Boolean): Line? {
+        if (filter) {
+            val chars = words.sumOf { it.text.length }
+            val mean = words.sumOf { (it.confidence * it.text.length).toDouble() } / maxOf(1, chars)
+            if (mean < MIN_LINE_CONFIDENCE) return null
+        }
+        val kept = if (filter) words.filter { it.confidence >= MIN_WORD_CONFIDENCE } else words
         if (kept.none { w -> w.text.any { it.isLetterOrDigit() } }) return null
         val box = Rect(kept[0].box)
         kept.forEach { box.union(it.box) }
