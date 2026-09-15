@@ -73,6 +73,8 @@
     <string name="camera_reading">Reading the text</string>
     <string name="camera_translating_progress">Translating %1$d of %2$d</string>
     <string name="camera_show_original">Original</string>
+    <string name="camera_rotate">Turn the photo and read it again</string>
+    <string name="camera_rotate_short">Turn</string>
     <string name="camera_text_list">Show as text</string>
     <string name="camera_tap_hint">Tap a translation to see the original under it. Pinch or double-tap to zoom.</string>
     <string name="camera_retake">Take another</string>

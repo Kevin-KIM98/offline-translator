@@ -72,6 +72,8 @@
     <string name="camera_reading">글자를 읽는 중</string>
     <string name="camera_translating_progress">번역 중 %1$d / %2$d</string>
     <string name="camera_show_original">원문</string>
+    <string name="camera_rotate">사진을 돌려서 다시 읽기</string>
+    <string name="camera_rotate_short">돌리기</string>
     <string name="camera_text_list">텍스트로 보기</string>
     <string name="camera_tap_hint">번역을 누르면 그 자리의 원문이 보입니다. 두 손가락으로 벌리거나 두 번 눌러 확대하세요.</string>
     <string name="camera_retake">다시 찍기</string>
