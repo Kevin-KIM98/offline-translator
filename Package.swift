@@ -18,8 +18,8 @@ let package = Package(
         // Prebuilt C++ core (whisper.cpp + CTranslate2 + SentencePiece + RNNoise), C ABI only.
         .binaryTarget(
             name: "OfflineTranslatorCore",
-            url: "https://github.com/Kevin-KIM98/offline-translator/releases/download/v0.3.16/OfflineTranslatorCore.xcframework.zip",
-            checksum: "76a3b21a4f392077f0200ec0774eb07b80f7882c2178ecf5d8e4b288354c091a"
+            url: "https://github.com/Kevin-KIM98/offline-translator/releases/download/v0.3.17/OfflineTranslatorCore.xcframework.zip",
+            checksum: "0bad2dd861cb1cac00f8191648c23dcaf3c8c29e9e3bacd3fd159f70a112a00a"
         ),
         // Objective-C++ wrapper (OTTranslationPipeline / OTModelManager).
         .target(
