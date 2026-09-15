@@ -1,7 +1,7 @@
 """Photo text recognition: Tesseract's thresholding and the photo's orientation.
 
-The app hands Tesseract (tessdata_fast, PSM_AUTO) a bitmap of at most 2000 px with no resolution,
-so Tesseract assumes 70 dpi. This renders a ticket in capitals (English) and a price board
+The app hands Tesseract (tessdata_fast, PSM_AUTO) a bitmap of at most 2000 px with no resolution;
+Tesseract estimates one from the text. This renders a ticket in capitals (English) and a price board
 (Spanish), makes each look photographed (uneven light, noise, blur, JPEG) and rotates it, then
 reports:
 
@@ -146,9 +146,10 @@ def fit(img, longest):
 def ocr(img, lang, tessdata, method):
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "page.png"
-        img.save(path)  # no pHYs: Tesseract falls back to 70 dpi, as with the app's bitmap
+        img.save(path)  # no pHYs, like the app's bitmap: Tesseract estimates the resolution
         cmd = ["tesseract", "--tessdata-dir", str(Path(tessdata).resolve()), str(path), "stdout",
-               "-l", lang, "--psm", "3", "-c", f"thresholding_method={method}", "tsv"]
+               "-l", lang, "--psm", "3", "-c", f"thresholding_method={method}",
+               "-c", "tessedit_create_tsv=1", "-c", "tessedit_create_txt=0"]
         t = time.time()
         proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
         secs = time.time() - t
@@ -199,6 +200,10 @@ def score(words):
     return sum(sum(c.isalnum() for c in w["text"]) for w in words if w["conf"] >= 70)
 
 
+def letters(words):
+    return sum(sum(c.isalnum() for c in w["text"]) for w in words)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tessdata", required=True)
@@ -206,11 +211,11 @@ def main():
     ap.add_argument("--probe", type=int, default=1000)
     ap.add_argument("--out", default="tests/eval/out/ocr")
     args = ap.parse_args()
-    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
     Path(args.out).mkdir(parents=True, exist_ok=True)
 
-    print("== thresholding (upright, 2000 px, 70 dpi fallback)")
-    print(f"{'page':<10} {'look':<6} {'method':>6} {'words':>6} {'found':>6} {'filtered':>8} {'invented':>8} {'conf>=70':>8} {'secs':>5}")
+    print("== thresholding (upright, 2000 px, no resolution given)")
+    print(f"{'page':<10} {'look':<6} {'method':>6} {'words':>6} {'found':>6} {'filtered':>8} {'invented':>8} {'conf>=70':>8} {'letters':>7} {'secs':>5}")
     for name, (lang, size, items) in PAGES.items():
         truth = truth_of(items)
         clean = render(size, items, args.fonts)
@@ -220,28 +225,31 @@ def main():
                 words, secs = ocr(img, lang, args.tessdata, method)
                 recall, invented = compare(words, truth)
                 filtered, _ = compare(app_filter(words), truth)
-                print(f"{name:<10} {look:<6} {method:>6} {len(words):>6} {recall:>6.0%} {filtered:>8.0%} {invented:>8} {score(words):>8} {secs:>5.1f}")
+                print(f"{name:<10} {look:<6} {method:>6} {len(words):>6} {recall:>6.0%} {filtered:>8.0%} {invented:>8} {score(words):>8} {letters(words):>7} {secs:>5.1f}")
 
     print()
-    print("== orientation (photo look, method 0): score of each way to turn the input back")
-    print(f"{'page':<10} {'input':>5} {'size':>5}  {'back 0':>7} {'90':>7} {'180':>7} {'270':>7}  picks  found-when-picked")
+    print("== orientation (photo look, method 0): confident letters / all letters for each way to turn the input back")
+    print(f"{'page':<10} {'input':>5} {'size':>5}  {'back 0':>9} {'90':>9} {'180':>9} {'270':>9}  picks  found-when-picked")
     for name, (lang, size, items) in PAGES.items():
         truth = truth_of(items)
         photo = photograph(render(size, items, args.fonts))
         for rot in (0, 90, 180, 270):
             turned = photo.rotate(rot, expand=True)  # PIL: counter-clockwise
+            if rot == 90:
+                turned.save(Path(args.out) / f"{name}-photo-turned90.jpg", quality=85)
             for longest in (2000, args.probe):
-                scores, recalls = {}, {}
+                scores, cells, recalls = {}, [], {}
                 for back in (0, 90, 180, 270):
                     candidate = fit(turned.rotate(-back, expand=True), longest)
                     words, _ = ocr(candidate, lang, args.tessdata, 0)
                     scores[back] = score(words)
+                    cells.append(f"{scores[back]}/{letters(words)}")
                     recalls[back] = compare(words, truth)[0]
                 best = max(scores, key=scores.get)
                 # PIL turns counter-clockwise; turning back clockwise by the same angle undoes it.
                 ok = "ok" if best == rot else f"WRONG (right {rot})"
-                cells = " ".join(f"{scores[b]:>7}" for b in (0, 90, 180, 270))
-                print(f"{name:<10} {rot:>5} {longest:>5}  {cells}  {best:>5} {recalls[best]:>6.0%} {ok}")
+                row = " ".join(f"{c:>9}" for c in cells)
+                print(f"{name:<10} {rot:>5} {longest:>5}  {row}  {best:>5} {recalls[best]:>6.0%} {ok}")
 
 
 if __name__ == "__main__":
