@@ -327,6 +327,17 @@ void testTextUtil() {
     CHECK_EQ(postProcessTranslation("こんにちは 。 元気 です か ?", "ja"), "こんにちは。元気ですか？");
     CHECK_EQ(postProcessTranslation("你好 , 世界 .", "zh"), "你好，世界。");
     CHECK_EQ(postProcessTranslation("¿cómo estás? bien.", "es"), "¿Cómo estás? Bien.");
+
+    // Fixed answers for bare greetings Marian gets wrong (ko-en tc-big: "안녕하세요." → "Good evening.").
+    CHECK_EQ(fixedTranslation("안녕하세요", "ko", "en"), "Hello.");
+    CHECK_EQ(fixedTranslation(" 안녕하세요. ", "ko", "en"), "Hello.");
+    CHECK_EQ(fixedTranslation("안녕하세요!", "ko", "en"), "Hello.");
+    CHECK_EQ(fixedTranslation("안녕하십니까?", "ko", "en"), "Hello.");
+    CHECK_EQ(fixedTranslation("Hello.", "en", "ko"), "안녕하세요.");
+    CHECK_EQ(fixedTranslation("HI!", "en", "ko"), "안녕하세요.");
+    CHECK_EQ(fixedTranslation("안녕하세요, 저는 김입니다.", "ko", "en"), "");   // only the bare greeting
+    CHECK_EQ(fixedTranslation("안녕하세요", "ko", "ja"), "");                    // only pairs with a known fault
+    CHECK_EQ(fixedTranslation("...", "ko", "en"), "");
     CHECK(isCjkChar("한"));
     CHECK(isCjkChar("漢"));
     CHECK(!isCjkChar("a"));

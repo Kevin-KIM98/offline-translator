@@ -32,6 +32,12 @@ std::string cleanTranscript(const std::string& s, const std::string& lang);
 // Fixes spacing/capitalization of MT output for the target language.
 std::string postProcessTranslation(const std::string& s, const std::string& lang);
 
+// The fixed translation of a whole sentence that Marian renders wrongly, or empty. Only bare
+// greetings: OPUS-MT ko-en (tc-big) answers "안녕하세요." with "Good evening." and en-ko a bare
+// "Hello." with the phone greeting "여보세요?"; the sentence is matched without its final
+// punctuation and (for English) case.
+std::string fixedTranslation(const std::string& sentence, const std::string& src, const std::string& tgt);
+
 // UTF-8 helpers (exposed for tests).
 std::vector<std::string> utf8Chars(const std::string& s);
 bool isCjkChar(const std::string& ch);

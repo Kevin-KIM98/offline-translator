@@ -16,6 +16,7 @@
     <string name="setup_wifi_hint">Wi-Fi is recommended. An interrupted download resumes.</string>
     <string name="setup_download">Download %1$s</string>
     <string name="setup_change_languages">Change languages</string>
+    <string name="setup_ocr_subtitle">Reads this language in photos (camera translation)</string>
     <string name="download_title">Downloading models</string>
     <string name="verify_title">Checking files</string>
     <string name="download_progress">%1$s / %2$s  ·  %3$d%%</string>
@@ -80,6 +81,8 @@
     <string name="camera_retake">Take another</string>
     <string name="camera_done">Done</string>
     <string name="camera_image_failed">That image could not be opened.</string>
+    <string name="camera_image_failed_detail">That image could not be opened. %1$s</string>
+    <string name="camera_opening">Opening the photo</string>
     <string name="err_camera">Could not open the camera</string>
     <string name="err_ocr">Text recognition failed</string>
     <string name="ocr_no_text">No text was found in the photo. Try again closer and in better light, with the text level.</string>
@@ -128,8 +131,8 @@
     <string name="delete">Delete</string>
     <string name="settings_total">Total %1$s</string>
     <string name="settings_download_all">Download everything (%1$s left)</string>
-    <string name="settings_download_all_desc">Both speech models, every translation model and both LLMs in one go. Afterwards no language or model choice needs a download. Wi-Fi recommended; an interrupted download resumes.</string>
-    <string name="setup_everything_subtitle">Every model the app can use, downloaded once: both speech models, all translation models and both LLMs. Afterwards any language or model choice works without a network.</string>
+    <string name="settings_download_all_desc">Both speech models, every translation model, both LLMs and the text-recognition files for photo translation in one go. Afterwards no language or model choice needs a download. Wi-Fi recommended; an interrupted download resumes.</string>
+    <string name="setup_everything_subtitle">Every model the app can use, downloaded once: both speech models, all translation models, both LLMs and the text-recognition files for photo translation. Afterwards any language or model choice works without a network.</string>
     <string name="all_models_installed">Every model is already installed.</string>
     <string name="settings_about">About</string>
     <string name="info_engine_version">Engine version</string>

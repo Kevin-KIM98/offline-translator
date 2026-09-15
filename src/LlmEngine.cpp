@@ -324,6 +324,15 @@ bool LlmEngine::load(const std::string& ggufPath, const LlmOptions& opts, std::s
     llama_model_params mp = llama_model_default_params();
     mp.n_gpu_layers = opts.gpuLayers;
     mp.use_mmap = opts.useMmap;
+    // With no layers offloaded the model must not touch a GPU at all. Left to itself llama.cpp
+    // still lists every GPU device it was compiled with (the Android AAR carries ggml's Vulkan
+    // backend), initialises that backend when the context is created (driver, shader
+    // compilation, pipeline cache) and lets the scheduler hand prompt batches of 32 tokens or
+    // more to it, weights on the CPU or not. On a phone that means the LLM ran on the Vulkan
+    // driver whenever an LLM was loaded, whatever the GPU setting said. An empty device list
+    // keeps everything on the CPU backend.
+    static ggml_backend_dev_t noDevices[] = {nullptr};
+    if (opts.gpuLayers <= 0) mp.devices = noDevices;
     impl_->model = llama_model_load_from_file(ggufPath.c_str(), mp);
     if (!impl_->model) {
         if (error) *error = "llama: failed to load model: " + ggufPath;

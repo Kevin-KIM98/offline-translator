@@ -264,13 +264,15 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
                         )
                     }
                 }
-                // Everything the manifest offers, in one go: both speech models, every pair, both LLMs.
+                // Everything the manifest offers, in one go: both speech models, every pair, both
+                // LLMs and the text-recognition files for photo translation.
                 val missing = state.installed.filter { it.needsDownload }
-                if (missing.isNotEmpty()) {
+                val missingOcr = state.ocrCatalog.filter { it.lang !in state.ocrInstalled }
+                if (missing.isNotEmpty() || missingOcr.isNotEmpty()) {
                     Divider()
                     Column(Modifier.padding(16.dp)) {
                         Button(onClick = { vm.downloadEverything(); onBack() }, modifier = Modifier.fillMaxWidth()) {
-                            Text(stringResource(R.string.settings_download_all, mb(missing.sumOf { it.totalBytes })))
+                            Text(stringResource(R.string.settings_download_all, mb(missing.sumOf { it.totalBytes } + missingOcr.sumOf { it.sizeBytes })))
                         }
                         Spacer(Modifier.height(6.dp))
                         Text(

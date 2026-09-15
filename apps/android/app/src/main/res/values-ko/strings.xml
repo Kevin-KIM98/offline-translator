@@ -15,6 +15,7 @@
     <string name="setup_wifi_hint">Wi-Fi에서 받는 것을 권합니다. 중단해도 이어받습니다.</string>
     <string name="setup_download">%1$s 내려받기</string>
     <string name="setup_change_languages">언어 바꾸기</string>
+    <string name="setup_ocr_subtitle">사진 속 이 언어 글자를 읽습니다 (이미지 번역)</string>
     <string name="download_title">모델을 내려받는 중</string>
     <string name="verify_title">파일을 검사하는 중</string>
     <string name="download_progress">%1$s / %2$s  ·  %3$d%%</string>
@@ -79,6 +80,8 @@
     <string name="camera_retake">다시 찍기</string>
     <string name="camera_done">완료</string>
     <string name="camera_image_failed">이미지를 열 수 없습니다.</string>
+    <string name="camera_image_failed_detail">이미지를 열 수 없습니다. %1$s</string>
+    <string name="camera_opening">사진을 여는 중</string>
     <string name="err_camera">카메라를 열 수 없습니다</string>
     <string name="err_ocr">글자 인식에 실패했습니다</string>
     <string name="ocr_no_text">사진에서 글자를 찾지 못했습니다. 글자가 수평이 되게, 더 가까이에서 밝은 곳에서 다시 찍어 보세요.</string>
@@ -127,8 +130,8 @@
     <string name="delete">삭제</string>
     <string name="settings_total">합계 %1$s</string>
     <string name="settings_download_all">모든 모델 내려받기 (남은 용량 %1$s)</string>
-    <string name="settings_download_all_desc">음성 인식 모델 2개, 번역 모델 전부, LLM 2개를 한 번에 받습니다. 그 뒤로는 어떤 언어나 모델을 골라도 추가로 내려받지 않습니다. Wi-Fi를 권하며, 중단해도 이어받습니다.</string>
-    <string name="setup_everything_subtitle">앱이 쓸 수 있는 모든 모델을 한 번에 내려받습니다: 음성 인식 모델 2개, 번역 모델 전부, LLM 2개. 그 뒤로는 어떤 언어·모델을 골라도 인터넷 없이 동작합니다.</string>
+    <string name="settings_download_all_desc">음성 인식 모델 2개, 번역 모델 전부, LLM 2개, 이미지 번역용 글자 인식 언어팩을 한 번에 받습니다. 그 뒤로는 어떤 언어나 모델을 골라도 추가로 내려받지 않습니다. Wi-Fi를 권하며, 중단해도 이어받습니다.</string>
+    <string name="setup_everything_subtitle">앱이 쓸 수 있는 모든 모델을 한 번에 내려받습니다: 음성 인식 모델 2개, 번역 모델 전부, LLM 2개, 이미지 번역용 글자 인식 언어팩. 그 뒤로는 어떤 언어·모델을 골라도 인터넷 없이 동작합니다.</string>
     <string name="all_models_installed">모든 모델이 이미 설치되어 있습니다.</string>
     <string name="settings_about">정보</string>
     <string name="info_engine_version">엔진 버전</string>

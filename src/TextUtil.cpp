@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <cstring>
 #include <map>
 
 namespace translator {
@@ -418,6 +419,41 @@ std::string postProcessTranslation(const std::string& input, const std::string& 
         cap += ch;
     }
     return trim(cap);
+}
+
+
+std::string fixedTranslation(const std::string& sentence, const std::string& src, const std::string& tgt) {
+    // Bare sentence: trimmed, final punctuation (ASCII and full-width) removed, English lower-cased.
+    std::string bare = trim(sentence);
+    for (;;) {
+        static const char* const kFinal[] = {".", "!", "?", ",", "\xE3\x80\x82", "\xEF\xBC\x81", "\xEF\xBC\x9F", "\xE2\x80\xA6"};
+        bool cut = false;
+        for (const char* f : kFinal) {
+            const std::size_t n = std::strlen(f);
+            if (bare.size() >= n && bare.compare(bare.size() - n, n, f) == 0) {
+                bare.erase(bare.size() - n);
+                cut = true;
+            }
+        }
+        bare = trim(bare);
+        if (!cut || bare.empty()) break;
+    }
+    if (bare.empty()) return "";
+    if (src == "en")
+        for (char& c : bare) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+    struct Entry { const char* src; const char* tgt; const char* from; const char* to; };
+    // OPUS-MT ko-en (tc-big): "안녕하세요." → "Good evening.", "안녕하십니까." → "Good evening.";
+    // en-ko: "Hello." → "여보세요?" (the phone greeting). The greeting itself names no time of day.
+    static const Entry kFixed[] = {
+        {"ko", "en", "\xEC\x95\x88\xEB\x85\x95\xED\x95\x98\xEC\x84\xB8\xEC\x9A\x94", "Hello."},               // 안녕하세요
+        {"ko", "en", "\xEC\x95\x88\xEB\x85\x95\xED\x95\x98\xEC\x8B\xAD\xEB\x8B\x88\xEA\xB9\x8C", "Hello."}, // 안녕하십니까
+        {"en", "ko", "hello", "\xEC\x95\x88\xEB\x85\x95\xED\x95\x98\xEC\x84\xB8\xEC\x9A\x94."},              // 안녕하세요.
+        {"en", "ko", "hi", "\xEC\x95\x88\xEB\x85\x95\xED\x95\x98\xEC\x84\xB8\xEC\x9A\x94."},
+    };
+    for (const Entry& e : kFixed)
+        if (src == e.src && tgt == e.tgt && bare == e.from) return e.to;
+    return "";
 }
 
 } // namespace text

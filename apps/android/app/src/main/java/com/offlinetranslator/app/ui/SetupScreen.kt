@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.offlinetranslator.ModelStatus
 import com.offlinetranslator.app.Lang
+import com.offlinetranslator.app.OcrModel
 import com.offlinetranslator.app.Phase
 import com.offlinetranslator.app.R
 import com.offlinetranslator.app.UiState
@@ -49,7 +50,7 @@ fun SetupScreen(
     onDownload: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    val total = phase.pending.sumOf { it.totalBytes }
+    val total = phase.totalBytes
     Column(
         Modifier
             .fillMaxSize()
@@ -77,6 +78,7 @@ fun SetupScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             phase.pending.forEach { ModelRow(it) }
+            phase.ocrPending.forEach { OcrRow(it) }
             if (phase.pending.any { it.kind == "llm" }) {
                 Spacer(Modifier.height(4.dp))
                 Note(stringResource(R.string.setup_llm_note))
@@ -139,6 +141,33 @@ private fun ModelRow(m: ModelStatus) {
             }
             Text(
                 mb(m.totalBytes),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** A Tesseract language file for photo translation, listed with the models in "download everything". */
+@Composable
+private fun OcrRow(m: OcrModel) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.ocr_model_title, Lang.of(m.lang).name), style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    stringResource(R.string.setup_ocr_subtitle),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                mb(m.sizeBytes),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

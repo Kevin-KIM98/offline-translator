@@ -73,7 +73,9 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   re-check both directions: a quiet room gives zero utterances, and speech 18 dB below normal is
   still transcribed.
 - **Push-to-talk.** A flush that queues nothing must call `onNoSpeech`, or the app's progress
-  indicator never clears.
+  indicator never clears. The callback fires synchronously inside `TranslatorSession.stop()`, so
+  the app must switch its indicator on *before* calling stop (2026-09-15: a tap on the talk button
+  used to leave "translating" on for good because the callback ran first).
 - **Noise.** Whisper must hear the microphone audio, not RNNoise's output (`sttOnDenoisedAudio`
   is off since 0.3.9): the denoiser cost words on clean speech and most of the old "20 dB over the
   background" requirement. RNNoise still supplies the voice activity and the level for the
@@ -139,8 +141,23 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   Whether whisper uses it is `PipelineConfig.useGpu`, off by default in the Kotlin library and
   behind Settings → Performance → "Speech recognition on the GPU" in the app, with a crash-loop
   guard (`gpuTrialPending`: still set at the next launch → switch off + message). The LLM stays on
-  the CPU on Android (JNI sets `llm_gpu_layers = 0`). Nothing about GPU speed or stability has
+  the CPU on Android (JNI sets `llm_gpu_layers = 0`), and since 2026-09-15 that is enforced:
+  `LlmEngine::load` hands llama.cpp an empty device list when no layers are offloaded. Left to
+  its default, llama.cpp b5030 lists every compiled-in GPU device regardless of `n_gpu_layers`,
+  initialises the Vulkan backend when the context is created (driver, shader compilation,
+  pipeline cache) and its scheduler offloads prompt batches of ≥ 32 tokens to it
+  (`ggml_backend_vk_device_offload_op`), so on the phone the LLM — loaded only for pairs that
+  need it, i.e. Thai — ran through the Vulkan driver with the GPU setting off. Reported as
+  "Thai translation fails, the app closes, a cache error"; not reproduced here (no device), the
+  pin is the fix by reading of the llama.cpp source. Nothing about GPU speed or stability has
   been measured on a device; do not claim otherwise.
+- **Greetings (2026-09-15).** OPUS-MT ko-en tc-big answers "안녕하세요." with "Good evening." and
+  "안녕하십니까" the same (whisper adds the full stop, so the app always hit it); en-ko answers
+  a bare "Hello." with the phone greeting "여보세요?". `text::fixedTranslation` in TextUtil holds
+  the few bare greetings with a fixed answer, checked per sentence in `NmtEngine::translateDirect`
+  before the batch (so the pivot hop of ko → th gets "Hello." too); a greeting inside a longer
+  sentence goes to Marian as before ("안녕하세요, 저는 김입니다." → "Hi, I'm Kim."). Measured
+  on the desktop with `translator_cli translate --backend marian`.
 - **Speed (0.3.13).** `LlmEngine` reuses the KV cache of the shared prompt prefix
   (`cachedPrompt`, `llama_kv_self_seq_rm` from the first differing token): ko→th 2.1 → 1.1 s per
   sentence on the desktop; outputs differ slightly (batch-size rounding), Thai chrF 39.2 → 39.5.
@@ -213,7 +230,12 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   code; `prepare_models.py manifest` emits it from `<root>/ocr`) and live in `files/ocr/tessdata`,
   downloaded by `OcrModels` on first use (sha256-checked), separate from the engine's store. The
   engine and older apps ignore the `ocr` key. The text must be in one of the two conversation
-  languages; the user picks which.
+  languages; the user picks which. Settings → "Download everything" fetches the OCR files with
+  the models (2026-09-15: `Phase.Setup.ocrPending`, installed after the engine models). A picked
+  gallery photo is opened off the main thread by `PhotoFiles` (ImageDecoder, then BitmapFactory
+  with the EXIF rotation when that fails) and a failure shows the decoder's message; the camera
+  screen and its language side are `rememberSaveable`, so the picker's result still lands when
+  the activity was recreated behind it.
 - **Model selection.** A language choice must download every pair its routes use, including the
   English hops. Before 0.3.7 `ko,ja` got speech recognition only and could not translate.
 
