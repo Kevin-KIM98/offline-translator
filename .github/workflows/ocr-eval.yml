@@ -1,0 +1,47 @@
+# Measures photo text recognition (Tesseract thresholding, orientation) on synthesised photos with
+# the app's own tessdata_fast files. No Tesseract runs on the Windows dev PC; this runs it on Linux.
+name: OCR eval
+
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - "tests/eval/ocr_eval.py"
+      - ".github/workflows/ocr-eval.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tesseract, fonts, Python packages
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q tesseract-ocr fonts-dejavu-core > /dev/null
+          tesseract --version
+          pip install -q pillow numpy
+
+      - name: The app's tessdata_fast files from models-v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p tessdata
+          gh release download models-v1 -R "$GITHUB_REPOSITORY" -p "ocr_eng.traineddata" -p "ocr_spa.traineddata" -D tessdata
+          for f in tessdata/ocr_*.traineddata; do mv "$f" "tessdata/${f#tessdata/ocr_}"; done
+          ls -l tessdata
+
+      - name: Evaluate
+        run: python tests/eval/ocr_eval.py --tessdata tessdata | tee ocr_eval.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ocr-eval
+          path: |
+            ocr_eval.txt
+            tests/eval/out/ocr/
