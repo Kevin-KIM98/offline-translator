@@ -185,7 +185,9 @@ fun ConversationScreen(
                             speaking = state.speakingTurn == turn.id,
                             onReplay = { if (state.speakingTurn == turn.id) vm.stopSpeaking() else vm.speakTurn(turn) },
                             onCopy = {
-                                clipboard.setText(AnnotatedString(turn.translatedText))
+                                // A photo's turn copies what was read as well, so a wrong reading can be reported.
+                                val text = if (turn.fromImage) turn.sourceText + "\n\n" + turn.translatedText else turn.translatedText
+                                clipboard.setText(AnnotatedString(text))
                                 vm.showMessage(copiedMessage)
                             },
                         )

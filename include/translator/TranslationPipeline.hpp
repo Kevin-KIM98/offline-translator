@@ -58,6 +58,11 @@ public:
     // ---- One-shot API ----------------------------------------------------------
     SttResult transcribe(const float* pcm, std::size_t n, const std::string& sourceLang);
     TranslationResult translateText(const std::string& text, const std::string& sourceLang, const std::string& targetLang);
+    // Several pieces of text at once, one per line of `text`: Marian translates them as one batch
+    // (40 lines of a photo: 2.4 s against 6.3 s one call each on the desktop), the LLM one by
+    // one. The result's translatedText has exactly one line per input line, empty where a piece
+    // failed; the call fails only when every piece did.
+    TranslationResult translateLines(const std::string& text, const std::string& sourceLang, const std::string& targetLang);
     TranslationResult processSpeechToTranslation(const float* pcm, std::size_t n,
                                                  const std::string& sourceLang, const std::string& targetLang,
                                                  const std::string& otherLang = "");

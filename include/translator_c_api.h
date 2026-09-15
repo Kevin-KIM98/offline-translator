@@ -126,6 +126,10 @@ TR_API char* tr_pipeline_process_pending2(tr_pipeline* p, const char* source_lan
 TR_API char* tr_pipeline_transcribe(tr_pipeline* p, const float* pcm, size_t n, const char* source_lang);
 /* TranslationResult JSON */
 TR_API char* tr_pipeline_translate_text(tr_pipeline* p, const char* text, const char* source_lang, const char* target_lang);
+/* Several pieces of text at once, one per line of `text` (0.3.17). Marian translates them as one
+   batch; the result's translated_text has exactly one line per input line, empty where a piece
+   failed. TranslationResult JSON. */
+TR_API char* tr_pipeline_translate_lines(tr_pipeline* p, const char* text, const char* source_lang, const char* target_lang);
 TR_API char* tr_pipeline_process_speech(tr_pipeline* p, const float* pcm, size_t n, const char* source_lang, const char* target_lang);
 
 /* NMT management ----------------------------------------------------------- */

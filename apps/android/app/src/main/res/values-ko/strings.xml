@@ -70,7 +70,7 @@
     <string name="camera_needed_title">카메라 권한이 필요합니다</string>
     <string name="camera_needed_body">사진은 기기 안에서만 처리되며 어디로도 전송되지 않습니다.</string>
     <string name="camera_reading">글자를 읽는 중</string>
-    <string name="camera_translating_progress">번역 중 %1$d / %2$d</string>
+    <string name="camera_timing">%1$s → %2$s · 글자 인식 %3$.1f초 · 번역 %4$.1f초 · %5$d개 조각</string>
     <string name="camera_show_original">원문</string>
     <string name="camera_rotate">사진을 돌려서 다시 읽기</string>
     <string name="camera_rotate_short">돌리기</string>

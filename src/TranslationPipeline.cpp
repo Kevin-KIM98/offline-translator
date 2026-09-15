@@ -24,18 +24,22 @@ struct TranslationPipeline::Impl {
     LlmEngine llm;
     SpeechSegmenter segmenter;
 
+    // Whether the configured backend sends src → tgt to the LLM rather than Marian.
+    bool choosesLlm(const std::string& src, const std::string& tgt) {
+        const bool marianRoute = (src != "auto" && !src.empty()) && !nmt.resolveRoute(src, tgt, cfg.pivotLangs).empty();
+        switch (cfg.backend) {
+            case TranslationBackend::Llm: return true;
+            case TranslationBackend::Marian: return false;
+            case TranslationBackend::Auto: return !marianRoute && llm.isLoaded();
+        }
+        return false;
+    }
+
     // Runs the configured backend. Fills translatedText/route or error.
     bool translateWith(const std::string& text, const std::string& src, const std::string& tgt, TranslationResult& r) {
         std::string err;
         const bool llmReady = llm.isLoaded();
-        const bool marianRoute = (src != "auto" && !src.empty()) && !nmt.resolveRoute(src, tgt, cfg.pivotLangs).empty();
-        bool useLlm = false;
-        switch (cfg.backend) {
-            case TranslationBackend::Llm: useLlm = true; break;
-            case TranslationBackend::Marian: useLlm = false; break;
-            case TranslationBackend::Auto: useLlm = !marianRoute && llmReady; break;
-        }
-        if (useLlm) {
+        if (choosesLlm(src, tgt)) {
             if (!llmReady) {
                 r.error = "LLM backend requested but no LLM model loaded";
                 return false;
@@ -381,6 +385,80 @@ TranslationResult TranslationPipeline::translateText(const std::string& text, co
         return r;
     }
     if (impl_->cfg.postProcessTranslations && !r.route.empty()) r.translatedText = text::postProcessTranslation(r.translatedText, targetLang);
+    r.nmtMs = Impl::msSince(t0);
+    r.totalMs = r.nmtMs;
+    r.ok = true;
+    return r;
+}
+
+namespace {
+std::vector<std::string> splitLines(const std::string& text) {
+    std::vector<std::string> lines;
+    for (std::size_t start = 0;;) {
+        const std::size_t nl = text.find('\n', start);
+        lines.push_back(nl == std::string::npos ? text.substr(start) : text.substr(start, nl - start));
+        if (nl == std::string::npos) return lines;
+        start = nl + 1;
+    }
+}
+} // namespace
+
+TranslationResult TranslationPipeline::translateLines(const std::string& text, const std::string& sourceLang, const std::string& targetLang) {
+    TranslationResult r;
+    r.sourceText = text;
+    r.sourceLang = sourceLang;
+    r.targetLang = targetLang;
+    const auto t0 = std::chrono::steady_clock::now();
+    const std::vector<std::string> lines = splitLines(text);
+
+    std::lock_guard<std::mutex> lock(impl_->engineMutex);
+    if (!impl_->initialized) {
+        r.error = "pipeline not initialized";
+        return r;
+    }
+    if (sourceLang == targetLang) {
+        r.translatedText = text;
+        r.ok = true;
+        r.totalMs = Impl::msSince(t0);
+        return r;
+    }
+
+    // Marian keeps the lines apart and translates them as one batch; the LLM, and any failure of
+    // the batch, go line by line.
+    std::vector<std::string> out;
+    if (!impl_->choosesLlm(sourceLang, targetLang)) {
+        TranslationResult all;
+        if (impl_->translateWith(text, sourceLang, targetLang, all)) {
+            out = splitLines(all.translatedText);
+            if (out.size() == lines.size()) r.route = all.route; else out.clear();
+        }
+    }
+    if (out.empty()) {
+        std::string firstError;
+        for (const auto& line : lines) {
+            if (text::trim(line).empty()) {
+                out.emplace_back();
+                continue;
+            }
+            TranslationResult one;
+            if (impl_->translateWith(line, sourceLang, targetLang, one)) {
+                out.push_back(one.translatedText);
+                if (r.route.empty()) r.route = one.route;
+            } else {
+                out.emplace_back();
+                if (firstError.empty()) firstError = one.error;
+            }
+        }
+        if (r.route.empty() && !firstError.empty()) {
+            r.error = firstError;
+            impl_->setError(r.error);
+            return r;
+        }
+    }
+    for (std::size_t i = 0; i < out.size(); ++i) {
+        if (i) r.translatedText += '\n';
+        r.translatedText += impl_->cfg.postProcessTranslations && !r.route.empty() ? text::postProcessTranslation(out[i], targetLang) : out[i];
+    }
     r.nmtMs = Impl::msSince(t0);
     r.totalMs = r.nmtMs;
     r.ok = true;

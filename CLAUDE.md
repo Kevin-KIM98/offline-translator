@@ -177,10 +177,22 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   one only when the heights match, the gap is small and it starts lower-case, follows `-`/`,`,
   both lines are capitals, or the previous line ran to the paragraph's right edge; a line ending
   in a digit or `.!?:;` ends the piece (before, a block's lines were joined into one sentence,
-  gluing menu items and sign lines together). Each region is translated on its own (repeated text
-  once) and `TranslatedPhoto` paints it over the photo: colour sampled around the box, the largest
-  font that fits, pinch/double-tap zoom, tap to uncover the original, "Original" toggle; the
-  `Turn` (`fromImage`) joins the regions with newlines. All-caps text of cased languages is
+  gluing menu items and sign lines together). Codes, dates, prices and phone numbers
+  (`OcrEngine.isTranslatable`: no run of two letters without a digit, or more digits than
+  letters) are kept as they are — Marian answered "10SEP26 B0066" and "$ 42.600" with invented
+  words. The remaining distinct pieces go to the engine in **one batch**:
+  `tr_pipeline_translate_lines` / `TranslatorSession.translateLines` (0.3.17; one piece per
+  line, one output line per input line, `NmtEngine::translateDirect` keeps lines apart through
+  every hop and sends all their sentences to CTranslate2 together). Desktop, 40 lines of the
+  price board es→ko: 18.6 s one call each → 6.8 s in one batch (`translator_cli translate
+  --lines --batch`); es→en in Python 6.3 → 2.4 s, identical output. An app running on an engine
+  AAR without the call (app-only push on main uses the released AAR) hits UnsatisfiedLinkError,
+  caught in `translateImage`, and falls back to one call per piece — cut an engine release to
+  make the batch the default. `TranslatedPhoto` paints each translation over the photo: colour
+  sampled around the box, the largest font that fits, pinch/double-tap zoom, tap to uncover the
+  original, "Original" toggle; the result footer shows OCR and translation seconds and the piece
+  count; the `Turn` (`fromImage`) joins the regions with newlines, and a long press on it in the
+  conversation copies the text read as well as the translation (to report a wrong reading). All-caps text of cased languages is
   sentence-cased first (`OcrEngine.forTranslation`): 50 sign texts through the app's pairs came
   out right 16 in capitals, 36 sentence-cased (en→ko 12→14/20, fr 1→7, es 0→8, ru 3→7 of 10;
   `tests/eval/ocr_caps_eval.py`, judged by reading). Language files are Tesseract `tessdata_fast`

@@ -160,6 +160,11 @@ class TranslatorSession(
         translator.translateText(text, src, tgt)
     }
 
+    /** Several pieces of text in one batch: see [OfflineTranslator.translateLines]. */
+    suspend fun translateLines(lines: List<String>, src: String, tgt: String): TranslationResult = withContext(Dispatchers.Default) {
+        translator.translateLines(lines, src, tgt)
+    }
+
     /** Speaks through the OS TTS with the microphone muted, then drops what the microphone caught. */
     suspend fun speak(text: String, lang: String, rate: Float = speechRate): Boolean {
         muted = true

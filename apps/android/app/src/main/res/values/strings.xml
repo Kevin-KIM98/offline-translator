@@ -71,7 +71,7 @@
     <string name="camera_needed_title">Camera access is needed</string>
     <string name="camera_needed_body">Photos are read on this device only and are never sent anywhere.</string>
     <string name="camera_reading">Reading the text</string>
-    <string name="camera_translating_progress">Translating %1$d of %2$d</string>
+    <string name="camera_timing">%1$s → %2$s · read in %3$.1f s, translated in %4$.1f s · %5$d pieces</string>
     <string name="camera_show_original">Original</string>
     <string name="camera_rotate">Turn the photo and read it again</string>
     <string name="camera_rotate_short">Turn</string>

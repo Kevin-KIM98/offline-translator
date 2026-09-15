@@ -86,6 +86,9 @@ data class TranslationResult(
     /** True when STT produced no speech (silence) — nothing to translate, not an error. */
     val isEmpty: Boolean get() = ok && sourceText.isBlank()
 
+    /** The translation line by line: one per input line of [OfflineTranslator.translateLines]. */
+    val lines: List<String> get() = translatedText.split('\n')
+
     companion object {
         fun fromJson(json: String): TranslationResult {
             val o = JSONObject(json)
@@ -170,6 +173,16 @@ class OfflineTranslator(config: PipelineConfig) : Closeable {
 
     fun translateText(text: String, sourceLang: String, targetLang: String): TranslationResult =
         TranslationResult.fromJson(NativeBridge.pipelineTranslateText(h(), text, sourceLang, targetLang))
+
+    /**
+     * Translates [lines] together (Marian batches them: several times faster than one call each).
+     * The result's [TranslationResult.translatedText] has one line per input line, empty where a
+     * piece failed; [TranslationResult.lines] splits it. Fails only when every piece failed.
+     */
+    fun translateLines(lines: List<String>, sourceLang: String, targetLang: String): TranslationResult {
+        val text = lines.joinToString("\n") { it.replace('\n', ' ') }
+        return TranslationResult.fromJson(NativeBridge.pipelineTranslateLines(h(), text, sourceLang, targetLang))
+    }
 
     fun processSpeech(pcm: FloatArray, sourceLang: String = "auto", targetLang: String): TranslationResult =
         TranslationResult.fromJson(NativeBridge.pipelineProcessSpeech(h(), pcm, sourceLang, targetLang))

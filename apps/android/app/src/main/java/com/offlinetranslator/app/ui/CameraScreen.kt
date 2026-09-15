@@ -236,11 +236,7 @@ fun CameraScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit, onOpenAp
                     CircularProgressIndicator(color = Color.White, strokeWidth = 3.dp, modifier = Modifier.size(36.dp))
                     Spacer(Modifier.height(14.dp))
                     Text(
-                        when {
-                            !phase.translating -> stringResource(R.string.camera_reading)
-                            phase.total > 1 -> stringResource(R.string.camera_translating_progress, phase.done, phase.total)
-                            else -> stringResource(R.string.translating)
-                        },
+                        stringResource(if (phase.translating) R.string.translating else R.string.camera_reading),
                         style = MaterialTheme.typography.bodyLarge,
                         color = Color.White,
                     )
@@ -278,15 +274,17 @@ fun CameraScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit, onOpenAp
                                     phase.texts.forEach { piece ->
                                         Text(
                                             piece.region.text,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            style = if (piece.kept) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodySmall,
+                                            color = if (piece.kept) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
-                                        Spacer(Modifier.height(2.dp))
-                                        Text(
-                                            piece.translation.ifBlank { none },
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                        )
+                                        if (!piece.kept) {
+                                            Spacer(Modifier.height(2.dp))
+                                            Text(
+                                                piece.translation.ifBlank { none },
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                            )
+                                        }
                                         Spacer(Modifier.height(12.dp))
                                     }
                                 }
@@ -300,10 +298,12 @@ fun CameraScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit, onOpenAp
                             }
                             Text(
                                 stringResource(
-                                    R.string.turn_footer,
+                                    R.string.camera_timing,
                                     Lang.of(phase.turn.sourceLang).name,
                                     Lang.of(phase.turn.targetLang).name,
-                                    phase.turn.totalMs.toInt(),
+                                    phase.ocrMs / 1000.0,
+                                    phase.nmtMs / 1000.0,
+                                    phase.texts.size,
                                 ),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.outline,
