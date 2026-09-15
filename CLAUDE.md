@@ -138,7 +138,11 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   `SttEngine::detectLanguage` encodes 5 s / 256 positions: −0.1–0.4 s per auto utterance,
   identification unchanged. `TranslatorSession.start` preloads the route(s) (`preloadPair` loads
   every hop). Tried and dropped: whisper beam 3 (th/vi worse for 11% speed), flash attention on
-  CPU (no change), `large-v3-turbo` (repeats). `ko-en` is tc-big since 0.3.13 (manifest 1.6.0,
+  CPU (no change), `large-v3-turbo` (repeats), Marian beam 2 or 1 (2026-09-15, ko→en tc-big on
+  the 40 sentences of the Thai sets against their English references, desktop: beam 4 chrF 60.0
+  at 471 ms median, beam 2 59.1 at 416 ms, beam 1 54.7 at 412 ms — the encoder and the call
+  cost most of the time, so a narrower beam buys little; Marian time is only cut by batching
+  several sentences into one call, as photo translation does). `ko-en` is tc-big since 0.3.13 (manifest 1.6.0,
   entry version 2 → devices re-download it): chrF 59.1 → 62.9 / 44.2 → 53.9 against English
   references, 420 vs 233 ms per sentence; converted from pouta with `vocab_to_yml` (the .vocab
   files are one token per line) + `ctranslate2.converters.marian`, py -3.11.
