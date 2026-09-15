@@ -26,7 +26,7 @@ releases — no server of your own is needed.
 push-to-talk per speaker, a replayable transcript, a conversation mode that recognises which
 language was spoken and needs no buttons, keyboard input, photo translation (the camera reads a
 sign or a menu on the phone) and model management. Grab
-[offline-interpreter-1.0.0.apk](https://github.com/Kevin-KIM98/offline-translator/releases/download/v0.3.16/offline-interpreter-1.0.0.apk)
+[offline-interpreter-1.0.0.apk](https://github.com/Kevin-KIM98/offline-translator/releases/download/v0.3.17/offline-interpreter-1.0.0.apk)
 for an arm64 Android 9+ device, or build either app from source:
 
 ```
@@ -84,7 +84,7 @@ device.
 2. `app/build.gradle.kts`:
 
 ```kotlin
-implementation(files("libs/offline-translator-0.3.16.aar"))
+implementation(files("libs/offline-translator-0.3.17.aar"))
 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 ```
 
