@@ -372,14 +372,35 @@ AAR on Ubuntu, the XCFramework on macOS, rewrites `Package.swift` with the new c
   step still decides the result (chrF 39.9 / 28.9 against 39.5 / 33.2 with the old hop, mixed by
   reading, 10 held-out sentences). Whisper beam 3 and flash attention were tried and dropped: beam
   3 cost Thai and Vietnamese accuracy for 11% speed, flash attention changed nothing on CPU.
-* **French, Russian and photo translation (0.3.17).** Ninth and tenth languages: OPUS-MT `fr-en` /
-  `en-fr` (79 MB each) and `ru-en` / `en-ru` (83 MB each), converted to CTranslate2 INT8, so every
-  direction reaches them through English with Marian. Whisper on 20 synthesised clips per language
-  through the app path: small fr 3.7% / ru 0.3% character error rate ("Deux billets" heard as
-  "Debiez"), medium fr 0.0% / ru 0.4%, language identified 40/40 with both. Russian is its
-  own script for the LLM guard (Cyrillic tokens allowed, Latin banned) and for the trailing-English
-  cleanup. The Android app can now translate a photo: a camera button on the conversation screen
-  opens a viewfinder (or the gallery), the text is read on the phone by Tesseract
-  (tesseract4android, `tessdata_fast` files of 0.5–4 MB per language listed in the manifest's
-  `ocr` section and fetched on first use) and translated like typed text, paragraph by paragraph.
-  Nothing about the camera path has been measured on a device yet.
+* **French, Russian, photo translation and automatic model choice (0.3.17).** Ninth and tenth
+  languages: OPUS-MT `fr-en` / `en-fr` (79 MB each) and `ru-en` / `en-ru` (83 MB each), converted
+  to CTranslate2 INT8, so every direction reaches them through English with Marian. Whisper on 20
+  synthesised clips per language through the app path: small fr 3.7% / ru 0.3% character error
+  rate ("Deux billets" heard as "Debiez"), medium fr 0.0% / ru 0.4%, language identified 40/40
+  with both. Russian is its own script for the LLM guard (Cyrillic tokens allowed, Latin banned)
+  and for the trailing-English cleanup.
+
+  The Android app translates photos. A camera button on the conversation screen opens a
+  viewfinder (or the gallery); Tesseract (tesseract4android, `tessdata_fast` files of 0.5–4 MB per
+  language listed in the manifest's `ocr` section and fetched on first use) reads positioned
+  lines on the phone, and each piece of text is covered by its translation where it stands, in
+  the colour sampled around it. Lines are joined only where a sentence wraps, so menu items and
+  the lines of a sign stay apart; codes, dates, prices and phone numbers stay as they are;
+  all-caps text is sentence-cased before translation (36 of 50 sign texts right against 16 in
+  capitals, judged by reading); a sideways or upside-down photo is turned upright (8 of 8
+  synthesised rotations), and a button turns it by hand. On synthesised photos read by Tesseract
+  on Linux, tiled thresholding found 26% / 21% of the words against 95% / 79% with Tesseract's
+  default, which the app keeps.
+
+  The pieces of a photo go to the engine in one call, `tr_pipeline_translate_lines` (one output
+  line per input line, all their sentences in one CTranslate2 batch): 40 lines of a price board
+  Spanish→Korean took 6.8 s instead of 18.6 s on the desktop (`translator_cli translate --lines
+  --batch`).
+
+  Settings → speech recognition model and translation LLM default to **Automatic**: whisper small
+  for Korean, English, Spanish and Russian (as accurate as medium at a third of the time), medium
+  when the pair includes Thai, Vietnamese, French, Japanese, Chinese or Indonesian (character error
+  rate small → medium: ja 2.1 → 0.0%, zh 2.7 → 0.4%, id 3.5 → 2.4%), and the 3B LLM only when
+  Thai is in the pair. A tapped model overrides the choice. Marian beam 2 and 1 were tried and
+  dropped: ko→en chrF 60.0 → 59.1 / 54.7 for at most 12% speed. Nothing about the camera path or
+  the automatic choice has been measured on a device yet.
