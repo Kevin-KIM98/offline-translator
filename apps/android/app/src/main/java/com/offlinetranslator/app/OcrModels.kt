@@ -2,11 +2,13 @@ package com.offlinetranslator.app
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
@@ -32,6 +34,12 @@ data class OcrModel(
  * time a language is used with the camera rather than during the first-run setup.
  */
 class OcrModels(context: Context) {
+    private companion object {
+        /** Extra attempts after a transient failure; the pause doubles from [RETRY_DELAY_MS]. */
+        const val MAX_RETRIES = 4
+        const val RETRY_DELAY_MS = 1_000L
+    }
+
     /** Handed to Tesseract; it looks for `tessdata/<lang>.traineddata` below it. */
     val root: File = File(context.filesDir, "ocr")
     private val tessdata = File(root, "tessdata")
@@ -69,7 +77,9 @@ class OcrModels(context: Context) {
 
     /**
      * Downloads one language file, resuming a partial one, and keeps it only when its SHA-256
-     * matches the manifest. [progress] gets (bytes done, bytes total).
+     * matches the manifest. [progress] gets (bytes done, bytes total). A transient failure (5xx
+     * from the release host, 408/429, a timeout, a cut connection) is retried with a growing
+     * pause, resuming from what is already on disk.
      */
     suspend fun install(m: OcrModel, progress: suspend (Long, Long) -> Unit) = withContext(Dispatchers.IO) {
         tessdata.mkdirs()
@@ -79,6 +89,28 @@ class OcrModels(context: Context) {
             return@withContext
         }
         val part = File(target.path + ".part")
+        var attempt = 0
+        while (true) {
+            try {
+                fetch(m, part, progress)
+                break
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (attempt >= MAX_RETRIES || !isTransient(e)) throw e   // the partial file stays; a later run resumes
+                delay(RETRY_DELAY_MS shl attempt)
+                attempt++
+            }
+        }
+        if (m.sha256.isNotEmpty() && !sha256Of(part).equals(m.sha256, ignoreCase = true)) {
+            part.delete()
+            throw IllegalStateException("checksum mismatch for ${m.filename}")
+        }
+        if (target.exists()) target.delete()
+        if (!part.renameTo(target)) throw IllegalStateException("cannot finalize ${m.filename}")
+    }
+
+    /** One attempt: appends to `part` until the file is complete, or throws. */
+    private suspend fun fetch(m: OcrModel, part: File, progress: suspend (Long, Long) -> Unit) {
         var offset = if (part.exists()) part.length() else 0L
         if (m.sizeBytes in 1..offset) { part.delete(); offset = 0 }
 
@@ -91,7 +123,7 @@ class OcrModels(context: Context) {
             val append = when (val code = conn.responseCode) {
                 HttpURLConnection.HTTP_PARTIAL -> true
                 HttpURLConnection.HTTP_OK -> { offset = 0; false }
-                else -> throw IllegalStateException("HTTP $code for ${m.url}")
+                else -> throw HttpStatusException(code, m.url)
             }
             val total = if (m.sizeBytes > 0) m.sizeBytes else conn.contentLengthLong.let { if (it > 0) it + offset else -1L }
             var done = offset
@@ -113,16 +145,17 @@ class OcrModels(context: Context) {
             conn.disconnect()
         }
         if (m.sizeBytes > 0 && part.length() != m.sizeBytes) {
-            part.delete()
-            throw IllegalStateException("incomplete download: ${part.length()} of ${m.sizeBytes} bytes")
+            throw IOException("incomplete download: ${part.length()} of ${m.sizeBytes} bytes")
         }
-        if (m.sha256.isNotEmpty() && !sha256Of(part).equals(m.sha256, ignoreCase = true)) {
-            part.delete()
-            throw IllegalStateException("checksum mismatch for ${m.filename}")
-        }
-        if (target.exists()) target.delete()
-        if (!part.renameTo(target)) throw IllegalStateException("cannot finalize ${m.filename}")
     }
+
+    private fun isTransient(e: Exception): Boolean = when (e) {
+        is HttpStatusException -> e.code >= 500 || e.code == 408 || e.code == 429
+        is IOException -> true
+        else -> false
+    }
+
+    private class HttpStatusException(val code: Int, url: String) : IOException("HTTP $code for $url")
 
     private fun sha256Of(f: File): String {
         val md = MessageDigest.getInstance("SHA-256")

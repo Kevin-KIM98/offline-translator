@@ -156,6 +156,8 @@
     <string name="err_storage">Not enough storage. %1$s or more is needed.</string>
     <string name="err_download_stopped">Download stopped. Starting it again resumes where it left off.</string>
     <string name="err_download_failed">Download failed</string>
+    <string name="err_download_one">%1$s. Starting the download again fetches only what is missing.</string>
+    <string name="err_download_partial">%1$s (and %2$d more). Starting the download again fetches only what is missing.</string>
     <string name="err_engine_open">Could not start the engine</string>
     <string name="err_translate">Translation failed</string>
     <string name="err_mic">Could not open the microphone</string>

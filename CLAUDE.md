@@ -238,6 +238,15 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   the activity was recreated behind it.
 - **Model selection.** A language choice must download every pair its routes use, including the
   English hops. Before 0.3.7 `ko,ja` got speech recognition only and could not translate.
+- **Model download (2026-09-15).** The release host answers a file with HTTP 500 now and then
+  (reported on `nmt_en-es_target.spm`; the asset is intact and downloads fine from here). One such
+  answer used to end the whole run, and the setup screen then offered the full 5.0 GB again because
+  its list was the one computed before the run. `ModelRepository.download` and `OcrModels.install`
+  now retry a transient failure (5xx, 408, 429, timeout, cut connection) up to four times with
+  1/2/4/8 s pauses, resuming from the `.part` file; a 404 still fails at once. `MainViewModel`
+  re-asks the core after a failed run, so the button offers only what is left, and one failed
+  text-recognition file no longer stops the others. Not reproduced on a device; the retry path is
+  untested against a real 500.
 
 ## Reporting
 
