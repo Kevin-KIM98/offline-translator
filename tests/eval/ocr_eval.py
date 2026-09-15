@@ -7,8 +7,15 @@ reports:
 
   * per thresholding method, how many of the page's words Tesseract returns before and after the
     app's confidence filter (words under 30, lines under 45), and how many invented words;
-  * per rotation of the input, the orientation score (letters in words of confidence >= 70) of the
-    four ways to turn it back, at full size and at the probe size.
+  * per rotation of the input, OcrEngine's orientation decision: the score (letters in words of
+    confidence >= 70 on lines that run across) as the photo stands at full size, the scores of the
+    four ways round on probes, the turn the app makes, and the words found after it.
+
+Tesseract reads text turned a quarter clockwise by itself (lines running down), so counting every
+confident letter could not tell that from upright; the overlay needs lines that run across.
+
+2026-09-15 (tesseract 5.3.4 on the CI runner; the app bundles 5.5.1): thresholding_method=1 found
+26% (ticket) and 21% (board) of the words on the photo look against 95% / 79% with the default 0.
 
 Needs tesseract 5.x on PATH, Pillow, numpy, DejaVu fonts, and a tessdata directory holding
 eng/spa traineddata (the app's `ocr_*.traineddata` from models-v1, renamed).
@@ -30,6 +37,12 @@ NAVY = (45, 42, 110)
 RED = (215, 45, 45)
 WHITE = (255, 255, 255)
 BLACK = (20, 20, 20)
+
+# OcrEngine's constants.
+CONFIDENT = 70
+UPRIGHT_LETTERS = 20
+UPRIGHT_SHARE = 0.5
+TURN_MARGIN = 1.5
 
 TICKET = [
     ("text", 110, 30, 70, "bold", BLACK, "DELTA"),
@@ -143,7 +156,7 @@ def fit(img, longest):
     return img if s >= 1 else img.resize((round(img.width * s), round(img.height * s)), Image.LANCZOS)
 
 
-def ocr(img, lang, tessdata, method):
+def ocr(img, lang, tessdata, method=0):
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "page.png"
         img.save(path)  # no pHYs, like the app's bitmap: Tesseract estimates the resolution
@@ -161,7 +174,9 @@ def ocr(img, lang, tessdata, method):
         text = (row.get("text") or "").strip()
         if row["level"] == "5" and text and float(row["conf"]) >= 0:
             key = (int(row["block_num"]), int(row["par_num"]), int(row["line_num"]))
-            words.append({"line": key, "conf": float(row["conf"]), "text": text})
+            left, top = int(row["left"]), int(row["top"])
+            box = (left, top, left + int(row["width"]), top + int(row["height"]))
+            words.append({"line": key, "conf": float(row["conf"]), "text": text, "box": box})
     return words, secs
 
 
@@ -196,12 +211,27 @@ def compare(words, truth):
     return hit / sum(truth.values()), sum((found - truth).values())
 
 
-def score(words):
-    return sum(sum(c.isalnum() for c in w["text"]) for w in words if w["conf"] >= 70)
+def nletters(w):
+    return sum(c.isalnum() for c in w["text"])
 
 
 def letters(words):
-    return sum(sum(c.isalnum() for c in w["text"]) for w in words)
+    return sum(nletters(w) for w in words)
+
+
+def confident(words):
+    return sum(nletters(w) for w in words if w["conf"] >= CONFIDENT)
+
+
+def across(words):
+    """OcrEngine.read: confident letters on lines whose words' union box is at least as wide as tall."""
+    boxes = {}
+    for w in words:
+        b = boxes.get(w["line"])
+        x0, y0, x1, y1 = w["box"]
+        boxes[w["line"]] = w["box"] if b is None else (min(b[0], x0), min(b[1], y0), max(b[2], x1), max(b[3], y1))
+    flat = {k for k, b in boxes.items() if b[2] - b[0] >= b[3] - b[1]}
+    return sum(nletters(w) for w in words if w["conf"] >= CONFIDENT and w["line"] in flat)
 
 
 def main():
@@ -210,46 +240,52 @@ def main():
     ap.add_argument("--fonts", default="/usr/share/fonts/truetype/dejavu")
     ap.add_argument("--probe", type=int, default=1000)
     ap.add_argument("--out", default="tests/eval/out/ocr")
+    ap.add_argument("--skip-thresholding", action="store_true")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
     Path(args.out).mkdir(parents=True, exist_ok=True)
 
-    print("== thresholding (upright, 2000 px, no resolution given)")
-    print(f"{'page':<10} {'look':<6} {'method':>6} {'words':>6} {'found':>6} {'filtered':>8} {'invented':>8} {'conf>=70':>8} {'letters':>7} {'secs':>5}")
-    for name, (lang, size, items) in PAGES.items():
-        truth = truth_of(items)
-        clean = render(size, items, args.fonts)
-        for look, img in (("scan", clean), ("photo", photograph(clean))):
-            img.save(Path(args.out) / f"{name}-{look}.jpg", quality=85)
-            for method in (0, 1, 2):
-                words, secs = ocr(img, lang, args.tessdata, method)
-                recall, invented = compare(words, truth)
-                filtered, _ = compare(app_filter(words), truth)
-                print(f"{name:<10} {look:<6} {method:>6} {len(words):>6} {recall:>6.0%} {filtered:>8.0%} {invented:>8} {score(words):>8} {letters(words):>7} {secs:>5.1f}")
+    if not args.skip_thresholding:
+        print("== thresholding (upright, 2000 px, no resolution given)")
+        print(f"{'page':<10} {'look':<6} {'method':>6} {'words':>6} {'found':>6} {'filtered':>8} {'invented':>8} {'conf>=70':>8} {'letters':>7} {'secs':>5}")
+        for name, (lang, size, items) in PAGES.items():
+            truth = truth_of(items)
+            clean = render(size, items, args.fonts)
+            for look, img in (("scan", clean), ("photo", photograph(clean))):
+                img.save(Path(args.out) / f"{name}-{look}.jpg", quality=85)
+                for method in (0, 1, 2):
+                    words, secs = ocr(img, lang, args.tessdata, method)
+                    recall, invented = compare(words, truth)
+                    filtered, _ = compare(app_filter(words), truth)
+                    print(f"{name:<10} {look:<6} {method:>6} {len(words):>6} {recall:>6.0%} {filtered:>8.0%} {invented:>8} {confident(words):>8} {letters(words):>7} {secs:>5.1f}")
+        print()
 
-    print()
-    print("== orientation (photo look, method 0): confident letters / all letters for each way to turn the input back")
-    print(f"{'page':<10} {'input':>5} {'size':>5}  {'back 0':>9} {'90':>9} {'180':>9} {'270':>9}  picks  found-when-picked")
+    print("== orientation (photo look): OcrEngine's decision")
+    print("   as-is = across/confident/letters at 2000 px; probes = across score turned 0/90/180/270 clockwise at probe size")
+    print(f"{'page':<10} {'input':>5}  {'as-is':>13} {'reads':>5}  {'probes':>21}  {'turn':>4} {'right':>5}  found")
     for name, (lang, size, items) in PAGES.items():
         truth = truth_of(items)
         photo = photograph(render(size, items, args.fonts))
         for rot in (0, 90, 180, 270):
-            turned = photo.rotate(rot, expand=True)  # PIL: counter-clockwise
-            if rot == 90:
-                turned.save(Path(args.out) / f"{name}-photo-turned90.jpg", quality=85)
-            for longest in (2000, args.probe):
-                scores, cells, recalls = {}, [], {}
+            turned = photo.rotate(rot, expand=True)  # PIL turns counter-clockwise
+            words, _ = ocr(turned, lang, args.tessdata)
+            a, c, n = across(words), confident(words), letters(words)
+            reads = a >= UPRIGHT_LETTERS and a >= n * UPRIGHT_SHARE
+            probes = "-"
+            turn = 0
+            if not reads:
+                scores = []
                 for back in (0, 90, 180, 270):
-                    candidate = fit(turned.rotate(-back, expand=True), longest)
-                    words, _ = ocr(candidate, lang, args.tessdata, 0)
-                    scores[back] = score(words)
-                    cells.append(f"{scores[back]}/{letters(words)}")
-                    recalls[back] = compare(words, truth)[0]
-                best = max(scores, key=scores.get)
-                # PIL turns counter-clockwise; turning back clockwise by the same angle undoes it.
-                ok = "ok" if best == rot else f"WRONG (right {rot})"
-                row = " ".join(f"{c:>9}" for c in cells)
-                print(f"{name:<10} {rot:>5} {longest:>5}  {row}  {best:>5} {recalls[best]:>6.0%} {ok}")
+                    pw, _ = ocr(fit(turned.rotate(-back, expand=True), args.probe), lang, args.tessdata)
+                    scores.append(across(pw))
+                probes = "/".join(map(str, scores))
+                best = max(range(4), key=lambda i: scores[i])
+                if best != 0 and scores[best] >= UPRIGHT_LETTERS and scores[best] > scores[0] * TURN_MARGIN:
+                    turn = best * 90
+            final = words if turn == 0 else ocr(turned.rotate(-turn, expand=True), lang, args.tessdata)[0]
+            recall = compare(app_filter(final), truth)[0]
+            ok = "ok" if turn == rot else "WRONG"
+            print(f"{name:<10} {rot:>5}  {f'{a}/{c}/{n}':>13} {'yes' if reads else 'no':>5}  {probes:>21}  {turn:>4} {ok:>5}  {recall:.0%}")
 
 
 if __name__ == "__main__":
