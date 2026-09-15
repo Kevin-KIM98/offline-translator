@@ -24,11 +24,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -46,6 +47,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.NoPhotography
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.StopCircle
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -69,6 +71,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -95,7 +98,8 @@ import kotlinx.coroutines.withContext
 /**
  * Photo translation: point the camera at a sign, a menu or a page (or pick a photo), say which of
  * the two languages the text is in, and the text is read on the phone and translated into the
- * other language. The result also joins the conversation, so it can be replayed or copied there.
+ * other language, painted over the photo where the text stands. The result also joins the
+ * conversation, so it can be replayed or copied there.
  */
 @Composable
 fun CameraScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit, onOpenAppSettings: () -> Unit) {
@@ -109,7 +113,8 @@ fun CameraScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit, onOpenAp
     var pickError by remember { mutableStateOf<String?>(null) }
     val imageFailed = stringResource(R.string.camera_image_failed)
     val cameraError = stringResource(R.string.err_camera)
-    val imageCapture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build() }
+    // Quality over latency: the letters' edges are what the recogniser reads.
+    val imageCapture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY).build() }
     val takePhoto: () -> Unit = {
         imageCapture.takePicture(ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageCapturedCallback() {
             override fun onCaptureSuccess(image: ImageProxy) {
@@ -230,58 +235,88 @@ fun CameraScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit, onOpenAp
                     CircularProgressIndicator(color = Color.White, strokeWidth = 3.dp, modifier = Modifier.size(36.dp))
                     Spacer(Modifier.height(14.dp))
                     Text(
-                        stringResource(if (phase.translating) R.string.translating else R.string.camera_reading),
+                        when {
+                            !phase.translating -> stringResource(R.string.camera_reading)
+                            phase.total > 1 -> stringResource(R.string.camera_translating_progress, phase.done, phase.total)
+                            else -> stringResource(R.string.translating)
+                        },
                         style = MaterialTheme.typography.bodyLarge,
                         color = Color.White,
                     )
                 }
             }
             is CameraPhase.Result -> {
+                var showOriginal by remember(phase) { mutableStateOf(false) }
+                var showText by remember(phase) { mutableStateOf(false) }
                 Column(Modifier.fillMaxSize()) {
-                    Box(Modifier.fillMaxWidth().weight(0.38f)) {
-                        Photo(phase.image)
-                        TopBar(onBack = leave)
+                    Box(Modifier.fillMaxWidth().weight(1f)) {
+                        TranslatedPhoto(phase.image, phase.texts, showOriginal)
+                        TopBar(onBack = leave) {
+                            FilterChip(
+                                selected = showOriginal,
+                                onClick = { showOriginal = !showOriginal },
+                                label = { Text(stringResource(R.string.camera_show_original)) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    containerColor = Color.Black.copy(alpha = 0.45f),
+                                    labelColor = Color.White,
+                                    selectedContainerColor = Color.White,
+                                    selectedLabelColor = Color.Black,
+                                ),
+                            )
+                        }
                     }
-                    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxWidth().weight(0.62f)) {
-                        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp).padding(top = 16.dp).navigationBarsPadding()) {
-                            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.navigationBarsPadding().padding(horizontal = 20.dp).padding(top = 12.dp)) {
+                            if (showText) {
+                                val none = stringResource(R.string.no_translation)
+                                Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
+                                    phase.texts.forEach { piece ->
+                                        Text(
+                                            piece.region.text,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        Spacer(Modifier.height(2.dp))
+                                        Text(
+                                            piece.translation.ifBlank { none },
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                        )
+                                        Spacer(Modifier.height(12.dp))
+                                    }
+                                }
+                            } else {
                                 Text(
-                                    stringResource(R.string.camera_recognized),
+                                    stringResource(R.string.camera_tap_hint),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Spacer(Modifier.height(4.dp))
-                                Text(
-                                    phase.turn.sourceText,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Spacer(Modifier.height(14.dp))
-                                Text(
-                                    phase.turn.translatedText.ifBlank { stringResource(R.string.no_translation) },
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                                Spacer(Modifier.height(10.dp))
-                                Text(
-                                    stringResource(
-                                        R.string.turn_footer,
-                                        Lang.of(phase.turn.sourceLang).name,
-                                        Lang.of(phase.turn.targetLang).name,
-                                        phase.turn.totalMs.toInt(),
-                                    ),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.outline,
-                                )
-                                Spacer(Modifier.height(12.dp))
                             }
-                            Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                stringResource(
+                                    R.string.turn_footer,
+                                    Lang.of(phase.turn.sourceLang).name,
+                                    Lang.of(phase.turn.targetLang).name,
+                                    phase.turn.totalMs.toInt(),
+                                ),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.outline,
+                            )
+                            Row(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                                 val speaking = state.speakingTurn == phase.turn.id
                                 IconButton(onClick = { if (speaking) vm.stopSpeaking() else vm.speakTurn(phase.turn) }) {
                                     Icon(
                                         if (speaking) Icons.Filled.StopCircle else Icons.Filled.VolumeUp,
                                         stringResource(if (speaking) R.string.stop_playback else R.string.replay),
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                IconButton(onClick = { showText = !showText }) {
+                                    Icon(
+                                        Icons.Filled.TextFields,
+                                        stringResource(R.string.camera_text_list),
+                                        tint = if (showText) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                                 Spacer(Modifier.width(4.dp))
@@ -378,16 +413,23 @@ private fun Photo(image: Bitmap) {
     )
 }
 
+/** Back arrow and title over the photo, on a shade so they read on a bright picture; [actions] at the end. */
 @Composable
-private fun TopBar(onBack: () -> Unit) {
+private fun TopBar(onBack: () -> Unit, actions: @Composable RowScope.() -> Unit = {}) {
     Row(
-        Modifier.fillMaxWidth().statusBarsPadding().padding(start = 4.dp, end = 16.dp, top = 4.dp),
+        Modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent)))
+            .statusBarsPadding()
+            .padding(start = 4.dp, end = 16.dp, top = 4.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onBack) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back), tint = Color.White)
         }
         Text(stringResource(R.string.camera_title), style = MaterialTheme.typography.titleMedium, color = Color.White)
+        Spacer(Modifier.weight(1f))
+        actions()
     }
 }
 

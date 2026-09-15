@@ -63,14 +63,18 @@ data class Turn(
     val fromImage: Boolean = false,
 )
 
+/** A piece of text read from a photo and its translation (blank when that piece failed). */
+data class PhotoText(val region: OcrRegion, val translation: String)
+
 /** What the camera screen shows. */
 sealed interface CameraPhase {
     data object Preview : CameraPhase
 
-    /** Reading the photo ([translating] false) or translating what was read (true). */
-    data class Working(val image: Bitmap, val translating: Boolean) : CameraPhase
+    /** Reading the photo ([translating] false) or translating what was read (true), [done] of [total] pieces. */
+    data class Working(val image: Bitmap, val translating: Boolean, val done: Int = 0, val total: Int = 0) : CameraPhase
 
-    data class Result(val image: Bitmap, val turn: Turn) : CameraPhase
+    /** Every piece of text in [image] with its translation, to be painted where the text stands. */
+    data class Result(val image: Bitmap, val turn: Turn, val texts: List<PhotoText>) : CameraPhase
 
     data class Failed(val image: Bitmap?, val message: String) : CameraPhase
 }
@@ -431,8 +435,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Reads the text in [image] (written in the language of [from]) and translates it into the
-     * other language, paragraph by paragraph so a sign's lines stay lines. The result joins the
-     * conversation like a typed sentence and is read aloud when speech is on.
+     * other language piece by piece, so each translation can be painted where its text stands. The
+     * result joins the conversation like a typed sentence and is read aloud when speech is on.
      */
     fun translateImage(image: Bitmap, from: Side) {
         val s = _state.value
@@ -450,31 +454,54 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val read = runCatching {
                 withContext(Dispatchers.Default) { OcrEngine.recognize(ocr.root, image, src, model.tessLang) }
             }
-            val text = read.getOrNull()
-            if (text == null) {
+            val regions = read.getOrNull()
+            if (regions == null) {
                 _state.update { it.copy(camera = CameraPhase.Failed(image, read.exceptionOrNull()?.message ?: str(R.string.err_ocr))) }
                 return@launch
             }
-            if (text.isBlank()) {
+            if (regions.isEmpty()) {
                 _state.update { it.copy(camera = CameraPhase.Failed(image, str(R.string.ocr_no_text))) }
                 return@launch
             }
-            _state.update { it.copy(camera = CameraPhase.Working(image, translating = true)) }
-            val out = ArrayList<String>()
+            _state.update { it.copy(camera = CameraPhase.Working(image, translating = true, done = 0, total = regions.size)) }
+            // The same text (a repeated label, a price heading) is translated once. A piece that
+            // fails stays uncovered on the photo; only when every piece fails is it an error.
+            val translations = HashMap<String, String>()
+            val texts = ArrayList<PhotoText>()
             var route: List<String> = emptyList()
             var ms = 0.0
-            for (paragraph in text.split('\n')) {
-                val r = session?.translate(paragraph, src, tgt)
-                if (r == null || !r.ok) {
-                    _state.update { it.copy(camera = CameraPhase.Failed(image, r?.error ?: str(R.string.err_translate))) }
-                    return@launch
+            var firstError: String? = null
+            for ((i, region) in regions.withIndex()) {
+                val translated = translations.getOrPut(region.text) {
+                    val r = session?.translate(OcrEngine.forTranslation(region.text, src), src, tgt)
+                    if (r != null && r.ok) {
+                        if (route.isEmpty()) route = r.route
+                        ms += r.totalMs
+                        r.translatedText.trim()
+                    } else {
+                        if (firstError == null) firstError = r?.error
+                        ""
+                    }
                 }
-                out += r.translatedText
-                if (route.isEmpty()) route = r.route
-                ms += r.totalMs
+                texts += PhotoText(region, translated)
+                _state.update { it.copy(camera = CameraPhase.Working(image, translating = true, done = i + 1, total = regions.size)) }
             }
-            val turn = Turn(nextTurnId++, from, text, src, out.joinToString("\n"), tgt, route, ms, fromImage = true)
-            _state.update { it.copy(turns = it.turns + turn, camera = CameraPhase.Result(image, turn)) }
+            if (texts.all { it.translation.isBlank() }) {
+                _state.update { it.copy(camera = CameraPhase.Failed(image, firstError ?: str(R.string.err_translate))) }
+                return@launch
+            }
+            val turn = Turn(
+                nextTurnId++,
+                from,
+                texts.joinToString("\n") { it.region.text },
+                src,
+                texts.map { it.translation }.filter { it.isNotBlank() }.joinToString("\n"),
+                tgt,
+                route,
+                ms,
+                fromImage = true,
+            )
+            _state.update { it.copy(turns = it.turns + turn, camera = CameraPhase.Result(image, turn, texts)) }
             if (_state.value.speak) speakTurn(turn)
         }
     }

@@ -160,10 +160,20 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   language id 40/40 both (`run_stt_eval.py --langs fr,ru`, ~1.2 s vs ~3.7 s per clip on the desktop).
 - **Photo translation (0.3.17, app only, unmeasured on a device).** Camera button on the
   conversation screen → `CameraScreen` (CameraX viewfinder or the gallery) → `OcrEngine`
-  (tesseract4android-openmp 4.9.0 from JitPack, `PSM_AUTO`, longest side scaled to 2000 px) →
-  `OcrEngine.tidy` joins a block's lines into one paragraph (no space for ja/zh/th, hyphenation
-  mended, Tesseract's spaces between CJK characters removed) → `TranslatorSession.translate` per
-  paragraph → a `Turn` with `fromImage`. Language files are Tesseract `tessdata_fast`
+  (tesseract4android-openmp 4.9.0 from JitPack = Tesseract 5.5.1, `PSM_AUTO`, tiled Otsu via
+  `thresholding_method=1`, longest side scaled to 2000 px) reads positioned words through the
+  result iterator, drops words under confidence 30 and lines under 45 (hand-picked, unmeasured)
+  and groups lines into `OcrRegion`s. Within a Tesseract paragraph a line continues the previous
+  one only when the heights match, the gap is small and it starts lower-case, follows `-`/`,`,
+  both lines are capitals, or the previous line ran to the paragraph's right edge; a line ending
+  in a digit or `.!?:;` ends the piece (before, a block's lines were joined into one sentence,
+  gluing menu items and sign lines together). Each region is translated on its own (repeated text
+  once) and `TranslatedPhoto` paints it over the photo: colour sampled around the box, the largest
+  font that fits, pinch/double-tap zoom, tap to uncover the original, "Original" toggle; the
+  `Turn` (`fromImage`) joins the regions with newlines. All-caps text of cased languages is
+  sentence-cased first (`OcrEngine.forTranslation`): 50 sign texts through the app's pairs came
+  out right 16 in capitals, 36 sentence-cased (en→ko 12→14/20, fr 1→7, es 0→8, ru 3→7 of 10;
+  `tests/eval/ocr_caps_eval.py`, judged by reading). Language files are Tesseract `tessdata_fast`
   (`ocr_<code>.traineddata` on `models-v1`, listed in the manifest's `ocr` array with the ISO
   code; `prepare_models.py manifest` emits it from `<root>/ocr`) and live in `files/ocr/tessdata`,
   downloaded by `OcrModels` on first use (sha256-checked), separate from the engine's store. The
