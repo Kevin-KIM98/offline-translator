@@ -2,6 +2,7 @@ package com.offlinetranslator.app
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.net.Uri
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -31,9 +32,17 @@ sealed interface Phase {
 
     /**
      * Models are missing; [pending] is what the chosen languages still need — or, with
-     * [everything], every model the manifest offers, so no later choice needs a download.
+     * [everything], every model the manifest offers plus the text-recognition files for photo
+     * translation ([ocrPending]), so no later choice needs a download.
      */
-    data class Setup(val pending: List<ModelStatus>, val error: String? = null, val everything: Boolean = false) : Phase
+    data class Setup(
+        val pending: List<ModelStatus>,
+        val error: String? = null,
+        val everything: Boolean = false,
+        val ocrPending: List<OcrModel> = emptyList(),
+    ) : Phase {
+        val totalBytes: Long get() = pending.sumOf { it.totalBytes } + ocrPending.sumOf { it.sizeBytes }
+    }
 
     data class Downloading(
         val label: String,
@@ -73,6 +82,9 @@ data class PhotoText(val region: OcrRegion, val translation: String, val kept: B
 /** What the camera screen shows. */
 sealed interface CameraPhase {
     data object Preview : CameraPhase
+
+    /** A picked photo is being opened and scaled. */
+    data object Loading : CameraPhase
 
     /** Reading the photo ([translating] false) or translating what was read (true). */
     data class Working(val image: Bitmap, val translating: Boolean) : CameraPhase
@@ -200,22 +212,26 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (_state.value.backend == TranslationBackend.LLM) LlmMode.ALWAYS else LlmMode.IF_NEEDED
 
     fun download() {
-        val pending = (_state.value.phase as? Phase.Setup)?.pending ?: return
-        val total = pending.sumOf { it.totalBytes }
+        val setup = _state.value.phase as? Phase.Setup ?: return
+        val pending = setup.pending
+        val ocrPending = setup.ocrPending
+        if (pending.isEmpty() && ocrPending.isEmpty()) return
+        val total = setup.totalBytes
         downloadJob?.cancel()
         downloadJob = viewModelScope.launch {
             val repository = repo ?: return@launch
             val free = withContext(Dispatchers.IO) { repository.freeBytes() }
             if (free < total + 50L * 1024 * 1024) {
                 _state.update {
-                    it.copy(phase = Phase.Setup(pending, str(R.string.err_storage, mb(total))))
+                    it.copy(phase = setup.copy(error = str(R.string.err_storage, mb(total))))
                 }
                 return@launch
             }
-            _state.update { it.copy(phase = Phase.Downloading(label(pending.first()), 0, total)) }
+            val firstLabel = pending.firstOrNull()?.let { label(it) } ?: ocrLabel(ocrPending.first())
+            _state.update { it.copy(phase = Phase.Downloading(firstLabel, 0, total)) }
             var completed = 0L
             var failure: String? = null
-            runCatching {
+            if (pending.isNotEmpty()) runCatching {
                 repository.installAll(pending).collect { ev ->
                     when (ev) {
                         is InstallEvent.Started ->
@@ -232,15 +248,31 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }.onFailure { e -> failure = e.message ?: str(R.string.err_download_failed) }
 
+            // The text-recognition files ("download everything"): a few MB each, after the models.
+            for (model in ocrPending) {
+                if (failure != null) break
+                val name = ocrLabel(model)
+                _state.update { it.copy(phase = Phase.Downloading(name, completed, total)) }
+                runCatching {
+                    ocr.install(model) { done, _ ->
+                        _state.update { it.copy(phase = Phase.Downloading(name, completed + done, total)) }
+                    }
+                }.onFailure { e -> failure = "$name: ${e.message ?: str(R.string.err_download_failed)}" }
+                completed += model.sizeBytes
+            }
+            refreshOcr()
+
             val err = failure
             if (err != null) {
-                _state.update { it.copy(phase = Phase.Setup(pending, err)) }
+                _state.update { it.copy(phase = setup.copy(error = err)) }
             } else {
                 prefs.setupDone = true
                 openSession()
             }
         }
     }
+
+    private fun ocrLabel(m: OcrModel): String = str(R.string.ocr_model_title, Lang.of(m.lang).name)
 
     fun cancelDownload() {
         downloadJob?.cancel()
@@ -258,19 +290,26 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Every model the manifest offers — both speech models, every translation pair, both LLMs —
-     * in one download, so changing languages or models later never waits for the network. The
-     * setup screen lists them with the total size and asks before starting.
+     * and every text-recognition file for photo translation, in one download, so changing
+     * languages or models later never waits for the network. The setup screen lists them with
+     * the total size and asks before starting.
      */
     fun downloadEverything() {
         viewModelScope.launch {
             val pending = withContext(Dispatchers.IO) { runCatching { repo?.status() }.getOrNull() }
                 ?.filter { it.needsDownload } ?: emptyList()
-            if (pending.isEmpty()) {
+            val ocrPending = withContext(Dispatchers.IO) {
+                val catalog = ocr.catalog()
+                catalog.filterNot { ocr.isInstalled(it) }
+            }
+            if (pending.isEmpty() && ocrPending.isEmpty()) {
                 showMessage(str(R.string.all_models_installed))
                 return@launch
             }
             pauseMic()
-            _state.update { it.copy(phase = Phase.Setup(pending, everything = true), handsFree = false, listening = null) }
+            _state.update {
+                it.copy(phase = Phase.Setup(pending, everything = true, ocrPending = ocrPending), handsFree = false, listening = null)
+            }
         }
     }
 
@@ -376,8 +415,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** Manual mode: talk button released. */
     fun stopTalking() {
         if (_state.value.listening == null) return
-        session?.stop()
+        // The indicator goes on first: stop() flushes the audio and, when the press held no
+        // speech (a tap on the button), reports it through onNoSpeech at once — which used to
+        // fire before the indicator was switched on, leaving "translating" on for good.
         _state.update { it.copy(listening = null, working = true, level = 0f) }
+        session?.stop()
     }
 
     // Deliberately not persisted: the microphone should never open on launch by itself.
@@ -465,8 +507,34 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * button passes false, since the user has chosen how the photo stands.
      */
     fun translateImage(image: Bitmap, from: Side, findOrientation: Boolean = true) {
+        if (_state.value.phase != Phase.Ready) return
+        ocrJob?.cancel()
+        ocrJob = viewModelScope.launch { readAndTranslate(image, from, findOrientation) }
+    }
+
+    /**
+     * A photo picked from the gallery: opened and scaled off the main thread (a 50 MP photo, a
+     * HEIC or a cloud-backed picture can take seconds), then read like a photo just taken. When
+     * it cannot be opened the failure screen says why, so it can be reported.
+     */
+    fun openImage(uri: Uri, from: Side) {
+        if (_state.value.phase != Phase.Ready) return
+        ocrJob?.cancel()
+        ocrJob = viewModelScope.launch {
+            _state.update { it.copy(camera = CameraPhase.Loading) }
+            val decoded = runCatching { withContext(Dispatchers.IO) { PhotoFiles.load(getApplication<Application>(), uri) } }
+            val bitmap = decoded.getOrNull()
+            if (bitmap == null) {
+                val why = decoded.exceptionOrNull()?.let { e -> "${e.javaClass.simpleName}: ${e.message ?: ""}" }.orEmpty()
+                _state.update { it.copy(camera = CameraPhase.Failed(null, str(R.string.camera_image_failed_detail, why))) }
+                return@launch
+            }
+            readAndTranslate(bitmap, from, findOrientation = true)
+        }
+    }
+
+    private suspend fun readAndTranslate(image: Bitmap, from: Side, findOrientation: Boolean) {
         val s = _state.value
-        if (s.phase != Phase.Ready) return
         val src = if (from == Side.A) s.langA else s.langB
         val tgt = if (from == Side.A) s.langB else s.langA
         cameraSide = from
@@ -475,8 +543,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(camera = CameraPhase.Failed(image, str(R.string.ocr_not_installed, Lang.of(src).name))) }
             return
         }
-        ocrJob?.cancel()
-        ocrJob = viewModelScope.launch {
+        run {
             _state.update { it.copy(camera = CameraPhase.Working(image, translating = false)) }
             val ocrStart = SystemClock.elapsedRealtime()
             val read = runCatching {
@@ -486,14 +553,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val page = read.getOrNull()
             if (page == null) {
                 _state.update { it.copy(camera = CameraPhase.Failed(image, read.exceptionOrNull()?.message ?: str(R.string.err_ocr))) }
-                return@launch
+                return@run
             }
             // The photo as it was read: turned upright when it was sideways.
             val image = page.image
             val regions = page.regions
             if (regions.isEmpty()) {
                 _state.update { it.copy(camera = CameraPhase.Failed(image, str(R.string.ocr_no_text))) }
-                return@launch
+                return@run
             }
             _state.update { it.copy(camera = CameraPhase.Working(image, translating = true)) }
             // Codes, dates, prices and phone numbers are not language and came back from Marian
@@ -533,7 +600,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
             if (distinct.isNotEmpty() && texts.all { it.translation.isBlank() }) {
                 _state.update { it.copy(camera = CameraPhase.Failed(image, error ?: str(R.string.err_translate))) }
-                return@launch
+                return@run
             }
             val turn = Turn(
                 nextTurnId++,

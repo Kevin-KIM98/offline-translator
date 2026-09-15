@@ -1,4 +1,5 @@
 #include "translator/NmtEngine.hpp"
+#include "translator/TextUtil.hpp"
 
 #include "translator/FileUtil.hpp"
 #include "translator/MiniJson.hpp"
@@ -359,13 +360,23 @@ bool NmtEngine::translateDirect(const std::string& text, const std::string& src,
             lineOf.push_back(i);
         }
     }
+    // A bare greeting Marian gets wrong ("안녕하세요." → "Good evening.") has a fixed answer and
+    // stays out of the batch; everything else goes to CTranslate2.
+    std::vector<std::string> translated(sentences.size());
+    std::vector<std::size_t> toModel;
     std::vector<std::vector<std::string>> batch;
     batch.reserve(sentences.size());
-    for (const auto& s : sentences) batch.push_back(impl_->encode(p, s));
+    for (std::size_t i = 0; i < sentences.size(); ++i) {
+        translated[i] = text::fixedTranslation(sentences[i], src, tgt);
+        if (translated[i].empty()) {
+            toModel.push_back(i);
+            batch.push_back(impl_->encode(p, sentences[i]));
+        }
+    }
 
-    std::vector<std::string> translated;
+    std::vector<std::string> modelOut;
 #if TRANSLATOR_HAS_CTRANSLATE2
-    try {
+    if (!batch.empty()) try {
         ctranslate2::TranslationOptions opts;
         opts.beam_size = static_cast<std::size_t>(impl_->beamSize);
         opts.max_decoding_length = static_cast<std::size_t>(impl_->maxDecodingLength);
@@ -382,29 +393,22 @@ bool NmtEngine::translateDirect(const std::string& text, const std::string& src,
 
         const auto results = prefixes.empty() ? p.translator->translate_batch(batch, opts)
                                               : p.translator->translate_batch(batch, prefixes, opts);
-        for (const auto& r : results) translated.push_back(impl_->decode(p, r.output()));
+        for (const auto& r : results) modelOut.push_back(impl_->decode(p, r.output()));
     } catch (const std::exception& e) {
         if (error) *error = std::string("CTranslate2 translate failed: ") + e.what();
         return false;
     }
 #else
     // Stub build: echo the tokens back so the pipeline can be exercised end-to-end.
-    for (const auto& tokens : batch) translated.push_back("[" + pairName(src, tgt) + "] " + impl_->decode(p, tokens));
+    for (const auto& tokens : batch) modelOut.push_back("[" + pairName(src, tgt) + "] " + impl_->decode(p, tokens));
 #endif
+    for (std::size_t k = 0; k < modelOut.size() && k < toModel.size(); ++k) translated[toModel[k]] = std::move(modelOut[k]);
 
     const std::string sep = isCjk(tgt) ? "" : " ";
     std::vector<std::string> outLines(lines.size());
     for (std::size_t i = 0; i < translated.size() && i < lineOf.size(); ++i) {
         std::string t = trim(translated[i]);
         if (t.empty()) continue;
-        if (tgt == "ko") {
-            // Marian renders a bare "Hello." as the phone greeting "여보세요?"; in conversation
-            // the face-to-face greeting is meant.
-            std::string lowerSrc;
-            for (const char c : sentences[i]) lowerSrc.push_back(static_cast<char>((c >= 'A' && c <= 'Z') ? c - 'A' + 'a' : c));
-            const bool greeting = lowerSrc == "hello." || lowerSrc == "hello" || lowerSrc == "hello!" || lowerSrc == "hi." || lowerSrc == "hi" || lowerSrc == "hi!";
-            if (greeting && t.find("\xEC\x97\xAC\xEB\xB3\xB4\xEC\x84\xB8\xEC\x9A\x94") == 0) t = "\xEC\x95\x88\xEB\x85\x95\xED\x95\x98\xEC\x84\xB8\xEC\x9A\x94.";
-        }
         if (isCjk(tgt)) {
             // Some ja/zh models drop sentence-final punctuation; restore it from the source
             // sentence so consecutive sentences don't run together ("こんにちはいい天気だ").

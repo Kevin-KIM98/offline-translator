@@ -3,7 +3,6 @@ package com.offlinetranslator.app.ui
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.ImageDecoder
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -68,6 +67,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -106,13 +106,12 @@ import kotlinx.coroutines.withContext
 fun CameraScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit, onOpenAppSettings: () -> Unit) {
     val context = LocalContext.current
     val speakers = LocalSpeakerColors.current
-    var side by remember { mutableStateOf(Side.A) }
+    var side by rememberSaveable { mutableStateOf(Side.A) }
     var granted by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
     val requestCamera = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted = it }
     var pickError by remember { mutableStateOf<String?>(null) }
-    val imageFailed = stringResource(R.string.camera_image_failed)
     val cameraError = stringResource(R.string.err_camera)
     // Quality over latency: the letters' edges are what the recogniser reads.
     val imageCapture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY).build() }
@@ -136,19 +135,10 @@ fun CameraScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit, onOpenAp
     }
     BackHandler(onBack = leave)
 
-    // Decoding through ImageDecoder applies the photo's EXIF rotation; a software bitmap is
-    // needed because Tesseract reads the pixels.
+    // The picked photo is opened off the main thread by the view model (PhotoFiles): decoding a
+    // large photo here blocked the screen, and a decoder failure said nothing about why.
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        val bitmap = runCatching {
-            ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) { decoder, info, _ ->
-                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                decoder.isMutableRequired = false
-                val longest = maxOf(info.size.width, info.size.height)
-                if (longest > 2400) decoder.setTargetSampleSize(longest / 2000)
-            }
-        }.getOrNull()
-        if (bitmap == null) pickError = imageFailed else vm.translateImage(OcrEngine.prepare(bitmap), side)
+        if (uri != null) vm.openImage(uri, side)
     }
 
     val srcLang = if (side == Side.A) state.langA else state.langB
@@ -224,6 +214,17 @@ fun CameraScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit, onOpenAp
                             )
                         }
                     }
+                }
+            }
+            is CameraPhase.Loading -> {
+                TopBar(onBack = leave)
+                Column(
+                    Modifier.align(Alignment.Center).background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(18.dp)).padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    CircularProgressIndicator(color = Color.White, strokeWidth = 3.dp, modifier = Modifier.size(36.dp))
+                    Spacer(Modifier.height(14.dp))
+                    Text(stringResource(R.string.camera_opening), style = MaterialTheme.typography.bodyLarge, color = Color.White)
                 }
             }
             is CameraPhase.Working -> {

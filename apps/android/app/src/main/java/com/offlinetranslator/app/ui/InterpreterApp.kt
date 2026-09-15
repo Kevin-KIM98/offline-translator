@@ -17,7 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,8 +39,11 @@ fun InterpreterApp(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val mic by micGranted.collectAsStateWithLifecycle()
-    var showSettings by remember { mutableStateOf(false) }
-    var showCamera by remember { mutableStateOf(false) }
+    // Saved across an activity recreation: the gallery picker returns its photo to a recreated
+    // activity when the app was dropped from memory behind it, and the camera screen must be
+    // back in place to receive it.
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showCamera by rememberSaveable { mutableStateOf(false) }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         // Settings stays reachable during setup so the languages can be changed before a
