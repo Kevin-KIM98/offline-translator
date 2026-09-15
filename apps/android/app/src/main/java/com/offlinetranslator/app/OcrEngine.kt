@@ -115,6 +115,39 @@ object OcrEngine {
         return text.lowercase(locale).replaceFirstChar { it.titlecase(locale) }
     }
 
+    /**
+     * Whether [text] is language rather than a code, a date, a price or a phone number
+     * ("10SEP26 B0066", "DL/CC", "$ 42.600", "387 4217474"): Marian answered those with invented
+     * words, so they stay as they are. Language has a run of two or more letters with no digit
+     * in it and more letters than digits.
+     */
+    fun isTranslatable(text: String, lang: String): Boolean {
+        var letters = 0
+        var digits = 0
+        var word = false
+        var run = 0
+        var runHasDigit = false
+        fun endRun() {
+            if (run >= 2 && !runHasDigit) word = true
+            run = 0
+            runHasDigit = false
+        }
+        for (c in text) {
+            val type = Character.getType(c)
+            when {
+                c.isLetter() -> { letters++; run++ }
+                c.isDigit() -> { digits++; run++; runHasDigit = true }
+                // Vowel signs and tone marks (Thai, Vietnamese) belong to the letter before them.
+                type == Character.NON_SPACING_MARK.toInt() || type == Character.COMBINING_SPACING_MARK.toInt() -> {}
+                c == '\'' || c == '’' -> {}
+                else -> endRun()
+            }
+        }
+        endRun()
+        if (lang in unspaced) return letters >= 2 && letters > digits
+        return word && letters > digits
+    }
+
     private class Word(val text: String, val confidence: Float, val box: Rect)
 
     /** A recognised text line; [para] numbers Tesseract's paragraphs across the page. */

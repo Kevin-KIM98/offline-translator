@@ -2,6 +2,7 @@ package com.offlinetranslator.app
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.offlinetranslator.InstallEvent
@@ -63,18 +64,24 @@ data class Turn(
     val fromImage: Boolean = false,
 )
 
-/** A piece of text read from a photo and its translation (blank when that piece failed). */
-data class PhotoText(val region: OcrRegion, val translation: String)
+/**
+ * A piece of text read from a photo and its translation: blank when that piece failed, or when it
+ * is [kept] as it is because it is a code, a number or a price rather than language.
+ */
+data class PhotoText(val region: OcrRegion, val translation: String, val kept: Boolean = false)
 
 /** What the camera screen shows. */
 sealed interface CameraPhase {
     data object Preview : CameraPhase
 
-    /** Reading the photo ([translating] false) or translating what was read (true), [done] of [total] pieces. */
-    data class Working(val image: Bitmap, val translating: Boolean, val done: Int = 0, val total: Int = 0) : CameraPhase
+    /** Reading the photo ([translating] false) or translating what was read (true). */
+    data class Working(val image: Bitmap, val translating: Boolean) : CameraPhase
 
-    /** Every piece of text in [image] with its translation, to be painted where the text stands. */
-    data class Result(val image: Bitmap, val turn: Turn, val texts: List<PhotoText>) : CameraPhase
+    /**
+     * Every piece of text in [image] with its translation, to be painted where the text stands;
+     * [ocrMs] reading the photo and [nmtMs] translating it.
+     */
+    data class Result(val image: Bitmap, val turn: Turn, val texts: List<PhotoText>, val ocrMs: Double, val nmtMs: Double) : CameraPhase
 
     data class Failed(val image: Bitmap?, val message: String) : CameraPhase
 }
@@ -97,11 +104,16 @@ data class UiState(
     val backend: TranslationBackend = TranslationBackend.AUTO,
     val message: String? = null,
     val installed: List<ModelStatus> = emptyList(),
-    /** Chosen LLM id, null for the manifest's default; every LLM the manifest offers. */
+    /**
+     * The LLM in use (picked by [ModelPolicy] from the languages when [llmAuto], else the user's
+     * choice), null for the manifest's default; every LLM the manifest offers.
+     */
     val llmId: String? = null,
+    val llmAuto: Boolean = true,
     val llmOptions: List<ModelStatus> = emptyList(),
-    /** Chosen speech model id, null for the manifest's default; every whisper model the manifest offers. */
+    /** The speech model in use (as [llmId]); every whisper model the manifest offers. */
     val sttId: String? = null,
+    val sttAuto: Boolean = true,
     val sttOptions: List<ModelStatus> = emptyList(),
     /** Whisper on the GPU (experimental). */
     val useGpu: Boolean = false,
@@ -124,8 +136,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             speak = prefs.speak,
             speechRate = prefs.speechRate,
             backend = prefs.backend,
-            llmId = prefs.llmId,
-            sttId = prefs.sttId,
+            llmId = if (prefs.llmAuto) ModelPolicy.llmFor(listOf(prefs.langA, prefs.langB), prefs.roomy) else prefs.llmId,
+            llmAuto = prefs.llmAuto,
+            sttId = if (prefs.sttAuto) ModelPolicy.sttFor(listOf(prefs.langA, prefs.langB), prefs.roomy) else prefs.sttId,
+            sttAuto = prefs.sttAuto,
             useGpu = prefs.useGpu,
         )
     )
@@ -156,8 +170,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             prefs.gpuTrialPending = false
             _state.update { it.copy(useGpu = false, message = str(R.string.gpu_disabled_after_crash)) }
         }
+        // The languages may have changed since the models were picked.
+        _state.update {
+            it.copy(
+                phase = Phase.Checking,
+                sttId = if (it.sttAuto) ModelPolicy.sttFor(it.langs, prefs.roomy) else it.sttId,
+                llmId = if (it.llmAuto) ModelPolicy.llmFor(it.langs, prefs.roomy) else it.llmId,
+            )
+        }
         viewModelScope.launch {
-            _state.update { it.copy(phase = Phase.Checking) }
             val r = runCatching {
                 withContext(Dispatchers.IO) {
                     val repository = repo ?: ModelRepository(getApplication<Application>()).also { repo = it }
@@ -457,9 +478,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         ocrJob?.cancel()
         ocrJob = viewModelScope.launch {
             _state.update { it.copy(camera = CameraPhase.Working(image, translating = false)) }
+            val ocrStart = SystemClock.elapsedRealtime()
             val read = runCatching {
                 withContext(Dispatchers.Default) { OcrEngine.recognize(ocr.root, image, src, model.tessLang, findOrientation) }
             }
+            val ocrMs = (SystemClock.elapsedRealtime() - ocrStart).toDouble()
             val page = read.getOrNull()
             if (page == null) {
                 _state.update { it.copy(camera = CameraPhase.Failed(image, read.exceptionOrNull()?.message ?: str(R.string.err_ocr))) }
@@ -472,31 +495,44 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(camera = CameraPhase.Failed(image, str(R.string.ocr_no_text))) }
                 return@launch
             }
-            _state.update { it.copy(camera = CameraPhase.Working(image, translating = true, done = 0, total = regions.size)) }
-            // The same text (a repeated label, a price heading) is translated once. A piece that
+            _state.update { it.copy(camera = CameraPhase.Working(image, translating = true)) }
+            // Codes, dates, prices and phone numbers are not language and came back from Marian
+            // as invented words: they stay as they are. The same text (a repeated label) is
+            // translated once, and all the pieces go to the engine in one batch. A piece that
             // fails stays uncovered on the photo; only when every piece fails is it an error.
+            val distinct = regions.map { it.text }.filter { OcrEngine.isTranslatable(it, src) }.distinct()
+            val nmtStart = SystemClock.elapsedRealtime()
             val translations = HashMap<String, String>()
-            val texts = ArrayList<PhotoText>()
             var route: List<String> = emptyList()
-            var ms = 0.0
-            var firstError: String? = null
-            for ((i, region) in regions.withIndex()) {
-                val translated = translations.getOrPut(region.text) {
-                    val r = session?.translate(OcrEngine.forTranslation(region.text, src), src, tgt)
-                    if (r != null && r.ok) {
-                        if (route.isEmpty()) route = r.route
-                        ms += r.totalMs
-                        r.translatedText.trim()
-                    } else {
-                        if (firstError == null) firstError = r?.error
-                        ""
+            var error: String? = null
+            if (distinct.isNotEmpty()) {
+                val sources = distinct.map { OcrEngine.forTranslation(it, src) }
+                // An engine without the batch call (an app updated ahead of its engine) throws
+                // UnsatisfiedLinkError; the pieces then go one by one.
+                val batch = runCatching { session?.translateLines(sources, src, tgt) }.getOrNull()
+                val lines = batch?.takeIf { it.ok }?.lines?.takeIf { it.size == sources.size }
+                if (lines != null) {
+                    distinct.forEachIndexed { i, text -> translations[text] = lines[i].trim() }
+                    route = batch.route
+                } else {
+                    if (batch != null && !batch.ok) error = batch.error
+                    for ((i, text) in distinct.withIndex()) {
+                        val r = session?.translate(sources[i], src, tgt)
+                        if (r != null && r.ok) {
+                            translations[text] = r.translatedText.trim()
+                            if (route.isEmpty()) route = r.route
+                        } else if (error == null) {
+                            error = r?.error
+                        }
                     }
                 }
-                texts += PhotoText(region, translated)
-                _state.update { it.copy(camera = CameraPhase.Working(image, translating = true, done = i + 1, total = regions.size)) }
             }
-            if (texts.all { it.translation.isBlank() }) {
-                _state.update { it.copy(camera = CameraPhase.Failed(image, firstError ?: str(R.string.err_translate))) }
+            val nmtMs = (SystemClock.elapsedRealtime() - nmtStart).toDouble()
+            val texts = regions.map { region ->
+                PhotoText(region, translations[region.text].orEmpty(), kept = region.text !in distinct)
+            }
+            if (distinct.isNotEmpty() && texts.all { it.translation.isBlank() }) {
+                _state.update { it.copy(camera = CameraPhase.Failed(image, error ?: str(R.string.err_translate))) }
                 return@launch
             }
             val turn = Turn(
@@ -507,10 +543,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 texts.map { it.translation }.filter { it.isNotBlank() }.joinToString("\n"),
                 tgt,
                 route,
-                ms,
+                ocrMs + nmtMs,
                 fromImage = true,
             )
-            _state.update { it.copy(turns = it.turns + turn, camera = CameraPhase.Result(image, turn, texts)) }
+            _state.update { it.copy(turns = it.turns + turn, camera = CameraPhase.Result(image, turn, texts, ocrMs, nmtMs)) }
             if (_state.value.speak) speakTurn(turn)
         }
     }
@@ -613,23 +649,37 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         boot()
     }
 
-    /** Switches the speech model. One that is not installed yet goes through the normal download screen. */
+    /**
+     * Switches the speech model: [id] null leaves the choice to [ModelPolicy]. One that is not
+     * installed yet goes through the normal download screen.
+     */
     fun setStt(id: String?) {
-        if (id == _state.value.sttId) return
-        prefs.sttId = id
+        val s = _state.value
+        val auto = id == null
+        val effective = id ?: ModelPolicy.sttFor(s.langs, prefs.roomy)
+        prefs.sttAuto = auto
+        if (!auto) prefs.sttId = id
+        if (auto == s.sttAuto && effective == s.sttId) return
         pauseMic()
-        _state.update { it.copy(sttId = id) }
+        _state.update { it.copy(sttAuto = auto, sttId = effective) }
         boot()
     }
 
-    /** Switches the LLM. One that is not installed yet goes through the normal download screen. */
+    /** Switches the LLM, as [setStt] does the speech model. */
     fun setLlm(id: String?) {
-        if (id == _state.value.llmId) return
-        prefs.llmId = id
+        val s = _state.value
+        val auto = id == null
+        val effective = id ?: ModelPolicy.llmFor(s.langs, prefs.roomy)
+        prefs.llmAuto = auto
+        if (!auto) prefs.llmId = id
+        if (auto == s.llmAuto && effective == s.llmId) return
         pauseMic()
-        _state.update { it.copy(llmId = id) }
+        _state.update { it.copy(llmAuto = auto, llmId = effective) }
         boot()
     }
+
+    /** The language that makes the automatic choice pick whisper medium for the current pair, null when it picks small. */
+    fun autoSttReason(): String? = ModelPolicy.sttReason(_state.value.langs, prefs.roomy)
 
     fun clearConversation() {
         stopSpeaking()

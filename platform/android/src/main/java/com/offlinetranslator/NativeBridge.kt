@@ -42,6 +42,7 @@ object NativeBridge {
     external fun pipelineDiscardAudio(handle: Long)
     external fun pipelineTranscribe(handle: Long, pcm: FloatArray, sourceLang: String): String
     external fun pipelineTranslateText(handle: Long, text: String, sourceLang: String, targetLang: String): String
+    external fun pipelineTranslateLines(handle: Long, text: String, sourceLang: String, targetLang: String): String
     external fun pipelineProcessSpeech(handle: Long, pcm: FloatArray, sourceLang: String, targetLang: String): String
     external fun pipelinePreloadPair(handle: Long, src: String, tgt: String): Boolean
     external fun pipelineUnloadPair(handle: Long, src: String, tgt: String)

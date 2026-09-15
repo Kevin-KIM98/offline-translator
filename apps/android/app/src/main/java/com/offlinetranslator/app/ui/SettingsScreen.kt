@@ -169,30 +169,16 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
                 Spacer(Modifier.height(20.dp))
                 SectionLabel(stringResource(R.string.settings_stt))
                 Card {
-                    val selectedId = state.sttId ?: state.sttOptions.first().id
-                    state.sttOptions.forEachIndexed { i, m ->
-                        val choice = m.id
-                        if (i > 0) Divider()
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable { vm.setStt(choice) }
-                                .padding(start = 16.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(m.label.ifBlank { m.id }, style = MaterialTheme.typography.bodyLarge)
-                                Text(
-                                    mb(m.totalBytes) + " · " + stringResource(
-                                        if (m.state == ModelState.READY) R.string.llm_installed else R.string.llm_not_installed
-                                    ),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            RadioButton(selected = m.id == selectedId, onClick = { vm.setStt(choice) })
-                        }
-                    }
+                    val now = state.sttOptions.firstOrNull { it.id == state.sttId }?.label?.ifBlank { null } ?: state.sttId.orEmpty()
+                    val reason = vm.autoSttReason()
+                    ModelChoices(
+                        options = state.sttOptions,
+                        selectedId = state.sttId,
+                        auto = state.sttAuto,
+                        autoNow = if (reason != null) stringResource(R.string.model_auto_now_for, now, Lang.of(reason).name)
+                                  else stringResource(R.string.model_auto_now, now),
+                        onPick = vm::setStt,
+                    )
                     Divider()
                     Text(
                         stringResource(R.string.settings_stt_desc),
@@ -207,30 +193,15 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit) {
                 Spacer(Modifier.height(20.dp))
                 SectionLabel(stringResource(R.string.settings_llm))
                 Card {
-                    val selectedId = state.llmId ?: state.llmOptions.first().id
-                    state.llmOptions.forEachIndexed { i, m ->
-                        val choice = m.id
-                        if (i > 0) Divider()
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable { vm.setLlm(choice) }
-                                .padding(start = 16.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(m.label.ifBlank { m.id }, style = MaterialTheme.typography.bodyLarge)
-                                Text(
-                                    mb(m.totalBytes) + " · " + stringResource(
-                                        if (m.state == ModelState.READY) R.string.llm_installed else R.string.llm_not_installed
-                                    ),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            RadioButton(selected = m.id == selectedId, onClick = { vm.setLlm(choice) })
-                        }
-                    }
+                    val now = state.llmOptions.firstOrNull { it.id == state.llmId }?.label?.ifBlank { null } ?: state.llmId.orEmpty()
+                    ModelChoices(
+                        options = state.llmOptions,
+                        selectedId = state.llmId,
+                        auto = state.llmAuto,
+                        autoNow = if ("th" in state.langs) stringResource(R.string.model_auto_now_for, now, Lang.of("th").name)
+                                  else stringResource(R.string.model_auto_now_unused, now),
+                        onPick = vm::setLlm,
+                    )
                     Divider()
                     Text(
                         stringResource(R.string.settings_llm_desc),
@@ -407,6 +378,56 @@ private fun BackendChip(
     onPick: (TranslationBackend) -> Unit,
 ) {
     FilterChip(selected = current == value, onClick = { onPick(value) }, label = { Text(label) })
+}
+
+/**
+ * A model list with "Automatic" on top: [auto] means the app picks from the languages, and
+ * [autoNow] says what it picked; a tapped model becomes the user's fixed choice (null = automatic).
+ */
+@Composable
+private fun ModelChoices(
+    options: List<com.offlinetranslator.ModelStatus>,
+    selectedId: String?,
+    auto: Boolean,
+    autoNow: String,
+    onPick: (String?) -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable { onPick(null) }
+            .padding(start = 16.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.model_auto), style = MaterialTheme.typography.bodyLarge)
+            Text(autoNow, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        RadioButton(selected = auto, onClick = { onPick(null) })
+    }
+    options.forEach { m ->
+        val choice = m.id
+        Divider()
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable { onPick(choice) }
+                .padding(start = 16.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(m.label.ifBlank { m.id }, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    mb(m.totalBytes) + " · " + stringResource(
+                        if (m.state == ModelState.READY) R.string.llm_installed else R.string.llm_not_installed
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            RadioButton(selected = !auto && m.id == selectedId, onClick = { onPick(choice) })
+        }
+    }
 }
 
 @Composable

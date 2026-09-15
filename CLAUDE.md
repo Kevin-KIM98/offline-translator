@@ -109,6 +109,15 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   to small + 1.5B; the settings radios store explicit ids now (null used to mean "manifest
   default", which the app default no longer equals). The manifest's own `stt`/`llm` defaults are
   unchanged for library consumers.
+- **Automatic model choice (0.3.17, app only).** `ModelPolicy` picks per conversation pair when
+  Settings says "Automatic" (`Prefs.sttAuto/llmAuto`, default on; a tapped model fixes it):
+  whisper small unless a language of the pair is in `MEDIUM_LANGS` (th, vi, fr, ja, zh, id) and the
+  phone has ≥ 7.5 GB, Qwen 3B only when th is in the pair (1.5B otherwise: no other direction uses
+  the LLM). Basis, app-path CER small → medium on the 20-clip sets: ko 0.0/–, en 0.0/–, es 0.1/–,
+  ru 0.3/0.4, th 14.5/9.1, vi 3.9/0.8, fr 3.7/0.0, ja 2.1/0.0, zh 2.7/0.4, id 3.5/2.4
+  (`run_stt_eval.py --configs app --langs ja,zh,id [--whisper medium]`, 2026-09-15; desktop
+  ~1.2 s vs ~2.9 s per clip). `boot()` re-evaluates the policy, so a language change downloads
+  and opens the model it calls for.
 - **Several speech models (0.3.10).** The manifest's `stt` is the default (whisper small) and
   `stt_options` adds whisper medium (`stt_whisper-medium-q5_0.bin` on `models-v1`, label "Whisper
   medium"); same rules as `llm_options`, never turn `stt` into an array. Selected by id (`sttId` in
@@ -138,7 +147,11 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   `SttEngine::detectLanguage` encodes 5 s / 256 positions: −0.1–0.4 s per auto utterance,
   identification unchanged. `TranslatorSession.start` preloads the route(s) (`preloadPair` loads
   every hop). Tried and dropped: whisper beam 3 (th/vi worse for 11% speed), flash attention on
-  CPU (no change), `large-v3-turbo` (repeats). `ko-en` is tc-big since 0.3.13 (manifest 1.6.0,
+  CPU (no change), `large-v3-turbo` (repeats), Marian beam 2 or 1 (2026-09-15, ko→en tc-big on
+  the 40 sentences of the Thai sets against their English references, desktop: beam 4 chrF 60.0
+  at 471 ms median, beam 2 59.1 at 416 ms, beam 1 54.7 at 412 ms — the encoder and the call
+  cost most of the time, so a narrower beam buys little; Marian time is only cut by batching
+  several sentences into one call, as photo translation does). `ko-en` is tc-big since 0.3.13 (manifest 1.6.0,
   entry version 2 → devices re-download it): chrF 59.1 → 62.9 / 44.2 → 53.9 against English
   references, 420 vs 233 ms per sentence; converted from pouta with `vocab_to_yml` (the .vocab
   files are one token per line) + `ctranslate2.converters.marian`, py -3.11.
@@ -177,10 +190,22 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   one only when the heights match, the gap is small and it starts lower-case, follows `-`/`,`,
   both lines are capitals, or the previous line ran to the paragraph's right edge; a line ending
   in a digit or `.!?:;` ends the piece (before, a block's lines were joined into one sentence,
-  gluing menu items and sign lines together). Each region is translated on its own (repeated text
-  once) and `TranslatedPhoto` paints it over the photo: colour sampled around the box, the largest
-  font that fits, pinch/double-tap zoom, tap to uncover the original, "Original" toggle; the
-  `Turn` (`fromImage`) joins the regions with newlines. All-caps text of cased languages is
+  gluing menu items and sign lines together). Codes, dates, prices and phone numbers
+  (`OcrEngine.isTranslatable`: no run of two letters without a digit, or more digits than
+  letters) are kept as they are — Marian answered "10SEP26 B0066" and "$ 42.600" with invented
+  words. The remaining distinct pieces go to the engine in **one batch**:
+  `tr_pipeline_translate_lines` / `TranslatorSession.translateLines` (0.3.17; one piece per
+  line, one output line per input line, `NmtEngine::translateDirect` keeps lines apart through
+  every hop and sends all their sentences to CTranslate2 together). Desktop, 40 lines of the
+  price board es→ko: 18.6 s one call each → 6.8 s in one batch (`translator_cli translate
+  --lines --batch`); es→en in Python 6.3 → 2.4 s, identical output. An app running on an engine
+  AAR without the call (app-only push on main uses the released AAR) hits UnsatisfiedLinkError,
+  caught in `translateImage`, and falls back to one call per piece — cut an engine release to
+  make the batch the default. `TranslatedPhoto` paints each translation over the photo: colour
+  sampled around the box, the largest font that fits, pinch/double-tap zoom, tap to uncover the
+  original, "Original" toggle; the result footer shows OCR and translation seconds and the piece
+  count; the `Turn` (`fromImage`) joins the regions with newlines, and a long press on it in the
+  conversation copies the text read as well as the translation (to report a wrong reading). All-caps text of cased languages is
   sentence-cased first (`OcrEngine.forTranslation`): 50 sign texts through the app's pairs came
   out right 16 in capitals, 36 sentence-cased (en→ko 12→14/20, fr 1→7, es 0→8, ru 3→7 of 10;
   `tests/eval/ocr_caps_eval.py`, judged by reading). Language files are Tesseract `tessdata_fast`

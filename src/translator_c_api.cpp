@@ -290,6 +290,11 @@ TR_API char* tr_pipeline_translate_text(tr_pipeline* p, const char* text, const 
     return dupString(p->impl.translateText(safe(text), safe(source_lang), safe(target_lang, "en")).toJson().dump());
 }
 
+TR_API char* tr_pipeline_translate_lines(tr_pipeline* p, const char* text, const char* source_lang, const char* target_lang) {
+    if (!p) return dupString("{\"ok\":false,\"error\":\"null pipeline\"}");
+    return dupString(p->impl.translateLines(safe(text), safe(source_lang), safe(target_lang, "en")).toJson().dump());
+}
+
 TR_API char* tr_pipeline_process_speech(tr_pipeline* p, const float* pcm, size_t n, const char* source_lang, const char* target_lang) {
     if (!p) return dupString("{\"ok\":false,\"error\":\"null pipeline\"}");
     return dupString(p->impl.processSpeechToTranslation(pcm, n, safe(source_lang, "auto"), safe(target_lang, "en")).toJson().dump());

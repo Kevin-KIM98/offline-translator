@@ -207,6 +207,11 @@ JNI_FN(jstring, pipelineTranslateText)(JNIEnv* env, jobject, jlong h, jstring te
     return takeString(env, tr_pipeline_translate_text(P(h), x.c_str(), s.c_str(), t.c_str()));
 }
 
+JNI_FN(jstring, pipelineTranslateLines)(JNIEnv* env, jobject, jlong h, jstring text, jstring src, jstring tgt) {
+    OptString x(env, text), s(env, src), t(env, tgt);
+    return takeString(env, tr_pipeline_translate_lines(P(h), x.c_str(), s.c_str(), t.c_str()));
+}
+
 JNI_FN(jstring, pipelineProcessSpeech)(JNIEnv* env, jobject, jlong h, jfloatArray pcm, jstring src, jstring tgt) {
     OptString s(env, src), t(env, tgt);
     jfloat* data = pcm ? env->GetFloatArrayElements(pcm, nullptr) : nullptr;

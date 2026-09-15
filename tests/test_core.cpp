@@ -794,6 +794,35 @@ void testPipelineStub() {
         CHECK_EQ(r.route[1], "ko-en");
     }
 #endif
+    // Lines stay apart through a hop (and through two): one output line per input line, empty
+    // lines kept, so a caller can send the pieces of a photo in one batch.
+    {
+        TranslationResult ml = p.translateLines("안녕하세요\n\n세계 평화", "ja", "en");
+#if !TRANSLATOR_HAS_CTRANSLATE2
+        CHECK(ml.ok);
+        CHECK_EQ(ml.route.size(), std::size_t(2));
+        std::vector<std::string> outLines;
+        std::size_t start = 0;
+        while (true) {
+            const std::size_t nl = ml.translatedText.find('\n', start);
+            outLines.push_back(nl == std::string::npos ? ml.translatedText.substr(start) : ml.translatedText.substr(start, nl - start));
+            if (nl == std::string::npos) break;
+            start = nl + 1;
+        }
+        CHECK_EQ(outLines.size(), std::size_t(3));
+        if (outLines.size() == 3) {
+            CHECK(outLines[0].find("[ko-en]") != std::string::npos);
+            CHECK(outLines[1].empty());
+            CHECK(outLines[2].find("[ko-en]") != std::string::npos);
+        }
+#endif
+        const TranslationResult none = p.translateLines("hola\nadiós", "es", "en");
+        CHECK(!none.ok);
+        const TranslationResult sameLines = p.translateLines("a\nb", "en", "en");
+        CHECK(sameLines.ok);
+        CHECK_EQ(sameLines.translatedText, "a\nb");
+    }
+
     TranslationResult bad = p.translateText("hola", "es", "en");
     CHECK(!bad.ok);
     CHECK(!bad.error.empty());
@@ -952,6 +981,15 @@ void testCApi() {
         CHECK(rj["ok"].asBool());
 #endif
         CHECK_EQ(rj["source_lang"].asString(), "ko");
+
+        char* lines = tr_pipeline_translate_lines(p, "하나\n둘", "ko", "en");
+        const Json lj = Json::parse(lines ? lines : "");
+        tr_string_free(lines);
+#if !TRANSLATOR_HAS_CTRANSLATE2
+        CHECK(lj["ok"].asBool());
+        CHECK(lj["translated_text"].asString().find('\n') != std::string::npos);
+#endif
+        CHECK_EQ(lj["source_text"].asString(), "하나\n둘");
 
         std::vector<int16_t> pcm(kSampleRate, 0);
         CHECK_EQ(tr_pipeline_feed_audio_i16(p, pcm.data(), pcm.size()), 0);
