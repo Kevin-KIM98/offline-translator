@@ -37,6 +37,7 @@ jobs:
           ls -l tessdata
 
       - name: Evaluate
+        shell: bash # -o pipefail: a crash in the script fails the step despite tee
         run: python tests/eval/ocr_eval.py --tessdata tessdata | tee ocr_eval.txt
 
       - uses: actions/upload-artifact@v4

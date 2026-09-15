@@ -147,11 +147,14 @@ def ocr(img, lang, tessdata, method):
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "page.png"
         img.save(path)  # no pHYs: Tesseract falls back to 70 dpi, as with the app's bitmap
-        cmd = ["tesseract", str(path), "stdout", "-l", lang, "--psm", "3", "--tessdata-dir", tessdata,
-               "-c", f"thresholding_method={method}", "tsv"]
+        cmd = ["tesseract", "--tessdata-dir", str(Path(tessdata).resolve()), str(path), "stdout",
+               "-l", lang, "--psm", "3", "-c", f"thresholding_method={method}", "tsv"]
         t = time.time()
-        out = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8").stdout
+        proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
         secs = time.time() - t
+    out = proc.stdout
+    if not out.startswith("level"):
+        raise RuntimeError(f"tesseract failed ({proc.returncode}): {proc.stderr.strip()[:2000]}")
     words = []
     for row in csv.DictReader(io.StringIO(out), delimiter="\t", quoting=csv.QUOTE_NONE):
         text = (row.get("text") or "").strip()
