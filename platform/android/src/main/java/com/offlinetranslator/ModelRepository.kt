@@ -3,6 +3,7 @@ package com.offlinetranslator
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.ProducerScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
@@ -13,6 +14,7 @@ import org.json.JSONObject
 import java.io.Closeable
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.zip.ZipInputStream
@@ -94,6 +96,10 @@ class ModelRepository(
     companion object {
         /** Default manifest: models hosted on the project's GitHub releases. Override to self-host. */
         const val DEFAULT_MANIFEST_URL = "https://raw.githubusercontent.com/Kevin-KIM98/offline-translator/main/assets/manifest.json"
+
+        /** Extra attempts per file after a transient failure; the pause doubles from [RETRY_DELAY_MS]. */
+        private const val MAX_DOWNLOAD_RETRIES = 4
+        private const val RETRY_DELAY_MS = 1_000L
     }
 
     private var handle: Long = NativeBridge.mmCreate(modelsRoot.absolutePath)
@@ -150,11 +156,24 @@ class ModelRepository(
         }.getOrDefault(false)
     }
 
-    /** Downloads the latest manifest; returns true if a manifest is loaded afterwards. */
+    /**
+     * Downloads the latest manifest; returns true if a manifest is loaded afterwards. A failed
+     * fetch is retried a few times (the host answers 5xx now and then) before falling back to the
+     * cached or bundled copy.
+     */
     suspend fun refreshManifest(): Boolean = withContext(Dispatchers.IO) {
         val url = manifestUrl ?: return@withContext hasManifest()
-        val json = runCatching { URL(url).openStream().bufferedReader().use { it.readText() } }.getOrNull()
-            ?: return@withContext hasManifest()
+        // With a manifest already in hand a failed fetch costs nothing, so do not make every
+        // offline start wait; only the first run, where no manifest means no download at all,
+        // is worth a couple of retries.
+        val attempts = if (hasManifest()) 1 else 3
+        var json: String? = null
+        for (attempt in 0 until attempts) {
+            json = runCatching { URL(url).openStream().bufferedReader().use { it.readText() } }.getOrNull()
+            if (json != null) break
+            if (attempt < attempts - 1) delay(RETRY_DELAY_MS shl attempt)
+        }
+        if (json == null) return@withContext hasManifest()
         val ok = NativeBridge.mmLoadManifestJson(h(), json)
         if (ok) NativeBridge.mmSaveManifest(h())
         ok || hasManifest()
@@ -255,7 +274,13 @@ class ModelRepository(
         return null
     }
 
-    /** Resumable HTTP download (Range requests) into `target` via a `.part` file. */
+    /**
+     * Resumable HTTP download (Range requests) into `target` via a `.part` file. A transient
+     * failure — a 5xx from the release host, 408/429, a timeout or a cut connection — is retried
+     * with a growing pause, resuming from the bytes already on disk; a 404 or another permanent
+     * answer fails at once. Without this, one hiccup out of the hundreds of files a full download
+     * fetches ended the whole run (seen as "HTTP 500 for .../nmt_en-es_target.spm").
+     */
     private suspend fun download(url: String, target: File, expectedSize: Long, progress: suspend (Long, Long) -> Unit) {
         target.parentFile?.mkdirs()
         if (target.exists() && expectedSize > 0 && target.length() == expectedSize) {
@@ -263,6 +288,24 @@ class ModelRepository(
             return
         }
         val part = File(target.path + ".part")
+        var attempt = 0
+        while (true) {
+            try {
+                fetch(url, part, expectedSize, progress)
+                break
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (attempt >= MAX_DOWNLOAD_RETRIES || !isTransient(e)) throw e
+                delay(RETRY_DELAY_MS shl attempt)
+                attempt++
+            }
+        }
+        if (target.exists()) target.delete()
+        if (!part.renameTo(target)) throw TranslatorException("cannot finalize ${target.name}")
+    }
+
+    /** One attempt: appends to `part` until the file is complete, or throws. */
+    private suspend fun fetch(url: String, part: File, expectedSize: Long, progress: suspend (Long, Long) -> Unit) {
         var offset = if (part.exists()) part.length() else 0L
         if (expectedSize in 1..offset) { part.delete(); offset = 0 } // stale or corrupt partial
 
@@ -276,7 +319,7 @@ class ModelRepository(
             val append = when (code) {
                 HttpURLConnection.HTTP_PARTIAL -> true
                 HttpURLConnection.HTTP_OK -> { offset = 0; false }
-                else -> throw TranslatorException("HTTP $code for $url")
+                else -> throw HttpStatusException(code, url)
             }
             val total = if (expectedSize > 0) expectedSize else conn.contentLengthLong.let { if (it > 0) it + offset else -1L }
             var done = offset
@@ -301,12 +344,20 @@ class ModelRepository(
         } finally {
             conn.disconnect()
         }
+        // A connection cut short leaves a shorter file; the next attempt resumes from here.
         if (expectedSize > 0 && part.length() != expectedSize) {
-            throw TranslatorException("incomplete download: ${part.length()} of $expectedSize bytes")
+            throw IOException("incomplete download: ${part.length()} of $expectedSize bytes")
         }
-        if (target.exists()) target.delete()
-        if (!part.renameTo(target)) throw TranslatorException("cannot finalize ${target.name}")
     }
+
+    /** A failure worth another attempt: the host's problem, not the file's. */
+    private fun isTransient(e: Exception): Boolean = when (e) {
+        is HttpStatusException -> e.code >= 500 || e.code == 408 || e.code == 429
+        is IOException -> true   // timeouts, resets, DNS, a connection cut mid-file
+        else -> false
+    }
+
+    private class HttpStatusException(val code: Int, url: String) : IOException("HTTP $code for $url")
 
     private fun extractZip(zip: File, into: File) {
         ZipInputStream(zip.inputStream().buffered()).use { zin ->

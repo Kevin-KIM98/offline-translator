@@ -231,6 +231,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(phase = Phase.Downloading(firstLabel, 0, total)) }
             var completed = 0L
             var failure: String? = null
+            var failures = 0
             if (pending.isNotEmpty()) runCatching {
                 repository.installAll(pending).collect { ev ->
                     when (ev) {
@@ -242,37 +243,70 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                             _state.update { it.copy(phase = Phase.Downloading(labelOf(pending, ev.id), completed, total, verifying = true)) }
                         is InstallEvent.Installed ->
                             completed += pending.firstOrNull { it.id == ev.id }?.totalBytes ?: 0L
-                        is InstallEvent.Failed -> failure = "${labelOf(pending, ev.id)}: ${ev.reason}"
+                        is InstallEvent.Failed -> {
+                            failures++
+                            if (failure == null) failure = "${labelOf(pending, ev.id)}: ${ev.reason}"
+                        }
                         is InstallEvent.AllDone -> {}
                     }
                 }
-            }.onFailure { e -> failure = e.message ?: str(R.string.err_download_failed) }
+            }.onFailure { e ->
+                failures++
+                if (failure == null) failure = e.message ?: str(R.string.err_download_failed)
+            }
 
             // The text-recognition files ("download everything"): a few MB each, after the models.
+            // One file failing does not stop the rest — whatever arrives is kept, and the setup
+            // screen afterwards lists only what is still missing.
             for (model in ocrPending) {
-                if (failure != null) break
                 val name = ocrLabel(model)
                 _state.update { it.copy(phase = Phase.Downloading(name, completed, total)) }
                 runCatching {
                     ocr.install(model) { done, _ ->
                         _state.update { it.copy(phase = Phase.Downloading(name, completed + done, total)) }
                     }
-                }.onFailure { e -> failure = "$name: ${e.message ?: str(R.string.err_download_failed)}" }
+                }.onFailure { e ->
+                    failures++
+                    if (failure == null) failure = "$name: ${e.message ?: str(R.string.err_download_failed)}"
+                }
                 completed += model.sizeBytes
             }
             refreshOcr()
 
             val err = failure
-            if (err != null) {
-                _state.update { it.copy(phase = setup.copy(error = err)) }
-            } else {
+            if (err == null) {
                 prefs.setupDone = true
                 openSession()
+                return@launch
+            }
+            // Everything that did arrive is installed: ask the core again so pressing the button
+            // once more fetches only what is left instead of the whole set.
+            val left = remaining(setup)
+            val message =
+                if (failures > 1) str(R.string.err_download_partial, err, failures - 1)
+                else str(R.string.err_download_one, err)
+            if (left.pending.isEmpty() && left.ocrPending.isEmpty()) {
+                prefs.setupDone = true
+                openSession()
+            } else {
+                _state.update { it.copy(phase = left.copy(error = message)) }
             }
         }
     }
 
     private fun ocrLabel(m: OcrModel): String = str(R.string.ocr_model_title, Lang.of(m.lang).name)
+
+    /** What [setup] still needs after a download run, in the same shape the setup screen wants. */
+    private suspend fun remaining(setup: Phase.Setup): Phase.Setup = withContext(Dispatchers.IO) {
+        val status = runCatching {
+            if (setup.everything) repo?.status()
+            else repo?.statusForLanguages(_state.value.langs, llmMode = llmMode(), llmId = _state.value.llmId, sttId = _state.value.sttId)
+        }.getOrNull()
+        // Without a fresh status keep the old list: re-downloading beats hiding a missing model.
+        val pending = status?.filter { it.needsDownload } ?: setup.pending
+        val ocrPending = setup.ocrPending.filterNot { ocr.isInstalled(it) }
+        setup.copy(pending = pending, ocrPending = ocrPending, error = null)
+    }
 
     fun cancelDownload() {
         downloadJob?.cancel()
