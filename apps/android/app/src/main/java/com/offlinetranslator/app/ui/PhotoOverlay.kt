@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.offlinetranslator.app.PhotoText
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -117,8 +118,40 @@ fun TranslatedPhoto(image: Bitmap, texts: List<PhotoText>, showOriginal: Boolean
     }
 }
 
+/**
+ * Live mode's overlay: the translations of the last frame painted over the viewfinder. The frame
+ * the recogniser read is [frameWidth] x [frameHeight] and the viewfinder shows the same picture
+ * cropped to the screen (PreviewView.FILL_CENTER), so the boxes follow that crop. Nothing to tap
+ * and nothing to zoom: the scene moves under them, and a photo is what can be examined.
+ */
+@Composable
+fun LiveOverlay(texts: List<PhotoText>, frameWidth: Int, frameHeight: Int, modifier: Modifier = Modifier) {
+    if (frameWidth <= 0 || frameHeight <= 0) return
+    val measurer = rememberTextMeasurer()
+    val labels = remember(texts) { texts.mapNotNull { label(measurer, it) } }
+    Canvas(modifier.fillMaxSize().clipToBounds()) {
+        val k = max(size.width / frameWidth, size.height / frameHeight)
+        val origin = Offset((size.width - frameWidth * k) / 2, (size.height - frameHeight * k) / 2)
+        for (l in labels) {
+            val area = Rect(origin + l.area.topLeft * k, l.area.size * k)
+            drawRoundRect(
+                color = l.background,
+                topLeft = area.topLeft,
+                size = area.size,
+                cornerRadius = CornerRadius(min(3.dp.toPx(), area.height / 4)),
+            )
+            withTransform({
+                translate(origin.x + l.textAt.x * k, origin.y + l.textAt.y * k)
+                scale(k, k, pivot = Offset.Zero)
+            }) {
+                drawText(l.layout, color = l.foreground)
+            }
+        }
+    }
+}
+
 /** A translation laid out in photo pixels: the patch it covers, where its text starts, its colours. */
-private class Label(
+internal class Label(
     val area: Rect,
     val textAt: Offset,
     val layout: TextLayoutResult,
@@ -129,7 +162,7 @@ private class Label(
 /** Text measured with one font unit to a pixel of the photo. */
 private val PhotoPixels = Density(1f)
 
-private fun label(measurer: TextMeasurer, piece: PhotoText): Label? {
+internal fun label(measurer: TextMeasurer, piece: PhotoText): Label? {
     val text = piece.translation
     if (text.isBlank()) return null
     val r = piece.region

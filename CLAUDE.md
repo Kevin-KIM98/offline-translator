@@ -236,6 +236,23 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   with the EXIF rotation when that fails) and a failure shows the decoder's message; the camera
   screen and its language side are `rememberSaveable`, so the picker's result still lands when
   the activity was recreated behind it.
+- **Live camera translation (app only, unmeasured on a device).** The camera screen's "Live" chip
+  (`CameraPhase.Live`) reads the viewfinder frame after frame instead of waiting for the shutter:
+  CameraX `ImageAnalysis` (RGBA_8888, `KEEP_ONLY_LATEST`, 4:3 like the preview so the overlay's
+  boxes can be placed by the same centre crop; `targetRotation` follows the display because the
+  activity handles rotation itself) hands over a frame only when the view model has finished with
+  the one before (`wantsLiveFrame`), and every other frame is dropped in the analyser. A frame is
+  scaled to `OcrEngine.LIVE_SIDE` (1024), read through one Tesseract kept open for the whole
+  session (`LiveOcr`; `init` reads the language file, which a frame cannot pay for), without the
+  orientation probe and without the "unconfident lines are better than nothing" fallback, which on
+  a moving viewfinder is noise that flickers over the scene. Text already translated is painted
+  from an LRU cache (200) and only `LIVE_MAX_NEW` (4) new pieces per frame go to the engine,
+  largest box first — with an engine AAR that has no `translateLines` those are four separate
+  Marian calls. The recogniser is opened, read and closed on one executor thread, in that order,
+  so it is never recycled while it is reading. The shutter still takes the accurate photo (that
+  path is untouched) and comes back to live mode afterwards. The screen shows the frame's read and
+  translate seconds, which is the only place the phone's real speed can be read: no device
+  measurement exists, so do not state a frame rate.
 - **Model selection.** A language choice must download every pair its routes use, including the
   English hops. Before 0.3.7 `ko,ja` got speech recognition only and could not translate.
 - **Model download (2026-09-15).** The release host answers a file with HTTP 500 now and then

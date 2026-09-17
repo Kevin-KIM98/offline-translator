@@ -397,6 +397,14 @@ AAR on Ubuntu, the XCFramework on macOS, rewrites `Package.swift` with the new c
   Spanish→Korean took 6.8 s instead of 18.6 s on the desktop (`translator_cli translate --lines
   --batch`).
 
+  The same screen has a **Live** mode: instead of waiting for the shutter, the viewfinder is read
+  frame after frame and the translations are painted over the scene. It is rough by design — a
+  quarter of a photo's pixels, one frame at a time with the rest dropped, one Tesseract kept open
+  across frames, at most four new pieces of text to the engine per frame, everything already
+  translated held in a small cache so a sign stays painted while the phone moves — and the shutter
+  is still what gives the accurate reading. How many frames a second a phone manages has not been
+  measured; the screen shows what each frame cost.
+
   Settings → speech recognition model and translation LLM default to **Automatic**: whisper small
   for Korean, English, Spanish and Russian (as accurate as medium at a third of the time), medium
   when the pair includes Thai, Vietnamese, French, Japanese, Chinese or Indonesian (character error

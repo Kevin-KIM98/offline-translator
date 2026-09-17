@@ -4,15 +4,20 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
+import android.util.Size
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Image
@@ -48,6 +53,7 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -76,6 +82,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -95,6 +102,7 @@ import com.offlinetranslator.app.mb
 import com.offlinetranslator.app.ui.theme.LocalSpeakerColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.concurrent.Executors
 
 /**
  * Photo translation: point the camera at a sign, a menu or a page (or pick a photo), say which of
@@ -115,6 +123,36 @@ fun CameraScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit, onOpenAp
     val cameraError = stringResource(R.string.err_camera)
     // Quality over latency: the letters' edges are what the recogniser reads.
     val imageCapture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY).build() }
+    // Live mode's frames: only the newest one, already RGBA so a frame becomes a bitmap with a
+    // copy, and four by three like the viewfinder — the overlay places its boxes by cropping the
+    // frame the way PreviewView crops the preview, which only holds while both show the same picture.
+    val analysis = remember {
+        ImageAnalysis.Builder()
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+            .setResolutionSelector(
+                ResolutionSelector.Builder()
+                    .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+                    .setResolutionStrategy(
+                        ResolutionStrategy(Size(1024, 768), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER)
+                    )
+                    .build()
+            )
+            .build()
+    }
+    // Which way round a frame is handed over follows the screen: this activity handles rotation
+    // itself, so CameraX would otherwise keep the rotation it was bound with and live mode would
+    // paint its boxes sideways after the phone was turned. Only the analyser is told; what the
+    // shutter does is unchanged.
+    val configuration = LocalConfiguration.current
+    LaunchedEffect(configuration.orientation) {
+        analysis.targetRotation = ContextCompat.getDisplayOrDefault(context).rotation
+    }
+    // One thread for turning frames into bitmaps, so the screen never waits for one.
+    val frames = remember { Executors.newSingleThreadExecutor() }
+    DisposableEffect(frames) {
+        onDispose { frames.shutdown() }
+    }
     val takePhoto: () -> Unit = {
         imageCapture.takePicture(ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageCapturedCallback() {
             override fun onCaptureSuccess(image: ImageProxy) {
@@ -130,10 +168,38 @@ fun CameraScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit, onOpenAp
     }
 
     val leave = {
-        vm.resetCamera()
+        vm.leaveCamera()
         onBack()
     }
     BackHandler(onBack = leave)
+
+    val live = state.camera as? CameraPhase.Live
+    // The analyser only runs in live mode, and hands over a frame only when the view model has
+    // finished with the one before; the rest are dropped where they are cheapest to drop.
+    DisposableEffect(live != null, side) {
+        if (live != null) {
+            analysis.setAnalyzer(frames) { image ->
+                val frame = if (vm.wantsLiveFrame()) {
+                    runCatching {
+                        val raw = image.toBitmap()
+                        val upright = OcrEngine.prepare(raw, image.imageInfo.rotationDegrees, OcrEngine.LIVE_SIDE)
+                        if (upright !== raw) raw.recycle()
+                        upright
+                    }
+                } else {
+                    null
+                }
+                image.close()
+                frame?.onSuccess { vm.liveFrame(it, side) }?.onFailure { e ->
+                    // A frame this phone's camera does not hand over as pixels would otherwise
+                    // leave live mode running with nothing on screen and nothing said.
+                    vm.showMessage(e.message ?: cameraError)
+                    vm.stopLive()
+                }
+            }
+        }
+        onDispose { analysis.clearAnalyzer() }
+    }
 
     // The picked photo is opened off the main thread by the view model (PhotoFiles): decoding a
     // large photo here blocked the screen, and a decoder failure said nothing about why.
@@ -147,8 +213,9 @@ fun CameraScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit, onOpenAp
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         when (val phase = state.camera) {
-            is CameraPhase.Preview -> {
-                if (granted) Viewfinder(imageCapture, onError = { pickError = it })
+            is CameraPhase.Preview, is CameraPhase.Live -> {
+                if (granted) Viewfinder(imageCapture, analysis, onError = { pickError = it })
+                if (live != null) LiveOverlay(live.texts, live.frameWidth, live.frameHeight)
                 TopBar(onBack = leave)
                 Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
                     Surface(color = Color.Black.copy(alpha = 0.72f)) {
@@ -191,22 +258,49 @@ fun CameraScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit, onOpenAp
                             }
                             Spacer(Modifier.height(16.dp))
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(onClick = { pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = ocrReady) {
-                                    Icon(
-                                        Icons.Filled.PhotoLibrary,
-                                        stringResource(R.string.camera_gallery),
-                                        tint = if (ocrReady) Color.White else Color.White.copy(alpha = 0.35f),
-                                        modifier = Modifier.size(28.dp),
+                                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                                    IconButton(onClick = { pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = ocrReady) {
+                                        Icon(
+                                            Icons.Filled.PhotoLibrary,
+                                            stringResource(R.string.camera_gallery),
+                                            tint = if (ocrReady) Color.White else Color.White.copy(alpha = 0.35f),
+                                            modifier = Modifier.size(28.dp),
+                                        )
+                                    }
+                                }
+                                Shutter(enabled = granted && ocrReady, onClick = takePhoto)
+                                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                                    FilterChip(
+                                        selected = live != null,
+                                        enabled = granted && ocrReady,
+                                        onClick = { if (live != null) vm.stopLive() else vm.startLive(side) },
+                                        leadingIcon = { Icon(Icons.Filled.Videocam, null, modifier = Modifier.size(18.dp)) },
+                                        label = { Text(stringResource(R.string.camera_live)) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            labelColor = Color.White.copy(alpha = 0.85f),
+                                            iconColor = Color.White.copy(alpha = 0.85f),
+                                            selectedLabelColor = Color.Black,
+                                            selectedLeadingIconColor = Color.Black,
+                                            selectedContainerColor = Color.White,
+                                        ),
                                     )
                                 }
-                                Spacer(Modifier.weight(1f))
-                                Shutter(enabled = granted && ocrReady, onClick = takePhoto)
-                                Spacer(Modifier.weight(1f))
-                                Spacer(Modifier.width(48.dp))
                             }
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                stringResource(R.string.camera_hint),
+                                if (live == null) {
+                                    stringResource(R.string.camera_hint)
+                                } else if (live.frameWidth == 0) {
+                                    stringResource(R.string.camera_live_hint)
+                                } else {
+                                    stringResource(
+                                        R.string.camera_live_timing,
+                                        live.ocrMs / 1000.0,
+                                        live.nmtMs / 1000.0,
+                                        live.texts.count { !it.kept },
+                                        live.pending,
+                                    )
+                                },
                                 style = MaterialTheme.typography.labelMedium,
                                 color = Color.White.copy(alpha = 0.6f),
                                 textAlign = TextAlign.Center,
@@ -373,9 +467,9 @@ fun CameraScreen(vm: MainViewModel, state: UiState, onBack: () -> Unit, onOpenAp
     }
 }
 
-/** CameraX preview bound to the screen's lifecycle together with [imageCapture]. */
+/** CameraX preview bound to the screen's lifecycle together with [imageCapture] and [analysis]. */
 @Composable
-private fun Viewfinder(imageCapture: ImageCapture, onError: (String) -> Unit) {
+private fun Viewfinder(imageCapture: ImageCapture, analysis: ImageAnalysis, onError: (String) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
@@ -391,7 +485,10 @@ private fun Viewfinder(imageCapture: ImageCapture, onError: (String) -> Unit) {
         val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
         runCatching {
             p.unbindAll()
-            p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
+            // Preview + capture + analysis is a combination every camera supports; binding the
+            // analysis here rather than when live mode starts keeps the toggle from restarting the
+            // camera, which blanked the viewfinder for a moment.
+            p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture, analysis)
         }.onFailure { onError(cameraError) }
         provider = p
     }

@@ -16,14 +16,17 @@ import com.offlinetranslator.TranslationResult
 import com.offlinetranslator.TranslatorSession
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.Executors
 
 /** Where the app is in its lifecycle: models first, then a live session. */
 sealed interface Phase {
@@ -95,8 +98,29 @@ sealed interface CameraPhase {
      */
     data class Result(val image: Bitmap, val turn: Turn, val texts: List<PhotoText>, val ocrMs: Double, val nmtMs: Double) : CameraPhase
 
+    /**
+     * Live mode: the viewfinder with the last frame's translations painted over the scene. The
+     * boxes of [texts] are in the pixels of a frame [frameWidth] × [frameHeight]; [ocrMs] and
+     * [nmtMs] are what that frame cost, shown on screen because the phone's real speed can be
+     * read nowhere else. [pending] counts the pieces still waiting for the engine.
+     */
+    data class Live(
+        val texts: List<PhotoText> = emptyList(),
+        val frameWidth: Int = 0,
+        val frameHeight: Int = 0,
+        val ocrMs: Double = 0.0,
+        val nmtMs: Double = 0.0,
+        val pending: Int = 0,
+    ) : CameraPhase
+
     data class Failed(val image: Bitmap?, val message: String) : CameraPhase
 }
+
+/** Texts live mode keeps translated; beyond this the least recently seen one goes. */
+private const val LIVE_CACHE = 200
+
+/** Pieces of text one live frame may hand to the engine; the rest wait for a later frame. */
+private const val LIVE_MAX_NEW = 4
 
 /** A text-recognition file on its way in. */
 data class OcrDownload(val lang: String, val bytesDone: Long, val bytesTotal: Long)
@@ -163,6 +187,32 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private var busyWatcher: Job? = null
     private var ocrJob: Job? = null
     private val ocr = OcrModels(app)
+
+    /**
+     * Live mode runs its recogniser on one thread of its own: Tesseract is opened, read and
+     * recycled in that order, and a frame is never read while the recogniser is being closed.
+     */
+    private val liveExecutor = Executors.newSingleThreadExecutor()
+    private val liveDispatcher = liveExecutor.asCoroutineDispatcher()
+    private var liveJob: Job? = null
+
+    /** The open recogniser and its language; opened, used and closed on the live thread only. */
+    private var liveReader: LiveOcr? = null
+    private var liveLang: String? = null
+    private var liveSide = Side.A
+    private var liveResume = false
+
+    /** Whether a frame is being read or translated; the viewfinder's other frames are dropped. */
+    @Volatile
+    private var liveBusy = false
+
+    /**
+     * What live mode has already translated, so a sign stays painted while the phone moves and is
+     * sent to the engine once. Least-recently-seen text goes first.
+     */
+    private val liveCache = object : LinkedHashMap<String, String>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>): Boolean = size > LIVE_CACHE
+    }
     private var nextTurnId = 1L
 
     /** Side the user is currently holding the talk button for, in manual mode. */
@@ -542,6 +592,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun translateImage(image: Bitmap, from: Side, findOrientation: Boolean = true) {
         if (_state.value.phase != Phase.Ready) return
+        noteLive()
         ocrJob?.cancel()
         ocrJob = viewModelScope.launch { readAndTranslate(image, from, findOrientation) }
     }
@@ -553,6 +604,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun openImage(uri: Uri, from: Side) {
         if (_state.value.phase != Phase.Ready) return
+        noteLive()
         ocrJob?.cancel()
         ocrJob = viewModelScope.launch {
             _state.update { it.copy(camera = CameraPhase.Loading) }
@@ -667,10 +719,183 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         translateImage(OcrEngine.prepare(image, 90), cameraSide, findOrientation = false)
     }
 
-    /** Back to the viewfinder; also cancels a recognition still running. */
+    /**
+     * Back to the viewfinder after a photo; also cancels a recognition still running. A photo
+     * taken out of live mode returns to live mode, whose recogniser is still open.
+     */
     fun resetCamera() {
         ocrJob?.cancel()
+        if (liveResume) startLive(liveSide) else _state.update { it.copy(camera = CameraPhase.Preview) }
+    }
+
+    /** Leaving the camera screen: live mode off and its recogniser closed. */
+    fun leaveCamera() {
+        ocrJob?.cancel()
+        liveResume = false
+        stopLive()
+    }
+
+    /** A photo taken while live mode was on comes back to it. */
+    private fun noteLive() {
+        if (_state.value.camera is CameraPhase.Live) liveResume = true
+    }
+
+    // ------------------------------------------------------------- live camera
+
+    /**
+     * Live mode: frame after frame of the viewfinder is read and its text painted over the scene,
+     * as fast as the phone manages. Rough by design — a quarter of a photo's pixels, no second
+     * reading to find which way round the frame stands, at most [LIVE_MAX_NEW] new pieces to the
+     * engine per frame — so the shutter is still what gives the accurate reading. Text already
+     * translated stays painted from [liveCache] while the phone moves, which is what makes the
+     * following frames cheap.
+     */
+    fun startLive(from: Side) {
+        if (_state.value.phase != Phase.Ready) return
+        ocrJob?.cancel()
+        liveResume = false
+        liveSide = from
+        synchronized(liveCache) { liveCache.clear() }
+        _state.update { it.copy(camera = CameraPhase.Live()) }
+    }
+
+    /** Live mode off: back to the plain viewfinder, recogniser closed. */
+    fun stopLive() {
+        closeLive()
         _state.update { it.copy(camera = CameraPhase.Preview) }
+    }
+
+    /**
+     * Whether the viewfinder should hand over the frame it has. False while a frame is still being
+     * read or translated: the analyser then drops it rather than queueing work the phone cannot do.
+     */
+    fun wantsLiveFrame(): Boolean = !liveBusy && _state.value.camera is CameraPhase.Live
+
+    /**
+     * A viewfinder frame, already upright and scaled ([OcrEngine.LIVE_SIDE]); the view model owns
+     * it from here and recycles it. Called from the analyser's thread.
+     */
+    fun liveFrame(frame: Bitmap, from: Side) {
+        if (!wantsLiveFrame()) {
+            frame.recycle()
+            return
+        }
+        liveBusy = true
+        // The other side's language means another recogniser and another language for the texts
+        // already translated.
+        if (from != liveSide) {
+            liveSide = from
+            synchronized(liveCache) { liveCache.clear() }
+        }
+        liveJob = viewModelScope.launch {
+            try {
+                readFrame(frame, from)
+            } finally {
+                liveBusy = false
+            }
+        }
+    }
+
+    private suspend fun readFrame(frame: Bitmap, from: Side) {
+        val s = _state.value
+        val src = if (from == Side.A) s.langA else s.langB
+        val tgt = if (from == Side.A) s.langB else s.langA
+        val model = s.ocrCatalog.firstOrNull { it.lang == src }
+        if (s.camera !is CameraPhase.Live || model == null || src !in s.ocrInstalled) {
+            frame.recycle()
+            return
+        }
+        val width = frame.width
+        val height = frame.height
+        val ocrStart = SystemClock.elapsedRealtime()
+        val page = withContext(liveDispatcher) {
+            val reader = reader(src, model.tessLang)
+            val read = if (reader == null) null else runCatching { reader.read(frame) }.getOrNull()
+            frame.recycle()
+            read
+        }
+        val ocrMs = (SystemClock.elapsedRealtime() - ocrStart).toDouble()
+        // A frame the recogniser could not read leaves the last one painted rather than blinking.
+        val regions = page?.regions ?: return
+        val translatable = regions.map { it.text }.filter { OcrEngine.isTranslatable(it, src) }.toSet()
+
+        fun paint(nmtMs: Double, pending: Int) {
+            val texts = regions.map { r ->
+                val kept = r.text !in translatable
+                PhotoText(r, if (kept) "" else liveCached(r.text).orEmpty(), kept)
+            }
+            _state.update { st ->
+                if (st.camera is CameraPhase.Live) {
+                    st.copy(camera = CameraPhase.Live(texts, width, height, ocrMs, nmtMs, pending))
+                } else {
+                    st
+                }
+            }
+        }
+
+        // What this frame already knows is painted before the engine is asked anything, so a sign
+        // read a moment ago stays on screen without waiting.
+        val fresh = regions
+            .filter { it.text in translatable && liveCached(it.text) == null }
+            .distinctBy { it.text }
+            // The largest text is the sign the phone is being pointed at; the small print can wait
+            // for a frame that has room for it.
+            .sortedByDescending { it.box.width().toLong() * it.box.height() }
+            .take(LIVE_MAX_NEW)
+            .map { it.text }
+        paint(nmtMs = 0.0, pending = fresh.size)
+        if (fresh.isEmpty()) return
+
+        val nmtStart = SystemClock.elapsedRealtime()
+        val sources = fresh.map { OcrEngine.forTranslation(it, src) }
+        // As on the photo path, an engine without the batch call throws UnsatisfiedLinkError and
+        // the pieces go one by one — which is why a frame hands over only a few of them.
+        val batch = runCatching { session?.translateLines(sources, src, tgt) }.getOrNull()
+        val lines = batch?.takeIf { it.ok }?.lines?.takeIf { it.size == sources.size }
+        if (lines != null) {
+            fresh.forEachIndexed { i, text -> liveRemember(text, lines[i].trim()) }
+        } else {
+            for ((i, text) in fresh.withIndex()) {
+                if (!currentCoroutineContext().isActive) return
+                val r = session?.translate(sources[i], src, tgt)
+                if (r != null && r.ok) liveRemember(text, r.translatedText.trim())
+            }
+        }
+        paint((SystemClock.elapsedRealtime() - nmtStart).toDouble(), pending = 0)
+    }
+
+    /** The open recogniser for [lang], opened or reopened when the side's language changed. Live thread only. */
+    private fun reader(lang: String, tessLang: String): LiveOcr? {
+        val open = liveReader
+        if (open != null && liveLang == lang) return open
+        open?.close()
+        val fresh = runCatching { LiveOcr.open(ocr.root, lang, tessLang) }.getOrNull()
+        liveReader = fresh
+        liveLang = if (fresh != null) lang else null
+        return fresh
+    }
+
+    private fun liveCached(text: String): String? = synchronized(liveCache) { liveCache[text] }
+
+    private fun liveRemember(text: String, translation: String) {
+        if (translation.isBlank()) return
+        synchronized(liveCache) { liveCache[text] = translation }
+    }
+
+    /**
+     * Closes the recogniser behind whatever frame is still being read: the close is queued on the
+     * live thread, which is also the only thread that opens one, so the two can never cross.
+     */
+    private fun closeLive() {
+        liveJob?.cancel()
+        liveJob = null
+        runCatching {
+            liveExecutor.execute {
+                liveReader?.close()
+                liveReader = null
+                liveLang = null
+            }
+        }
     }
 
     /** The text-recognition entry for [lang], null when the manifest does not offer one. */
@@ -844,6 +1069,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         repo = null
         // close() joins native threads — never on the main thread.
         Thread { runCatching { s?.close() }; runCatching { r?.close() } }.start()
+        closeLive()
+        liveExecutor.shutdown()
     }
 
     private fun str(id: Int, vararg args: Any): String =
