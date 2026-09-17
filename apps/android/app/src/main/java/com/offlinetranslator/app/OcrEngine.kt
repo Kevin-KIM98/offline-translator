@@ -6,6 +6,7 @@ import android.graphics.Matrix
 import android.graphics.Rect
 import com.googlecode.tesseract.android.TessBaseAPI
 import com.googlecode.tesseract.android.TessBaseAPI.PageIteratorLevel
+import java.io.Closeable
 import java.io.File
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -42,6 +43,12 @@ object OcrEngine {
 
     /** Longest side of the small copies read to find which way round a photo stands. */
     private const val PROBE_SIDE = 1000
+
+    /**
+     * Longest side of a viewfinder frame in live mode: a quarter of a photo's pixels, because a
+     * frame is read while the next one is already coming. Small text needs the shutter.
+     */
+    const val LIVE_SIDE = 1024
 
     /** Languages written without spaces between words: line breaks join with nothing, and Tesseract's spaces between characters go. */
     private val unspaced = setOf("ja", "zh", "th")
@@ -93,10 +100,34 @@ object OcrEngine {
         }
     }
 
-    /** Scales a photo down to [MAX_SIDE], turns it clockwise by [rotationDegrees], and makes sure Tesseract can read its pixels (no hardware bitmaps). */
-    fun prepare(image: Bitmap, rotationDegrees: Int = 0): Bitmap {
+    /**
+     * A recogniser kept open for the live viewfinder. [TessBaseAPI.init] reads the language file
+     * from disk, which a frame cannot pay for sixty times a minute, so live mode opens one
+     * recogniser and keeps it until it leaves ([LiveOcr.close]).
+     */
+    fun openLive(dataRoot: File, tessLang: String): TessBaseAPI {
+        val tess = TessBaseAPI()
+        if (!tess.init(dataRoot.absolutePath, tessLang)) {
+            tess.recycle()
+            throw IllegalStateException("tesseract init failed for $tessLang")
+        }
+        tess.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO)
+        return tess
+    }
+
+    /**
+     * One viewfinder frame through an open recogniser. No second reading to find which way round
+     * the frame stands (the phone is held the way the text stands, and the user sees at once when
+     * it is not), and no "better than nothing" fallback: on a still photo the unconfident lines
+     * are all there is, on a moving viewfinder they are noise that flickers over the scene.
+     */
+    fun readLive(tess: TessBaseAPI, image: Bitmap, lang: String): OcrPage =
+        page(image, read(tess, image, lang, fallback = false), lang)
+
+    /** Scales a photo down to [maxSide], turns it clockwise by [rotationDegrees], and makes sure Tesseract can read its pixels (no hardware bitmaps). */
+    fun prepare(image: Bitmap, rotationDegrees: Int = 0, maxSide: Int = MAX_SIDE): Bitmap {
         val longest = maxOf(image.width, image.height)
-        val scale = if (longest > MAX_SIDE) MAX_SIDE.toFloat() / longest else 1f
+        val scale = if (longest > maxSide) maxSide.toFloat() / longest else 1f
         val m = Matrix()
         if (scale < 1f) m.postScale(scale, scale)
         if (rotationDegrees != 0) m.postRotate(rotationDegrees.toFloat())
@@ -183,7 +214,7 @@ object OcrEngine {
     private fun page(image: Bitmap, reading: Reading, lang: String) =
         OcrPage(image, group(reading.lines).map { region(it, image, lang) })
 
-    private fun read(tess: TessBaseAPI, image: Bitmap, lang: String): Reading {
+    private fun read(tess: TessBaseAPI, image: Bitmap, lang: String, fallback: Boolean = true): Reading {
         tess.setImage(image)
         tess.getUTF8Text() // runs layout analysis and recognition; the iterator reads the result
         val iter = tess.resultIterator ?: return Reading(emptyList(), 0, 0)
@@ -229,7 +260,7 @@ object OcrEngine {
             iter.delete()
         }
         // When the confidence bars leave nothing, what was read is still better than "no text".
-        return Reading(lines.ifEmpty { unfiltered }, letters, confident)
+        return Reading(if (fallback) lines.ifEmpty { unfiltered } else lines, letters, confident)
     }
 
     /** The line made of [words], or null when it is noise; [filter] applies the confidence bars. */
@@ -363,4 +394,23 @@ object OcrEngine {
     }
 
     private fun Char.isAscii(): Boolean = code < 0x80
+}
+
+/**
+ * Tesseract kept open for live mode: one recogniser, one frame at a time, closed when the
+ * viewfinder leaves live mode. Reading and closing must happen on the same thread — the native
+ * recogniser is not recycled while it is reading.
+ */
+class LiveOcr private constructor(private val tess: TessBaseAPI, private val lang: String) : Closeable {
+    companion object {
+        /** Opens a recogniser for [lang]; [dataRoot] holds `tessdata/`. Throws when the file cannot be read. */
+        fun open(dataRoot: File, lang: String, tessLang: String): LiveOcr =
+            LiveOcr(OcrEngine.openLive(dataRoot, tessLang), lang)
+    }
+
+    fun read(image: Bitmap): OcrPage = OcrEngine.readLive(tess, image, lang)
+
+    override fun close() {
+        runCatching { tess.recycle() }
+    }
 }

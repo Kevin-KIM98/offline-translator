@@ -69,6 +69,9 @@
     <string name="camera_hint">Point at a sign, a menu or a page and take a photo, or pick one from the gallery.</string>
     <string name="camera_shutter">Take a photo</string>
     <string name="camera_gallery">Choose from the gallery</string>
+    <string name="camera_live">Live</string>
+    <string name="camera_live_hint">The viewfinder is read frame after frame, roughly and only as fast as the phone manages. Take a photo for the accurate reading.</string>
+    <string name="camera_live_timing">read %1$.1f s · translated %2$.1f s · %3$d pieces · %4$d waiting</string>
     <string name="camera_needed_title">Camera access is needed</string>
     <string name="camera_needed_body">Photos are read on this device only and are never sent anywhere.</string>
     <string name="camera_reading">Reading the text</string>
