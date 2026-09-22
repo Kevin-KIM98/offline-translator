@@ -151,13 +151,28 @@ Models are hosted on the `models-v1` release and described by `assets/manifest.j
   "Thai translation fails, the app closes, a cache error"; not reproduced here (no device), the
   pin is the fix by reading of the llama.cpp source. Nothing about GPU speed or stability has
   been measured on a device; do not claim otherwise.
-- **Greetings (2026-09-15).** OPUS-MT ko-en tc-big answers "안녕하세요." with "Good evening." and
-  "안녕하십니까" the same (whisper adds the full stop, so the app always hit it); en-ko answers
-  a bare "Hello." with the phone greeting "여보세요?". `text::fixedTranslation` in TextUtil holds
-  the few bare greetings with a fixed answer, checked per sentence in `NmtEngine::translateDirect`
-  before the batch (so the pivot hop of ko → th gets "Hello." too); a greeting inside a longer
-  sentence goes to Marian as before ("안녕하세요, 저는 김입니다." → "Hi, I'm Kim."). Measured
-  on the desktop with `translator_cli translate --backend marian`.
+- **Set phrases (2026-09-22).** A sentence-level model with no context is at its weakest on the
+  short phrases an interpreter hears most, and OPUS-MT ko-en tc-big / en-ko get many of them
+  wrong or answer in 반말. `text::fixedTranslation` in TextUtil holds them with a fixed answer,
+  checked per sentence in `NmtEngine::translateDirect` before the batch (so the pivot hop of
+  ko → th gets "Hello." too); a phrase inside a longer sentence goes to Marian as before
+  ("안녕하세요, 저는 김입니다." → "Hi, I'm Kim."). Matching is on the whole sentence through
+  `normalizeForMatch`, so punctuation, spacing and (for English) case do not decide whether a
+  phrase is found; an entry whose meaning turns over when it is asked is marked `statementOnly`
+  and left to the model then ("네?" is Marian's "Excuse me?", not "Yes."). 47 entries ko → en,
+  67 en → ko, measured on the desktop with `translator_cli translate --backend marian --lines`
+  (one call per line, as the app runs it) against the same build without the table: of 189
+  Korean probe sentences 42 changed and 147 came through untouched. What it corrects, besides
+  "안녕하세요." → "Good evening.": ko-en "아니요" → "Yes." (the opposite), "싫어요." → "Okay."
+  (the opposite), "목이 말라요." → "Not the throat.", "예약했습니다." → "Reservationd.",
+  "연락드리겠습니다." → "About Us", "계산해 주세요." → "Please calculate.", "카드로 계산할게요."
+  → "I'll count the cards.", "네, 알겠습니다." → "Yes, sir.", "처음 뵙겠습니다." → "See you
+  first."; en-ko "No." → "아니.", "Check, please." → "확인해 주세요." (= please verify),
+  "The bill, please." → "빌, 제발", "This way, please." → "이쪽으로, please.", "Turn right." →
+  "오른쪽으로 돌려." (= rotate it), and everyday phrases in 반말 ("How are you?" → "잘 지냈어?",
+  "Do you speak English?" → "영어 할 줄 알아요?", "Follow me." → "따라와"), which is rude between
+  people who have just met. Only ko-en and en-ko have a table; add a phrase only when the engine
+  itself was measured wrong on it — two candidates were dropped because it already got them right.
 - **Speed (0.3.13).** `LlmEngine` reuses the KV cache of the shared prompt prefix
   (`cachedPrompt`, `llama_kv_self_seq_rm` from the first differing token): ko→th 2.1 → 1.1 s per
   sentence on the desktop; outputs differ slightly (batch-size rounding), Thai chrF 39.2 → 39.5.
