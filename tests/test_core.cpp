@@ -338,6 +338,33 @@ void testTextUtil() {
     CHECK_EQ(fixedTranslation("안녕하세요, 저는 김입니다.", "ko", "en"), "");   // only the bare greeting
     CHECK_EQ(fixedTranslation("안녕하세요", "ko", "ja"), "");                    // only pairs with a known fault
     CHECK_EQ(fixedTranslation("...", "ko", "en"), "");
+
+    // The rest of the table: set phrases Marian rendered wrongly or in 반말.
+    CHECK_EQ(fixedTranslation("처음 뵙겠습니다.", "ko", "en"), "Nice to meet you.");   // was "See you soon."
+    CHECK_EQ(fixedTranslation("목이 말라요.", "ko", "en"), "I'm thirsty.");            // was "Not the throat."
+    CHECK_EQ(fixedTranslation("계산해 주세요.", "ko", "en"), "Check, please.");        // was "Please calculate."
+    CHECK_EQ(fixedTranslation("계산해주세요", "ko", "en"), "Check, please.");          // spacing does not matter
+    CHECK_EQ(fixedTranslation("예약했습니다.", "ko", "en"), "I have a reservation.");  // was "About Us"
+    CHECK_EQ(fixedTranslation("네, 알겠습니다.", "ko", "en"), "Yes, I understand.");   // was "Yes, sir."
+    CHECK_EQ(fixedTranslation("아니요", "ko", "en"), "No.");                            // was "Yes." — the opposite
+    CHECK_EQ(fixedTranslation("No.", "en", "ko"), "아니요.");                          // was "안 돼" (= you may not)
+    CHECK_EQ(fixedTranslation("Check, please.", "en", "ko"), "계산해 주세요.");        // was "확인해 주세요."
+    CHECK_EQ(fixedTranslation("check please", "en", "ko"), "계산해 주세요.");
+    CHECK_EQ(fixedTranslation("I’ll pay by card.", "en", "ko"), "카드로 결제할게요.");  // curly apostrophe
+    CHECK_EQ(fixedTranslation("Do you speak English?", "en", "ko"), "영어 하실 줄 아세요?");
+
+    // A statement whose meaning turns over when it is asked goes back to the model.
+    CHECK_EQ(fixedTranslation("네.", "ko", "en"), "Yes.");
+    CHECK_EQ(fixedTranslation("네?", "ko", "en"), "");        // "Pardon?", not "Yes."
+    CHECK_EQ(fixedTranslation("맞아요?", "ko", "en"), "");
+    CHECK_EQ(fixedTranslation("Okay?", "en", "ko"), "");
+    CHECK_EQ(fixedTranslation("누구세요", "ko", "en"), "Who is it?");   // a question either way
+    CHECK_EQ(fixedTranslation("누구세요?", "ko", "en"), "Who is it?");
+
+    // Every entry must be reachable: a duplicate key would shadow its neighbour silently.
+    CHECK_EQ(fixedTranslationCount("ko", "en"), 47u);
+    CHECK_EQ(fixedTranslationCount("en", "ko"), 67u);
+    CHECK_EQ(fixedTranslationCount("ko", "th"), 0u);
     CHECK(isCjkChar("한"));
     CHECK(isCjkChar("漢"));
     CHECK(!isCjkChar("a"));

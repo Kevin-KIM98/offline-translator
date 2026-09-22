@@ -72,11 +72,15 @@ std::string toLowerCyrillic(const std::string& ch) {
     return ch;
 }
 
-// Strip trailing punctuation/spaces for hallucination comparison.
+// Drop punctuation and spaces so two spellings of the same sentence compare equal: used for the
+// hallucination list and for the fixed-phrase table, where whisper's commas, hyphens and curly
+// apostrophes must not decide whether a phrase is found.
 std::string normalizeForMatch(const std::string& s) {
     std::string out;
     for (const auto& ch : utf8Chars(toLowerAscii(s))) {
-        if (isAsciiPunct(ch) || isCjkPunct(ch) || ch == " " || ch == "\"" || ch == "'" || ch == "\xE2\x80\x9C" || ch == "\xE2\x80\x9D") continue;
+        if (isAsciiPunct(ch) || isCjkPunct(ch) || ch == " " || ch == "\"" || ch == "'" || ch == "-" ||
+            ch == "\xE2\x80\x9C" || ch == "\xE2\x80\x9D" || ch == "\xE2\x80\x98" || ch == "\xE2\x80\x99" ||
+            ch == "\xE2\x80\x93" || ch == "\xE2\x80\x94" || ch == "\xE2\x80\xA6") continue;
         out += toLowerCyrillic(ch);
     }
     return out;
@@ -422,38 +426,190 @@ std::string postProcessTranslation(const std::string& input, const std::string& 
 }
 
 
-std::string fixedTranslation(const std::string& sentence, const std::string& src, const std::string& tgt) {
-    // Bare sentence: trimmed, final punctuation (ASCII and full-width) removed, English lower-cased.
-    std::string bare = trim(sentence);
-    for (;;) {
-        static const char* const kFinal[] = {".", "!", "?", ",", "\xE3\x80\x82", "\xEF\xBC\x81", "\xEF\xBC\x9F", "\xE2\x80\xA6"};
-        bool cut = false;
-        for (const char* f : kFinal) {
-            const std::size_t n = std::strlen(f);
-            if (bare.size() >= n && bare.compare(bare.size() - n, n, f) == 0) {
-                bare.erase(bare.size() - n);
-                cut = true;
-            }
-        }
-        bare = trim(bare);
-        if (!cut || bare.empty()) break;
-    }
-    if (bare.empty()) return "";
-    if (src == "en")
-        for (char& c : bare) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+namespace {
 
-    struct Entry { const char* src; const char* tgt; const char* from; const char* to; };
-    // OPUS-MT ko-en (tc-big): "안녕하세요." → "Good evening.", "안녕하십니까." → "Good evening.";
-    // en-ko: "Hello." → "여보세요?" (the phone greeting). The greeting itself names no time of day.
-    static const Entry kFixed[] = {
-        {"ko", "en", "\xEC\x95\x88\xEB\x85\x95\xED\x95\x98\xEC\x84\xB8\xEC\x9A\x94", "Hello."},               // 안녕하세요
-        {"ko", "en", "\xEC\x95\x88\xEB\x85\x95\xED\x95\x98\xEC\x8B\xAD\xEB\x8B\x88\xEA\xB9\x8C", "Hello."}, // 안녕하십니까
-        {"en", "ko", "hello", "\xEC\x95\x88\xEB\x85\x95\xED\x95\x98\xEC\x84\xB8\xEC\x9A\x94."},              // 안녕하세요.
-        {"en", "ko", "hi", "\xEC\x95\x88\xEB\x85\x95\xED\x95\x98\xEC\x84\xB8\xEC\x9A\x94."},
-    };
-    for (const Entry& e : kFixed)
-        if (src == e.src && tgt == e.tgt && bare == e.from) return e.to;
-    return "";
+// Short set phrases the OPUS-MT models get wrong, or answer in a register an interpreter between
+// strangers cannot use. A sentence-level model with no context is at its weakest here: measured on
+// the desktop (translator_cli translate --backend marian, 2026-09-22), ko-en answered "안녕하세요."
+// with "Good evening.", "목이 말라요." with "Not the throat.", "싫어요." with "Okay." (the opposite),
+// "예약했습니다." with "About Us"; en-ko answered "No." with "안 돼" (= you may not), "Check, please."
+// with "확인해 주세요." (= please verify), "This way, please." with "이쪽으로, please." and a long list
+// of everyday phrases in 반말, which is rude between people who have just met.
+//
+// An entry only fires on a whole bare sentence, so a greeting inside a longer one still goes to
+// Marian ("안녕하세요, 저는 김입니다." → "Hi, I'm Kim."). Sentences whose meaning turns over when
+// they are asked rather than stated ("네?" is "Pardon?", not "Yes.") are marked statementOnly and
+// are left to the model when the sentence ends in a question mark.
+struct FixedPhrase {
+    const char* from;    // written as it is spoken; matched through normalizeForMatch()
+    const char* to;      // the answer, punctuation and all
+    bool statementOnly;  // skip when the sentence is a question
+};
+
+const FixedPhrase kFixedKoEn[] = {
+    // Greetings and farewells. "안녕하세요." is the one the app hit on every conversation.
+    {"안녕하세요", "Hello.", false},
+    {"안녕하십니까", "Hello.", false},
+    {"안녕", "Hi.", false},
+    {"반갑습니다", "Nice to meet you.", false},
+    {"반가워요", "Nice to meet you.", false},
+    {"처음 뵙겠습니다", "Nice to meet you.", false},           // "See you soon."
+    {"오랜만입니다", "It's been a long time.", false},          // "Long time."
+    {"오랜만이에요", "It's been a long time.", false},
+    {"오랜만이네요", "It's been a long time.", false},
+    {"어서 오십시오", "Welcome.", false},                       // "Welcome back."
+    {"그럼 이만 가보겠습니다", "I'll be going now.", false},     // "So let's go."
+    {"연락드리겠습니다", "I'll be in touch.", false},            // "About Us"
+    // Yes, no and the short answers. Marian's "Yeah." / "Nope." are too casual for an interpreter,
+    // and "싫어요." came out as "Okay." — the opposite of what was said.
+    {"네", "Yes.", true},
+    {"예", "Yes.", true},
+    {"아니요", "No.", true},
+    {"아니오", "No.", true},
+    {"아닙니다", "No.", true},
+    {"맞아요", "That's right.", true},
+    {"맞습니다", "That's right.", true},
+    {"알겠습니다", "I understand.", true},
+    {"네, 알겠습니다", "Yes, I understand.", true},             // "Yes, sir."
+    {"싫어요", "I don't want to.", true},                       // "Okay."
+    {"몰라요", "I don't know.", true},
+    // Thanks and apologies: 합쇼체 in, the full form out.
+    {"감사합니다", "Thank you.", false},
+    {"죄송합니다", "I'm sorry.", false},
+    {"죄송해요", "I'm sorry.", false},
+    {"미안합니다", "I'm sorry.", false},
+    {"미안해요", "I'm sorry.", false},
+    {"수고하셨습니다", "Thank you for your hard work.", false},
+    {"수고 많으셨습니다", "Thank you for your hard work.", false},
+    {"잘 먹겠습니다", "Thank you for the meal.", false},         // "I'll eat."
+    {"잘 먹었습니다", "Thank you for the meal.", false},         // "I ate well."
+    // Paying and ordering: 계산 is the bill here, not arithmetic.
+    {"계산해 주세요", "Check, please.", false},                  // "Please calculate."
+    {"계산 좀 해주세요", "Check, please.", false},               // "Give me the calculation."
+    {"계산서 주세요", "The bill, please.", false},               // "Give me the account."
+    {"카드로 결제할게요", "I'll pay by card.", false},            // "I'll finish the card."
+    {"카드로 계산할게요", "I'll pay by card.", false},            // "Count to card."
+    {"예약했어요", "I have a reservation.", false},              // "Reservationd."
+    {"예약했습니다", "I have a reservation.", false},            // "About Us"
+    // Everyday sentences that came back wrong.
+    {"목이 말라요", "I'm thirsty.", false},                      // "Not the throat."
+    {"한국어를 조금 할 수 있어요", "I can speak a little Korean.", false}, // "I can do a little Korean."
+    {"누구세요", "Who is it?", false},                           // "Hello?"
+    {"어떡하죠", "What should I do?", false},                    // "What?"
+    {"어떡하지", "What should I do?", false},
+    {"잠시만요", "Just a moment.", false},                       // "Wait."
+    {"잠깐만요", "Just a moment.", false},                       // "Wait."
+    {"도와주세요", "Please help me.", false},                    // "Help."
+};
+
+const FixedPhrase kFixedEnKo[] = {
+    // Greetings and farewells. Marian's bare "Hello." was the phone greeting "여보세요?".
+    {"Hello.", "안녕하세요.", false},
+    {"Hi.", "안녕하세요.", false},
+    {"Hey.", "안녕하세요.", false},
+    {"Good morning.", "좋은 아침입니다.", false},
+    {"Good night.", "안녕히 주무세요.", false},
+    {"Goodbye.", "안녕히 가세요.", false},
+    {"Bye.", "안녕히 가세요.", false},
+    {"Bye bye.", "안녕히 가세요.", false},
+    {"See you.", "나중에 뵙겠습니다.", false},
+    {"See you later.", "나중에 뵙겠습니다.", false},
+    {"Take care.", "조심히 가세요.", false},
+    {"It's been a while.", "오랜만입니다.", false},
+    {"Welcome.", "어서 오세요.", false},
+    {"Congratulations.", "축하합니다.", false},
+    {"Happy birthday.", "생일 축하합니다.", false},
+    {"Cheers.", "건배.", false},
+    {"Enjoy your meal.", "맛있게 드세요.", false},
+    // Yes, no and the short answers: "No." came back as "안 돼" (= you may not).
+    {"Yes.", "네.", true},
+    {"No.", "아니요.", true},
+    {"Okay.", "알겠습니다.", true},
+    {"OK.", "알겠습니다.", true},
+    {"All right.", "알겠습니다.", true},
+    {"Got it.", "알겠습니다.", true},
+    {"That's right.", "맞습니다.", true},
+    {"I see.", "그렇군요.", true},
+    {"I don't know.", "잘 모르겠어요.", true},                   // "나도 몰라." (= I don't know either)
+    {"Never mind.", "괜찮습니다.", true},
+    {"Well done.", "잘하셨습니다.", true},
+    {"Of course.", "물론이죠.", false},
+    // Thanks and apologies.
+    {"Sorry.", "죄송합니다.", false},
+    {"I'm sorry.", "죄송합니다.", false},
+    {"I am sorry.", "죄송합니다.", false},
+    {"Excuse me.", "실례합니다.", false},
+    // Asking for help and for a repeat: all of these came back in 반말.
+    {"Help me.", "도와주세요.", false},
+    {"Please help me.", "도와주세요.", false},
+    {"I need help.", "도움이 필요해요.", false},
+    {"Can you help me?", "도와주시겠어요?", false},
+    {"I don't understand.", "이해하지 못했어요.", false},
+    {"Can you say that again?", "다시 한번 말씀해 주시겠어요?", false},
+    {"Could you say that again?", "다시 한번 말씀해 주시겠어요?", false},
+    {"Can you speak more slowly?", "조금 더 천천히 말씀해 주시겠어요?", false},
+    {"Could you speak more slowly?", "조금 더 천천히 말씀해 주시겠어요?", false},
+    {"Do you speak English?", "영어 하실 줄 아세요?", false},
+    {"Do you speak Korean?", "한국어 하실 줄 아세요?", false},
+    {"What do you mean?", "무슨 뜻이에요?", false},              // "무슨 소리야?"
+    {"What's your name?", "이름이 어떻게 되세요?", false},
+    {"How are you?", "어떻게 지내세요?", false},
+    {"How's it going?", "어떻게 지내세요?", false},
+    // Paying, ordering and getting about.
+    {"How much?", "얼마예요?", false},                           // "얼마나?"
+    {"How much is this?", "이거 얼마예요?", false},
+    {"How much is it?", "얼마예요?", false},
+    {"Check, please.", "계산해 주세요.", false},                  // "확인해 주세요." (= please verify)
+    {"Could I get the check?", "계산해 주세요.", false},          // "수표 좀 주실래요?" (= a bank cheque)
+    {"The bill, please.", "계산서 주세요.", false},               // "빌, 제발"
+    {"I'll pay by card.", "카드로 결제할게요.", false},
+    {"I'll pay in cash.", "현금으로 낼게요.", false},
+    {"I'm thirsty.", "목이 말라요.", false},
+    {"Just a moment.", "잠시만요.", false},
+    {"Hold on.", "잠시만요.", false},
+    {"Let's go.", "갑시다.", false},
+    {"Follow me.", "따라오세요.", false},
+    {"This way, please.", "이쪽으로 오세요.", false},             // "이쪽으로, please."
+    {"Go straight.", "직진하세요.", false},
+    {"Turn left.", "왼쪽으로 가세요.", false},
+    {"Turn right.", "오른쪽으로 가세요.", false},                 // "오른쪽으로 돌려." (= rotate it)
+    {"Have a seat.", "앉으세요.", false},
+    {"Is this seat taken?", "이 자리 주인 있나요?", false},       // "이 자리는?"
+};
+
+// Keyed by normalizeForMatch(from), built once. A duplicate key would silently shadow its
+// neighbour, so the table is checked for one in the tests.
+const std::map<std::string, const FixedPhrase*>* fixedTable(const std::string& src, const std::string& tgt) {
+    static const std::map<std::string, std::map<std::string, const FixedPhrase*>> index = [] {
+        std::map<std::string, std::map<std::string, const FixedPhrase*>> m;
+        for (const FixedPhrase& e : kFixedKoEn) m["ko-en"][normalizeForMatch(e.from)] = &e;
+        for (const FixedPhrase& e : kFixedEnKo) m["en-ko"][normalizeForMatch(e.from)] = &e;
+        return m;
+    }();
+    const auto it = index.find(src + "-" + tgt);
+    return it == index.end() ? nullptr : &it->second;
+}
+
+} // namespace
+
+std::string fixedTranslation(const std::string& sentence, const std::string& src, const std::string& tgt) {
+    const auto* table = fixedTable(src, tgt);
+    if (!table) return "";
+    const std::string bare = trim(sentence);
+    if (bare.empty()) return "";
+    const std::vector<std::string> chars = utf8Chars(bare);
+    const bool question = !chars.empty() && (chars.back() == "?" || chars.back() == "\xEF\xBC\x9F" /* ？ */);
+    const std::string key = normalizeForMatch(bare);
+    if (key.empty()) return "";
+    const auto it = table->find(key);
+    if (it == table->end()) return "";
+    if (question && it->second->statementOnly) return "";
+    return it->second->to;
+}
+
+std::size_t fixedTranslationCount(const std::string& src, const std::string& tgt) {
+    const auto* table = fixedTable(src, tgt);
+    return table ? table->size() : 0;
 }
 
 } // namespace text

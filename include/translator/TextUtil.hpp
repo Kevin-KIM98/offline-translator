@@ -7,6 +7,7 @@
 //   * translation post-processing — capitalization / spacing rules per target language.
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -32,11 +33,16 @@ std::string cleanTranscript(const std::string& s, const std::string& lang);
 // Fixes spacing/capitalization of MT output for the target language.
 std::string postProcessTranslation(const std::string& s, const std::string& lang);
 
-// The fixed translation of a whole sentence that Marian renders wrongly, or empty. Only bare
-// greetings: OPUS-MT ko-en (tc-big) answers "안녕하세요." with "Good evening." and en-ko a bare
-// "Hello." with the phone greeting "여보세요?"; the sentence is matched without its final
-// punctuation and (for English) case.
+// The fixed translation of a whole sentence that Marian renders wrongly or in the wrong register,
+// or empty. Short set phrases only, ko-en and en-ko: OPUS-MT answers "안녕하세요." with "Good
+// evening.", "목이 말라요." with "Not the throat.", "No." with "안 돼" (= you may not), and most
+// everyday English phrases in 반말. The sentence is matched whole, without its punctuation,
+// spacing or (for English) case; a phrase inside a longer sentence still goes to the model.
 std::string fixedTranslation(const std::string& sentence, const std::string& src, const std::string& tgt);
+
+// How many phrases the table holds for a direction (exposed so the tests can catch a duplicate
+// entry, which would silently shadow its neighbour).
+std::size_t fixedTranslationCount(const std::string& src, const std::string& tgt);
 
 // UTF-8 helpers (exposed for tests).
 std::vector<std::string> utf8Chars(const std::string& s);
