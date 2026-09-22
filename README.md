@@ -26,7 +26,7 @@ releases — no server of your own is needed.
 push-to-talk per speaker, a replayable transcript, a conversation mode that recognises which
 language was spoken and needs no buttons, keyboard input, photo translation (the camera reads a
 sign or a menu on the phone) and model management. Grab
-[offline-interpreter-1.0.0.apk](https://github.com/Kevin-KIM98/offline-translator/releases/download/v0.3.17/offline-interpreter-1.0.0.apk)
+[offline-interpreter-1.0.0.apk](https://github.com/Kevin-KIM98/offline-translator/releases/download/v0.3.18/offline-interpreter-1.0.0.apk)
 for an arm64 Android 9+ device, or build either app from source:
 
 ```
@@ -84,7 +84,7 @@ device.
 2. `app/build.gradle.kts`:
 
 ```kotlin
-implementation(files("libs/offline-translator-0.3.17.aar"))
+implementation(files("libs/offline-translator-0.3.18.aar"))
 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 ```
 
@@ -412,3 +412,23 @@ AAR on Ubuntu, the XCFramework on macOS, rewrites `Package.swift` with the new c
   Thai is in the pair. A tapped model overrides the choice. Marian beam 2 and 1 were tried and
   dropped: ko→en chrF 60.0 → 59.1 / 54.7 for at most 12% speed. Nothing about the camera path or
   the automatic choice has been measured on a device yet.
+
+* **The short phrases (0.3.18).** A sentence-level model with no context is at its weakest on the
+  set phrases an interpreter hears most, and OPUS-MT got many of them wrong — sometimes reversing
+  the meaning. Korean→English answered "안녕하세요." with "Good evening.", "아니요" with "Yes.",
+  "싫어요." with "Okay.", "목이 말라요." with "Not the throat.", "예약했습니다." with
+  "Reservationd.", "연락드리겠습니다." with "About Us", "계산해 주세요." with "Please calculate."
+  (계산 read as arithmetic) and "네, 알겠습니다." with "Yes, sir."; English→Korean answered "No."
+  with "아니.", "Check, please." with "확인해 주세요." (= please verify), "The bill, please." with
+  "빌, 제발" ("Bill" transliterated as a name), "This way, please." with "이쪽으로, please." and
+  "Turn right." with "오른쪽으로 돌려." (= rotate the thing), and rendered most everyday phrases
+  in 반말, which is rude between people who have just met.
+
+  `text::fixedTranslation` now holds 47 Korean→English and 67 English→Korean set phrases with a
+  fixed answer, checked per sentence before the batch, so the pivot hop of Korean→Thai gets them
+  too. A phrase inside a longer sentence still goes to the model ("안녕하세요, 저는 김입니다." →
+  "Hi, I'm Kim."), matching ignores spacing, punctuation and case, and an entry whose meaning
+  turns over when it is asked is left to the model then — "네?" stays "Excuse me?", not "Yes."
+  Measured on the desktop through the engine, one call per sentence as the app runs it: of 189
+  Korean probe sentences 42 changed and 147 came through untouched; two further candidates were
+  dropped because the engine already got them right.
