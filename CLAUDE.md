@@ -61,7 +61,11 @@ Engine release: run the Release workflow with a version (`gh workflow run releas
 version=X.Y.Z`). It builds the AAR, updates `Package.swift`, `CMakeLists.txt` and the app's
 `engineVersion`, tags and publishes. Afterwards: update the version strings in `README.md`, attach
 the APK with `gh workflow run android-app.yml -f release_tag=vX.Y.Z`, and replace the generic
-release notes with real ones (`gh release edit vX.Y.Z --notes-file ...`).
+release notes with real ones. A cloud session cannot edit a release itself — the API refuses it
+("Creating, editing, or deleting releases is not permitted for this session type") — so write the
+notes to `docs/release-notes/vX.Y.Z.md`, commit them, and run the Release notes workflow
+(`gh workflow run release-notes.yml -f tag=vX.Y.Z`), which applies the file with
+`gh release edit`. From a machine with `gh`, `gh release edit vX.Y.Z --notes-file ...` still works.
 
 Models are hosted on the `models-v1` release and described by `assets/manifest.json`.
 

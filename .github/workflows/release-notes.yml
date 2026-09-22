@@ -1,0 +1,44 @@
+# Replaces a release's notes with a file from the repository.
+#
+# The Release workflow publishes every release with the same generic text ("Prebuilt engine.
+# Android: add the AAR to app/libs..."), and `gh release edit` is how it is replaced afterwards.
+# A cloud session cannot do that: editing a release is refused for it at the API
+# ("Creating, editing, or deleting releases is not permitted for this session type"). Actions can,
+# so the notes are written into docs/release-notes/<tag>.md and applied from here.
+#
+#   Actions -> "Release notes" -> Run workflow -> tag (e.g. v0.3.18)
+name: Release notes
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to update (e.g. v0.3.18)"
+        required: true
+      notes_file:
+        description: "Notes file, relative to the repository (default: docs/release-notes/<tag>.md)"
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    name: Apply notes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply the notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          NOTES_FILE: ${{ inputs.notes_file }}
+        run: |
+          file="${NOTES_FILE:-docs/release-notes/${TAG}.md}"
+          if [ ! -f "$file" ]; then
+            echo "::error::no notes file at $file"
+            exit 1
+          fi
+          echo "Applying $file to $TAG:"
+          cat "$file"
+          gh release edit "$TAG" --notes-file "$file"
